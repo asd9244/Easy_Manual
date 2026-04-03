@@ -7,12 +7,10 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 회원 정보를 담는 테이블입니다. Spring Security와 연동하기 위해 권한(Role) 필드도 미리 넣어둡니다.
-
 @Entity
 @Table(name = "users")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED) // 기본 생성자 막기 (JPA 스펙상 PROTECTED 허용)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseTimeEntity {
 
     @Id
@@ -32,16 +30,22 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private Role role;
 
+    // 🌟 추가됨: 회원 탈퇴 여부 관리 (Soft Delete)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserStatus status;
+
     @Builder
     public User(String email, String password, String nickname, Role role) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;
         this.role = role;
+        this.status = UserStatus.ACTIVE; // 가입 시 기본값은 '활성'
     }
 
-    // 권한 관리를 위한 Enum (같은 파일 아래에 두거나 따로 빼도 됩니다)
-    public enum Role {
-        USER, ADMIN
-    }
+    public enum Role { USER, ADMIN }
+
+    // 🌟 추가됨: 상태 Enum
+    public enum UserStatus { ACTIVE, DELETED }
 }
