@@ -1,3 +1,29 @@
+server:
+  port: 8080 # FastAPI가 8000을 쓰므로 Spring은 8080을 씁니다.
+
 spring:
   application:
-    name: spring-backend
+    name: backend-core
+
+  # 1. PostgreSQL DB 연결 설정
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pixie
+    username: postgres      # 🌟 본인의 PostgreSQL 아이디 (보통 postgres)
+    password: 1234          # 🌟 본인의 PostgreSQL 비밀번호
+    driver-class-name: org.postgresql.Driver
+
+  # 2. JPA (ORM) 설정
+  jpa:
+    hibernate:
+      # 🌟 핵심: update로 설정하면, 아까 짠 Entity 코드를 보고 Spring이 알아서 테이블을 만들어줍니다!
+      ddl-auto: update
+    show-sql: true          # 콘솔창에 실행되는 SQL 쿼리를 보여줌
+    properties:
+      hibernate:
+        format_sql: true    # SQL 쿼리를 한 줄이 아니라 예쁘게 줄바꿈해서 보여줌
+        default_batch_fetch_size: 1000 # 실무 꿀팁: N+1 쿼리 성능 문제 방지용
+
+  # 3. (선택) 나중에 쓸 JWT 비밀키 미리 세팅
+  jwt:
+    secret: "PixieEasyManualProjectSecretKeyForJwtAuthentication2026"
+    expiration: 86400000 # 24시간 (밀리초)
