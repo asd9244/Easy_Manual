@@ -24,6 +24,6 @@ spring:
         default_batch_fetch_size: 1000 # 실무 꿀팁: N+1 쿼리 성능 문제 방지용
 
   # 3. (선택) 나중에 쓸 JWT 비밀키 미리 세팅
-  jwt:
-    secret: "PixieEasyManualProjectSecretKeyForJwtAuthentication2026"
-    expiration: 86400000 # 24시간 (밀리초)
+jwt:
+  secret: "PixieEasyManualProjectSecretKeyForJwtAuthentication2026"
+  expiration: 86400000 # 24시간 (밀리초)
