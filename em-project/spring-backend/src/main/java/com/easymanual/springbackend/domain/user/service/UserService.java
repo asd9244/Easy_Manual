@@ -1,9 +1,6 @@
 package com.easymanual.springbackend.domain.user.service;
 
-import com.easymanual.springbackend.domain.user.dto.LoginRequest;
-import com.easymanual.springbackend.domain.user.dto.LoginResponse;
-import com.easymanual.springbackend.domain.user.dto.SignUpRequest;
-import com.easymanual.springbackend.domain.user.dto.UserResponse;
+import com.easymanual.springbackend.domain.user.dto.*;
 import com.easymanual.springbackend.domain.user.entity.User;
 import com.easymanual.springbackend.domain.user.repository.UserRepository;
 import com.easymanual.springbackend.global.security.JwtProvider;
@@ -70,7 +67,7 @@ public class UserService {
     }
 
 
-    // 새로 추가된 기능: 내 정보 조회 (토큰 검사용)
+    // 내 정보 조회 (토큰 검사용)
     @Transactional(readOnly = true) // 데이터를 읽기만 하므로 속도 향상을 위해 readOnly를 붙여줍니다.
     public UserResponse getMyInfo(String email) {
 
@@ -81,5 +78,34 @@ public class UserService {
         // 2. 찾은 유저 정보를 프론트엔드에게 주기 좋게 영수증(UserResponse)에 담아서 돌려줍니다.
         // (비밀번호 같은 민감한 정보는 UserResponse 안에 없으므로 안전합니다!)
         return new UserResponse(user);
+    }
+
+    @Transactional // 변경된 내용이 DB에 자동으로 저장(Commit)
+    public UserResponse updateMyInfo(String email, UserUpdateRequest request) {
+
+        // 1. 매니저가 준 이메일로 창고(DB)에서 유저를 찾아옵니다.
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
+
+        // 2. 유저 객체의 스위치를 눌러서 닉네임을 새 것으로 바꿉니다.
+        // (JPA의 '더티 체킹(Dirty Checking)' 마법 덕분에, 여기서 값만 바꿔도
+        // 메서드가 끝날 때 스프링이 알아서 DB에 UPDATE 쿼리를 날려줍니다! save()를 안 써도 됩니다.)
+        user.updateNickname(request.getNickname());
+
+        // 3. 변경이 완료된 유저 정보를 영수증(UserResponse)에 담아서 돌려줍니다.
+        return new UserResponse(user);
+    }
+
+    // 회원 탈퇴 비즈니스 로직
+    @Transactional
+    public void withdrawUser(String email) {
+        // 1. SecurityContext 에서 전달받은 이메일로 DB에서 쥬어 엔티티를 조회합니다.
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
+
+        // 2. 조회된 유저 엔티티의 상태 변경 메서드를 호출합니다.
+        // @Transactional 어노테이션에 의해 영속성 컨텍스트(Persistence Context)가 이 객체를 관리하고 있으므로,
+        // 객체의 값만 변경해도 트랜잭션이 종료될 때 자동으로 UPDATE SQL 쿼리가 DB로 전송됩니다. (Dirty Checking)
+        user.withdraw();
     }
 }

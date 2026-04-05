@@ -13,6 +13,16 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseTimeEntity {
 
+    public void updateNickname(String newNickname) {
+        this.nickname = newNickname;
+    }
+
+    // 회원 탈퇴 시 상태를 DELETED로 변경하는 메서드
+    // 객체 지향적인 설계를 위해, 상태 변경 로직은 엔티티 내부에 위치시킵니다.
+    public void withdraw() {
+        this.status = UserStatus.DELETED;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
