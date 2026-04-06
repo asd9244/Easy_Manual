@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  postgres:
+    # 1. 사용할 도커 이미지 지정 (PostgreSQL 15 버전의 공식 이미지를 다운로드합니다)
+    image: postgres:15
+
+    # 2. 실행될 컨테이너의 이름을 지정합니다.
+    container_name: pixie-postgres
+
+    # 3. 포트 포워딩 (호스트 포트 : 컨테이너 포트)
+    # 내 컴퓨터의 5432 포트로 접속하면, 도커 컨테이너 내부의 5432 포트로 연결해준다는 의미입니다.
+    ports:
+      - "5432:5432"
+
+    # 4. 환경 변수 설정 (데이터베이스 초기 세팅)
+    # 이전에 Spring Boot application.yml에 설정했던 계정 정보와 동일하게 맞춥니다.
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: pixie
+
+    # 5. 볼륨 마운트 (데이터 영구 저장)
+    # 컨테이너가 삭제되어도 데이터가 날아가지 않도록, 도커 내부의 데이터 저장 경로를 로컬 볼륨과 연결합니다.
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    # 6. 재시작 정책
+    # 도커가 켜질 때나 에러로 꺼졌을 때 항상 자동으로 다시 실행하도록 설정합니다.
+    restart: always
+
+# 위에서 선언한 볼륨(postgres_data)을 도커 엔진이 관리하도록 정의합니다.
+volumes:
+  postgres_data:
