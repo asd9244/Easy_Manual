@@ -9,6 +9,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.easymanual.springbackend.domain.chat.dto.ChatAskRequest;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.security.Principal;
 import java.util.List;
@@ -54,6 +57,23 @@ public class ChatController {
 
         // 3. 처리된 DTO 리스트를 HTTP 상태 코드 200(OK)과 함께 클라이언트에게 응답으로 전송합니다.
         return ResponseEntity.ok(responseList);
+    }
+
+    // 새로 추가된 기능: 특정 채팅방에서 AI에게 질문하기 API
+    @PostMapping("/rooms/{roomId}/ask")
+    public ResponseEntity<ChatMessageResponse> askQuestion(
+            @PathVariable("roomId") Long roomId,
+            @RequestBody ChatAskRequest request,
+            Principal principal) {
+
+        // 1. 인증 객체(Principal)에서 이메일을 추출합니다.
+        String email = principal.getName();
+
+        // 2. 서비스 계층의 AI 통신 비즈니스 로직을 호출합니다.
+        ChatMessageResponse response = chatService.askQuestion(roomId, email, request);
+
+        // 3. AI의 답변이 담긴 DTO를 HTTP 상태 코드 200(OK)과 함께 클라이언트에게 반환합니다.
+        return ResponseEntity.ok(response);
     }
 }
 

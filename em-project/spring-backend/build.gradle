@@ -30,6 +30,8 @@ dependencies {
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
 
     // JWT 토큰을 만들고 해독하기 위한 라이브러리 (0.12.x 버전)
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'

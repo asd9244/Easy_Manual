@@ -59,7 +59,7 @@ def ask_manual(request: ChatRequest):
     {user_question}
     """
 
-    print(f"🤖 AI가 [{target_manual}]의 {found_page}페이지를 읽고 답변을 생성 중입니다...")
+    print(f" AI가 [{target_manual}]의 {found_page}페이지를 읽고 답변을 생성 중입니다...")
 
     ai_answer = llm.invoke(prompt)
 
