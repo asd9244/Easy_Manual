@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '@/src/api/apiService';
 import { motion } from 'motion/react';
 import { 
   Share2, 
@@ -16,24 +17,54 @@ interface HistoryProps {
 }
 
 export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilter, setScreen, setIsChatReadOnly }: HistoryProps) => {
-  // 나중에 이 데이터는 Spring Boot API에서 받아옴
-  const historyItems = [
-    { title: "세탁기 필터 청소", date: "2024.03.28", status: "completed", device: "스마트 세탁기" },
-    { title: "공기청정기 소음 문제", date: "2024.03.25", status: "visit", device: "공기 청정기" },
-    { title: "세탁기 E1 에러", date: "2024.03.20", status: "completed", device: "스마트 세탁기" },
-  ];
+  const [historyItems, setHistoryItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const res = await api.get('/chat/rooms');
+        const items = res.data.map((room: any) => ({
+          id: room.id,
+          title: room.title || '알 수 없는 대화',
+          date: new Date(room.createdAt).toLocaleDateString(),
+          status: 'completed', // 백엔드에 상태가 없으므로 임시값
+          device: '스마트 가전' // 백엔드 ChatRoomResponse에 기기명이 없으므로 임시값
+        }));
+        setHistoryItems(items);
+      } catch (error) {
+        console.error("채팅 목록 조회 실패:", error);
+      }
+    };
+    fetchRooms();
+  }, []);
 
   // 필터링 로직
   const filteredItems = historyFilter === 'all' 
     ? historyItems 
     : historyItems.filter(item => item.status === historyFilter);
 
+  const handleShare = (e: React.MouseEvent, id: string | number) => {
+    e.stopPropagation(); // 카드 클릭(채팅 이동) 이벤트 방지
+    const dummyUrl = `https://fixie.app/share/${id}`;
+    navigator.clipboard.writeText(dummyUrl).then(() => {
+      alert(`공유 링크가 클립보드에 복사되었습니다!\n${dummyUrl}\n(Mock 로직) 실제 서비스에서는 이 링크로 ShareView.tsx 화면이 열립니다.`);
+    });
+  };
+
+  const handleGoToReport = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 방지
+    setScreen('report');
+  };
+
   return (
     <div className="space-y-8 no-scrollbar pb-20">
       <header className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-fixie-steel">질문 이력</h1>
-        {/* 공유 버튼 */}
-        <button className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-slate-400 hover:text-theme-primary transition-all border border-slate-50">
+        {/* 상단 공통 공유 버튼 (예: 제일 최근 질문 이력 공유) */}
+        <button 
+          onClick={(e) => handleShare(e, 'latest')}
+          className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-slate-400 hover:text-theme-primary transition-all border border-slate-50"
+        >
           <Share2 size={20} />
         </button>
       </header>
@@ -87,10 +118,16 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
             
             {/* 하단 액션 버튼 */}
             <div className="flex gap-3 mt-auto">
-              <button className="flex-1 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm">
+              <button 
+                onClick={handleGoToReport}
+                className="flex-1 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
+              >
                 <FileText size={18} className="text-slate-400" /> PDF 저장
               </button>
-              <button className="flex-1 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm">
+              <button 
+                onClick={(e) => handleShare(e, item.id || i)}
+                className="flex-1 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
+              >
                 <Share2 size={18} className="text-slate-400" /> 링크 공유
               </button>
             </div>

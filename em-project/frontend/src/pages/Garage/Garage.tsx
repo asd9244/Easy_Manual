@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { 
   ChevronRight, 
@@ -12,6 +12,7 @@ import {
   Search 
 } from 'lucide-react';
 import { Device, Screen } from '@/src/types/index';
+import { api } from '@/src/api/apiService';
 
 // 1. 필요한 데이터와 함수들을 부모(App.tsx)로부터 받기 위한 설계도
 interface GarageProps {
@@ -20,6 +21,8 @@ interface GarageProps {
   setDevices: React.Dispatch<React.SetStateAction<Device[]>>;
   showGarageOptions: boolean;
   setShowGarageOptions: (show: boolean) => void;
+  scannedModel?: string;
+  setScannedModel?: (model: string) => void;
 }
 
 export const Garage: React.FC<GarageProps> = ({ 
@@ -27,24 +30,73 @@ export const Garage: React.FC<GarageProps> = ({
   devices, 
   setDevices, 
   showGarageOptions, 
-  setShowGarageOptions 
+  setShowGarageOptions,
+  scannedModel,
+  setScannedModel
 }: GarageProps) => {
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isRegistering, setIsRegistering] = useState(false);
 
+  useEffect(() => {
+    if (scannedModel && isSearching) {
+      handleSearch(scannedModel);
+      if (setScannedModel) setScannedModel('');
+    } else if (scannedModel && !isSearching) {
+      setIsSearching(true);
+      setTimeout(() => {
+        handleSearch(scannedModel);
+        if (setScannedModel) setScannedModel('');
+      }, 0);
+    }
+  }, [scannedModel, isSearching]);
 
-  // 백엔드에서 받아올 가짜 모델명 DB (실제론 스캔한 모델명과 비교해서 존재하는지 확인하는 용도)
-  const DUMMY_MODELS = [
-    'LG 휘센 에어컨 FQ17SADWE2', 
-    'LG 트롬 세탁기 F24WD', 
-    '삼성 비스포크 냉장고 RF85', 
-    '삼성 무풍 에어컨 AF17', 
-    '다이슨 청소기 V12'
-  ];
-  
-  // 유저가 검색한 글자가 포함된 모델명만 쏙쏙 골라낸다!
-  const filteredModels = DUMMY_MODELS.filter(model => model.includes(searchQuery.toUpperCase()));
+  // 검색 API 연동 (Debounce 적용 가능, 여기서는 문자열 변경 시마다 백엔드 조회 가정)
+  // [주의] 백엔드에 /api/devices/search 엔드포인트가 있다고 가정
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.trim().length === 0) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      const response = await api.get(`/devices/search`, { params: { query } });
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error("모델 검색 실패:", error);
+      // fallback mock (실제론 안 씀)
+      const DUMMY_MODELS = [{ model: 'LG 휘센 에어컨 FQ17SADWE2' }];
+      setSearchResults(DUMMY_MODELS.filter(m => m.model.includes(query.toUpperCase())));
+    }
+  };
+
+  const handleRegisterDevice = async (model: string) => {
+    setIsRegistering(true);
+    try {
+      const response = await api.post('/devices', {
+        model,
+        alias: model // 기본 별명으로 모델명 사용
+      });
+      // response.data 가 Device 객체라고 가정
+      const newDevice = {
+        id: String(response.data.id || Date.now()),
+        name: response.data.alias || model,
+        model: response.data.model || model,
+        image: 'https://picsum.photos/seed/purifier/400/400'
+      };
+      setDevices(prev => [...prev, newDevice]);
+      setIsSearching(false);
+      setSearchQuery('');
+      alert("성공적으로 기기가 등록되었습니다!");
+    } catch (error) {
+      console.error("기기 등록 실패:", error);
+      alert("기기 등록에 실패했습니다.");
+    } finally {
+      setIsRegistering(false);
+    }
+  };
 
 
 
@@ -246,7 +298,7 @@ export const Garage: React.FC<GarageProps> = ({
                     type="text" 
                     placeholder="예: 휘센, FQ17..." 
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => handleSearch(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-theme-primary/50"
                   />
                 </div>
@@ -254,10 +306,16 @@ export const Garage: React.FC<GarageProps> = ({
                 {/* 검색 결과 리스트 */}
                 <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
                   {searchQuery.length > 0 ? (
-                    filteredModels.length > 0 ? (
-                      filteredModels.map((model, idx) => (
-                        <button key={idx} className="w-full text-left p-4 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100">
-                          <span className="font-bold text-slate-700">{model}</span>
+                    searchResults.length > 0 ? (
+                      searchResults.map((device, idx) => (
+                        <button 
+                          key={idx} 
+                          disabled={isRegistering}
+                          onClick={() => handleRegisterDevice(device.model || device)}
+                          className="w-full text-left p-4 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100 flex justify-between items-center"
+                        >
+                          <span className="font-bold text-slate-700">{device.model || device}</span>
+                          <span className="text-xs text-theme-primary opacity-0 group-hover:opacity-100">등록하기</span>
                         </button>
                       ))
                     ) : (

@@ -63,9 +63,8 @@ export const Settings: React.FC<SettingsProps> = ({ setScreen }) => {
       <div className="space-y-3">
         <h3 className="text-xs font-bold text-slate-400 px-4">계정</h3>
         <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100">
-          <SettingsItem icon={User} title="프로필" subtitle="이름, 이메일, 사진" />
-          <SettingsItem icon={Bell} title="알림" subtitle="푸시 및 이메일 알림" />
-          <SettingsItem icon={Globe} title="언어" subtitle="한국어" />
+          <SettingsItem icon={User} title="프로필" subtitle="이름, 이메일, 사진" onClick={() => setScreen('profile')} />
+          <SettingsItem icon={Bell} title="알림" subtitle="푸시 및 이메일 알림" onClick={() => setScreen('settings-notifications')} />
         </div>
       </div>
 
@@ -74,7 +73,7 @@ export const Settings: React.FC<SettingsProps> = ({ setScreen }) => {
         <h3 className="text-xs font-bold text-slate-400 px-4">환경 설정</h3>
         <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100">
           <SettingsItem icon={Palette} title="화면 설정" subtitle="테마 및 디스플레이" onClick={() => setScreen('theme-select')} />
-          <SettingsItem icon={Shield} title="개인정보" subtitle="데이터 및 권한" />
+          <SettingsItem icon={Shield} title="개인정보" subtitle="데이터 및 권한" onClick={() => setScreen('settings-privacy')} />
         </div>
       </div>
 
@@ -82,7 +81,7 @@ export const Settings: React.FC<SettingsProps> = ({ setScreen }) => {
       <div className="space-y-3">
         <h3 className="text-xs font-bold text-slate-400 px-4">지원</h3>
         <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100">
-          <SettingsItem icon={HelpCircle} title="도움말" subtitle="자주 묻는 질문 및 가이드" />
+          <SettingsItem icon={HelpCircle} title="도움말" subtitle="자주 묻는 질문 및 가이드" onClick={() => setScreen('settings-help')} />
         </div>
       </div>
 
