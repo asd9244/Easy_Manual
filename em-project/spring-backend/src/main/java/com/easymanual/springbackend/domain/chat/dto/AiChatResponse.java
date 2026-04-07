@@ -1,17 +1,28 @@
 package com.easymanual.springbackend.domain.chat.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
 @NoArgsConstructor
 public class AiChatResponse {
-    // FastAPI가 Spring Boot에게 돌려줄 4가지 정보
-    // (파이썬 코드에서 return 했던 JSON 키값과 스펠링이 정확히 일치해야 합니다!)
-    private String manual_id;
+
+    // 파이썬(FastAPI)이 보내는 JSON 키값 "manual_id"를 자바의 manualId 변수에 바인딩합니다.
+    @JsonProperty("manual_id")
+    private String manualId;
+
     private String question;
-    private Integer found_page; // AI가 참고한 페이지 번호
-    private String ai_answer;   // AI가 생성한 최종 답변 텍스트
+
+    // 파이썬이 보내는 "found_page"를 자바의 foundPage 변수에 바인딩합니다.
+    // 이제 롬복이 getFoundPage() 라는 메서드를 정상적으로 만들어줍니다!
+    @JsonProperty("found_page")
+    private Integer foundPage;
+
+    // 파이썬이 보내는 "ai_answer"를 자바의 aiAnswer 변수에 바인딩합니다.
+    // 이제 롬복이 getAiAnswer() 라는 메서드를 정상적으로 만들어줍니다!
+    @JsonProperty("ai_answer")
+    private String aiAnswer;
 }

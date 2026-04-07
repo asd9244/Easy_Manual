@@ -18,6 +18,10 @@ import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateRequest;
 import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateResponse;
 import com.easymanual.springbackend.domain.device.entity.UserDevice;
 import com.easymanual.springbackend.domain.device.repository.UserDeviceRepository;
+import com.easymanual.springbackend.domain.chat.dto.AiChatRequest;
+import com.easymanual.springbackend.domain.chat.dto.AiChatResponse;
+import com.easymanual.springbackend.domain.chat.dto.ChatAskRequest;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 
@@ -72,8 +76,8 @@ public class ChatService {
     }
 
 
-    // AI에게 질문하고 답변 받기
-    @Transactional // DB에 데이터를 저장(INSERT)해야 하므로 트랜잭션을 시작합니다.
+    // AI에게 질문하고 답변 받기 (이미지 처리 및 제목 생성 추가)
+    @Transactional // DB에 데이터를 저장(INSERT) 및 수정(UPDATE)해야 하므로 트랜잭션을 시작합니다.
     public ChatMessageResponse askQuestion(Long roomId, String email, ChatAskRequest request) {
 
         // 1. DB에서 ChatRoom 엔티티를 조회하고, 현재 로그인한 유저의 소유인지 검증합니다.
@@ -84,36 +88,54 @@ public class ChatService {
             throw new IllegalArgumentException("해당 채팅방에 접근할 권한이 없습니다.");
         }
 
-        // 2. 클라이언트가 보낸 질문을 ChatMessage 엔티티로 생성하여 DB에 영구 저장(Persist)합니다.
+        // 🌟 추가됨: 프론트엔드 요구사항 4번 (채팅방 제목 자동 생성 로직)
+        // 해당 채팅방에 기존 메시지가 하나도 없는지(첫 질문인지) 확인하기 위해 리포지토리를 조회합니다.
+        boolean isFirstMessage = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId).isEmpty();
+
+        if (isFirstMessage) {
+            // 첫 질문이라면, 유저가 입력한 텍스트의 앞부분을 잘라내어 제목으로 사용합니다.
+            String newTitle = request.getMessage();
+            // 텍스트가 15자를 초과하면 15자까지만 자르고 "..."을 붙여 요약합니다.
+            if (newTitle.length() > 15) {
+                newTitle = newTitle.substring(0, 15) + "...";
+            }
+            // ChatRoom 엔티티의 내부 메서드를 호출하여 상태 값을 변경합니다.
+            // (주의: ChatRoom.java 엔티티 클래스 내부에 public void updateTitle(String title) { this.title = title; } 메서드를 미리 만들어 두어야 합니다!)
+            chatRoom.updateTitle(newTitle);
+            // @Transactional에 의해 영속성 컨텍스트가 변경을 감지(Dirty Checking)하여 트랜잭션 종료 시 자동으로 UPDATE 쿼리를 실행합니다.
+        }
+
+        // 2. 클라이언트가 보낸 질문과 이미지 URL을 ChatMessage 엔티티로 생성하여 DB에 영구 저장(Persist)합니다.
         ChatMessage userMessage = ChatMessage.builder()
                 .chatRoom(chatRoom)
                 .senderType(ChatMessage.SenderType.USER)
                 .message(request.getMessage())
+                .mediaUrl(request.getMediaUrl()) // 🌟 추가됨: 프론트엔드가 보낸 이미지 URL 바인딩
                 .build();
         chatMessageRepository.save(userMessage);
 
         // 3. FastAPI로 전송할 요청 DTO(AiChatRequest)를 조립합니다.
-        // 연관관계를 탐색하여 해당 기기에 매핑된 매뉴얼 코드를 추출합니다.
         String manualCode = chatRoom.getUserDevice().getManual().getManualCode();
         AiChatRequest aiRequest = AiChatRequest.builder()
                 .manual_id(manualCode)
                 .question(request.getMessage())
+                .media_url(request.getMediaUrl()) // 🌟 추가됨: AI 서버로 이미지 URL 전송
                 .build();
 
         // 4. WebClient를 사용하여 FastAPI 서버로 HTTP POST 요청을 전송합니다.
         AiChatResponse aiResponse = webClient.post()
-                .uri("/api/chat/ask") // FastAPI의 엔드포인트 주소
-                .bodyValue(aiRequest) // 요청 본문(Body)에 DTO를 JSON으로 직렬화하여 삽입
-                .retrieve() // 요청 실행 및 응답 수신 대기
-                .bodyToMono(AiChatResponse.class) // 응답 JSON을 AiChatResponse DTO로 역직렬화(바인딩)
-                .block(); // 비동기 통신을 동기적으로 대기하여 결과를 반환받습니다.
+                .uri("/api/chat/ask")
+                .bodyValue(aiRequest)
+                .retrieve()
+                .bodyToMono(AiChatResponse.class)
+                .block();
 
         // 5. FastAPI로부터 받은 AI의 답변을 ChatMessage 엔티티로 생성하여 DB에 저장합니다.
         ChatMessage aiMessage = ChatMessage.builder()
                 .chatRoom(chatRoom)
                 .senderType(ChatMessage.SenderType.AI)
-                .message(aiResponse.getAi_answer())
-                .referencedPage(aiResponse.getFound_page())
+                .message(aiResponse.getAiAnswer())
+                .referencedPage(aiResponse.getFoundPage())
                 .build();
         chatMessageRepository.save(aiMessage);
 

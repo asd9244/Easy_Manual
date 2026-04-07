@@ -32,4 +32,10 @@ public class ChatRoom extends BaseTimeEntity {
         this.userDevice = userDevice;
         this.title = title;
     }
+
+    // 채팅방 제목 변경 스위치
+    // 외부에서 무분별한 수정을 막고, 객체 지향적인 상태 변경을 위해 엔티티 내부에 메서드를 정의합니다.
+    public void updateTitle(String newTitle) {
+        this.title = newTitle;
+    }
 }
