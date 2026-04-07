@@ -14,6 +14,10 @@ Thumbs.db
 .vscode/
 /.idea/
 
+# 의존성 폴더
+node_modules/
+
+
 
 # 의존성 폴더
 node_modules/

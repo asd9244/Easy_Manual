@@ -6,6 +6,8 @@ import com.easymanual.springbackend.domain.device.service.DeviceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.easymanual.springbackend.domain.device.dto.ManualSearchResponse;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.security.Principal;
 import java.util.List;
@@ -47,6 +49,21 @@ public class DeviceController {
         List<DeviceResponse> responseList = deviceService.getMyDevices(email);
 
         // 3. 조회된 DTO 리스트를 HTTP 상태 코드 200(OK)과 함께 클라이언트에게 응답으로 전송합니다.
+        return ResponseEntity.ok(responseList);
+    }
+
+
+    // 새로 추가된 기능: 모델명 검색 API
+    // GET 방식으로 "/api/devices/search?query=검색어" 주소로 요청이 오면 실행됩니다.
+    @GetMapping("/search")
+    public ResponseEntity<List<ManualSearchResponse>> searchManuals(
+            // @RequestParam: URL 뒤에 물음표(?)로 붙어오는 데이터를 변수로 받아옵니다.
+            @RequestParam("query") String query) {
+
+        // 1. 서비스 계층에 검색어(query)를 넘겨주고 검색 결과를 받아옵니다.
+        List<ManualSearchResponse> responseList = deviceService.searchManuals(query);
+
+        // 2. 검색된 DTO 리스트를 HTTP 상태 코드 200(OK)과 함께 프론트엔드에 반환합니다.
         return ResponseEntity.ok(responseList);
     }
 }

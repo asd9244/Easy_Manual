@@ -10,6 +10,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -18,19 +23,37 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    // 1. 비밀번호를 안전하게 암호화해주는 도구
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // 2. API 보안 규칙 설정 (경비원 명부)
+    // 프론트엔드(localhost:3000)의 접근을 허용하는 CORS 설정 객체를 생성합니다.
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        // 프론트엔드 주소 허용
+        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        // GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용
+        configuration.setAllowedMethods(List.of("*"));
+        // 모든 헤더(Authorization 등) 허용
+        configuration.setAllowedHeaders(List.of("*"));
+        // 프론트엔드에서 인증 정보(토큰 등)를 포함해서 보낼 수 있도록 허용
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // 모든 API 주소("/**")에 위 설정을 적용합니다.
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // REST API에서는 CSRF 방어를 끕니다.
+                // 기존 설정에 cors 설정을 추가하여 위에서 만든 corsConfigurationSource를 적용합니다.
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // 🌟 추가됨: Swagger UI 화면을 보기 위한 주소들은 모두 프리패스 허용!
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
@@ -38,16 +61,9 @@ public class SecurityConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
-
-                        // 기존: 회원가입, 로그인 주소 프리패스 허용!
                         .requestMatchers("/api/auth/**").permitAll()
-
-                        // 그 외의 모든 요청은 JWT 팔찌가 있어야만 통과!
                         .anyRequest().authenticated()
                 )
-
-                // 스프링의 기본 검문소(UsernamePassword...)가 작동하기 '전'에,
-                // 우리가 만든 JWT 스캐너(jwtAuthenticationFilter)를 먼저 거치도록 입구에 설치합니다!
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
