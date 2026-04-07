@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { FixieLogo } from '@/src/components/common/FixieLogo';
 import { Message, Screen } from '@/src/types/index';
+import { api } from '@/src/api/apiService';
 
 
 // 4. 채팅 페이지 JSX 구조
@@ -55,16 +56,22 @@ interface ChatProps {
   removeAttachment: (index: number) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   isReadOnly?: boolean;
+  setIsAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
+  initialQuery?: string;
+  setInitialQuery?: React.Dispatch<React.SetStateAction<string>>;
  }
 
 
  
 // Chat 컴포넌트 정의
-export const Chat: React.FC<ChatProps> = ({setScreen, messages, setMessages, chatEndRef, removeAttachment }) => {
+export const Chat: React.FC<ChatProps> = ({setScreen, messages, setMessages, chatEndRef, removeAttachment, isAnalyzing, setIsAnalyzing, initialQuery, setInitialQuery }) => {
 const [inputText, setInputText] = useState('');
-const [isAnalyzing, setIsAnalyzing] = useState(false);
 const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
-const [isListening, setIsListening] = useState(false); // 음성 인식 상태
+const [isListening, setIsListening] = useState(false);
+
+const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+const [currentVideoUrl, setCurrentVideoUrl] = useState('');
+const hasProcessedInitialQuery = useRef(false); // [BUG FIX] Strict Mode 중복 호출 방지용
 
 // [UX] 전송 버튼 활성화 조건
 const canSend = inputText.trim().length > 0 || attachedFiles.length > 0;
@@ -83,23 +90,72 @@ const processFiles = async (files: FileList | null) => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-const onSendMessage = () => {
-    const newUserMsg: Message = { id: Date.now().toString(), sender: 'user', text: inputText, attachments: [...attachedFiles] };
+  useEffect(() => {
+    // initialQuery가 있고 아직 처리되지 않았을 때만 실행
+    if (initialQuery && !hasProcessedInitialQuery.current) {
+      onSendMessage(initialQuery);
+      hasProcessedInitialQuery.current = true; // 처리됨 표시
+      if (setInitialQuery) setInitialQuery('');
+    }
+  }, [initialQuery]);
+
+  const handleFeedback = async (messageId: string, isLike: boolean) => {
+    try {
+      await api.post('/chat/feedback', {
+        messageId,
+        feedback: isLike ? 'LIKE' : 'DISLIKE'
+      });
+      alert(isLike ? '좋은 답변 피드백 감사합니다.' : '답변 개선에 참고하겠습니다.');
+    } catch (error) {
+      console.error("피드백 전송 실패:", error);
+    }
+  };
+
+  const onSendMessage = async (customText?: string) => {
+    // 분석 중이거나 내용이 없으면 전송 차단
+    if (isAnalyzing) return; 
+    
+    const userText = customText || inputText;
+    const userAttachments = [...attachedFiles];
+    
+    if (!userText.trim() && userAttachments.length === 0) return;
+
+    const newUserMsg: Message = { id: Date.now().toString(), senderType: 'USER', text: userText, attachments: userAttachments };
     setMessages(prev => [...prev, newUserMsg]);
-    setInputText(''); // 다 보냈으니 수첩 비우기
+    setInputText(''); 
     setAttachedFiles([]);
     setIsAnalyzing(true);
 
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    try {
+      // [백엔드 연결] 임시로 roomId 1 하드코딩
+      const roomId = 1;
+
+      const response = await api.post(`/chat/rooms/${roomId}/ask`, {
+        message: userText
+        // 현재 백엔드 DTO(ChatAskRequest)에는 이미지 필드가 없음
+      });
+
+      const data = response.data; // ChatMessageResponse
+      
       const fixieMsg: Message = { 
-        id: (Date.now() + 1).toString(), 
-        sender: 'fixie', 
-        text: '매뉴얼 분석 결과, 필터 청소가 필요합니다.', 
-        type: 'guide' 
+        id: String(data.id || Date.now() + 1), 
+        senderType: 'AI', 
+        text: data.message || '답변을 생성할 수 없습니다.', 
+        type: 'guide',
+        referencedPage: data.referencedPage
       };
       setMessages(prev => [...prev, fixieMsg]);
-    }, 2000);
+    } catch (error: any) {
+      console.error("AI 질문 실패:", error);
+      const errorMsg: Message = { 
+        id: String(Date.now() + 1), 
+        senderType: 'AI', 
+        text: `서버 응답 오류: ${error.response?.data?.message || error.message || '알 수 없는 오류가 발생했습니다.'}` 
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   {/* 이미지 리사이징 함수 */}
@@ -143,30 +199,44 @@ const onSendMessage = () => {
   });
 };
 
-{/* 파일 변경 핸들러_ 파일을 선택하면 리사이징을 거친 후 attachedFiles에 추가 */}
-const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  {/* 파일 변경 핸들러_ 파일을 선택하면 서버로 바로 업로드 후 URL을 받아와 담기 */}
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // 1. 이미지 처리 중임을 알림 (로딩 시작)
     setIsAnalyzing(true); 
 
     try {
       const fileArray = Array.from(files);
-      
-      // 2. 모든 파일을 동시에 리사이징 (Promise.all 활용)
-      // resizeImage 함수가 비동기이므로 await를 붙여서 다 끝날 때까지 기다린다.
-      const resizedDataUrls = await Promise.all(
-        fileArray.map(file => resizeImage(file, 1000)) // 너비를 1000px로 제한
-      );
+      const uploadedUrls: string[] = [];
 
-      // 3. 기존 리스트에 추가
-      setAttachedFiles(prev => [...prev, ...resizedDataUrls]);
+      // 순차적으로 혹은 Promise.all로 업로드 (여기서는 S3 업로드 API 가정)
+      for (const file of fileArray) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // 예시 엔드포인트: /upload (미디어 전용 S3 업로드 API)
+        const response = await api.post('/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        // 백엔드에서 내려주는 URL을 추출한다고 가정
+        if (response.data && response.data.url) {
+          uploadedUrls.push(response.data.url);
+        } else {
+          // 서버 연결 안될 시 로컬 리사이즈로 폴백 (테스트 목적)
+          const localUrl = await resizeImage(file, 1000);
+          uploadedUrls.push(localUrl);
+        }
+      }
+
+      setAttachedFiles(prev => [...prev, ...uploadedUrls]);
     } catch (error) {
-      console.error("이미지 처리 중 오류 발생:", error);
-      alert("이미지를 처리하는 데 실패했습니다.");
+      console.error("이미지 업로드 중 오류 발생:", error);
+      // Fallback for local testing if API fails
+      const fallbackUrls = await Promise.all(Array.from(files).map(f => resizeImage(f, 1000)));
+      setAttachedFiles(prev => [...prev, ...fallbackUrls]);
     } finally {
-      // 4. 처리 완료 후 로딩 종료
       setIsAnalyzing(false);
     }
   };
@@ -199,18 +269,18 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
             key={msg.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex gap-3 ${msg.senderType === 'USER' ? 'justify-end' : 'justify-start'}`}
           >
 
             {/* Fixie 봇 프로필 아이콘 */}
-            {msg.sender === 'fixie' && (
+            {msg.senderType === 'AI' && (
               <div className="w-8 h-8 rounded-full bg-wing-gradient flex items-center justify-center shrink-0">
                 <span className="text-white font-bold italic text-[10px]">F</span>
               </div>
             )}
           {/* 메시지 컨텐츠 */}
           <div className={`max-w-[85%] p-1.5 relative ${
-                msg.sender === 'user' 
+                msg.senderType === 'USER' 
                   ? 'bg-fixie-steel text-white rounded-3xl rounded-tr-none' 
                   : 'bg-white text-slate-700 rounded-3xl rounded-tl-none border border-theme-primary/30 shadow-sm' 
           }`}>
@@ -238,7 +308,13 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                       <video src={msg.videoUrl} className="w-full h-full object-cover opacity-80" />
                       
                       {/* 예쁜 재생 버튼 오버레이 (가운데 반투명 버튼) */}
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors cursor-pointer">
+                      <div 
+                        onClick={() => {
+                          setCurrentVideoUrl(msg.videoUrl!);
+                          setIsVideoModalOpen(true);
+                        }}
+                        className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors cursor-pointer z-10"
+                      >
                         <button className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition-all">
                           <Play fill="white" size={20} className="ml-1" />
                         </button>
@@ -258,12 +334,18 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
               
             <p className="text-sm p-3 leading-relaxed">{msg.text}</p>
             {/* 피드백 버튼*/}
-            {msg.sender === 'fixie' && msg.type === 'guide' && (
+            {msg.senderType === 'AI' && msg.type === 'guide' && (
               <div className="flex gap-3 mt-3 pt-2 border-t border-slate-200/50">
-                <button className="flex items-center gap-1 text-slate-300 hover:text-theme-primary transition-colors group">
+                <button 
+                  onClick={() => handleFeedback(msg.id, true)} 
+                  className="flex items-center gap-1 text-slate-300 hover:text-theme-primary transition-colors group"
+                >
                   <ThumbsUp size={14} className="group-hover:scale-110 transition-transform" />
                 </button>
-                <button className="flex items-center gap-1 text-slate-300 hover:text-red-400 transition-colors group">
+                <button 
+                  onClick={() => handleFeedback(msg.id, false)} 
+                  className="flex items-center gap-1 text-slate-300 hover:text-red-400 transition-colors group"
+                >
                   <ThumbsDown size={14} className="group-hover:scale-110 transition-transform" />
                 </button>
               </div>
@@ -367,6 +449,34 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
           </button>
         </div>
       </div>
+
+      {/* 비디오 모달 팝업 */}
+      <AnimatePresence>
+        {isVideoModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          >
+            <div className="relative w-full max-w-4xl max-h-screen">
+              <button 
+                onClick={() => setIsVideoModalOpen(false)}
+                className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
+              >
+                <X size={32} />
+              </button>
+              <div className="bg-black rounded-2xl overflow-hidden shadow-2xl aspect-video w-full flex items-center justify-center">
+                {currentVideoUrl ? (
+                  <video src={currentVideoUrl} controls autoPlay className="w-full h-full object-contain" />
+                ) : (
+                  <div className="text-white/50 text-sm">해당 영상을 불러올 수 없습니다.</div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

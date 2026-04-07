@@ -16,8 +16,9 @@ import {
 
 // 1. 우리가 쪼갠 파일들 임포트
 import { Screen, Device, Message, ThemeType } from '@/src/types';
-import { THEMES, MOCK_DEVICES, TUTORIAL_STEPS } from '@/src/constants/data';
+import { THEMES, TUTORIAL_STEPS } from '@/src/constants/data';
 import { FixieLogo } from '@/src/components/common/FixieLogo';
+import { api } from '@/src/api/apiService';
 
 // 2. 페이지 컴포넌트 임포트
 import { Home } from '@/src/pages/Home/Home';
@@ -32,6 +33,9 @@ import { TutorialScreen } from '@/src/pages/TutorialScreen/tutorialScreen';
 import { AuthScreen } from '@/src/pages/Auth/Auth';
 import { ScanScreen } from '@/src/pages/Scan/Scan'; 
 import { Profile } from './pages/Profile/Profile';
+import { DiagnosticReport } from '@/src/pages/Report/DiagnosticReport';
+import { ShareView } from '@/src/pages/Share/ShareView';
+import { SettingsSubpage } from '@/src/pages/Settings/SettingsSubpage';
 
 
 
@@ -42,18 +46,23 @@ export default function App() {
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [screen, setScreen] = useState<Screen>('splash');
   const [currentTheme, setCurrentTheme] = useState<ThemeType>('magician');
-  const [devices, setDevices] = useState<Device[]>(MOCK_DEVICES);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', sender: 'fixie', text: '안녕하세요! 저는 픽시입니다. 무엇을 도와드릴까요?' }
+    { id: '1', senderType: 'AI', text: '안녕하세요! 저는 픽시입니다. 무엇을 도와드릴까요?' }
   ]);
   const [showGarageOptions, setShowGarageOptions] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'visit'>('all');
   const [tutorialStep, setTutorialStep] = useState(0);
   
+  // 파이프라인 제어용 상태
+  const [scannedModel, setScannedModel] = useState<string>('');
+  const [initialChatQuery, setInitialChatQuery] = useState<string>('');
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
   const [sliderConstraints, setSliderConstraints] = useState({ left: 0, right: 0 });
-  // 채팅 입력창이 읽기 전용인지 여부 (분석 중일 때는 입력 금지)
+  // 채팅 입력창이 읽기 전용인지 여부
   const [isChatReadOnly, setIsChatReadOnly] = useState(false);
 
   // --- 테마 적용 로직 ---
@@ -62,6 +71,35 @@ export default function App() {
     document.documentElement.style.setProperty('--theme-primary', theme.primary);
     document.documentElement.style.setProperty('--theme-secondary', theme.secondary);
   }, [currentTheme]);
+
+  // --- 기기 목록 가져오기 ---
+  useEffect(() => {
+    const fetchDevices = async () => {
+      setIsLoadingDevices(true);
+      try {
+        const response = await api.get('/devices');
+        if (response.data && Array.isArray(response.data)) {
+          // 백엔드 명세에 맞게 매핑
+          const mappedDevices = response.data.map((d: any) => ({
+            id: String(d.id),
+            name: d.alias || d.model,
+            model: d.model,
+            alias: d.alias,
+            image: d.image || 'https://picsum.photos/seed/washer/400/400',
+            icon: d.icon
+          }));
+          setDevices(mappedDevices);
+        }
+      } catch (error) {
+        console.error("기기 목록 불러오기 실패:", error);
+      } finally {
+        setIsLoadingDevices(false);
+      }
+    };
+    
+    // 로그인된 유저가 home이나 garage 등에 진입할 때 호출 (단순화를 위해 마운트 시 동작)
+    fetchDevices();
+  }, [screen]); // 화면 이동 시 목록 리프레시를 위해 screen 의존성 추가 (필요에 따라 조절)
 
   // --- 슬라이더 제약 조건 계산 로직 ---
  useEffect(() => {
@@ -154,8 +192,15 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
         {/* 2. 메인 레이아웃 (사이드바 + 메인 콘텐츠) */}
         {showNav && (
           <div className="flex min-h-screen">
-            <aside className="hidden md:flex flex-col w-64 bg-white/50  backdrop-blur-xl border-r border-slate-100 p-6 fixed h-full z-50">
-              <div className="flex items-center gap-3 mb-12">
+            <aside className="hidden md:flex flex-col w-64 bg-white/50 backdrop-blur-xl border-r border-slate-100 p-6 fixed h-full z-50">
+              {/* 로고 영역 커스텀 클릭 -> 프로필 이동 */}
+              <div 
+                className="flex items-center gap-3 mb-12 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => {
+                  setScreen('profile');
+                  setIsChatReadOnly(false);
+                }}
+              >
               <FixieLogo size={42} />
                   <div className="flex flex-col mt-1">
                     <h1 className="text-xl font-black text-slate-800 leading-tight">Fixie</h1>
@@ -172,9 +217,12 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
               <SidebarItem id="settings" icon={SettingsIcon} label="설정" />
             </nav>
 
-            {/* 유저 프로필 영역 */}
-            <div className="mt-auto pt-6 border-t border-slate-100">
-              <div className="flex items-center gap-3 p-2">
+            {/* 유저 프로필 영역 -> 클릭 시 프로필로 이동 */}
+            <div 
+              className="mt-auto pt-6 border-t border-slate-100 cursor-pointer hover:bg-slate-50 p-2 rounded-xl transition-colors -mx-2 px-4"
+              onClick={() => setScreen('profile')}
+            >
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-wing-gradient flex items-center justify-center text-white font-bold">U</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold truncate">사용자님</p>
@@ -187,14 +235,28 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
             {/* 메인 콘텐츠 영역 */}
             <main className={`flex-1 ${showNav ? 'md:ml-64' : ''} ${screen === 'chat' ? 'p-0 pb-20 md:p-6' : 'p-6 pb-32'}`}>              
               <AnimatePresence mode="wait">
-                {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} />}
-                {screen === 'garage' && <Garage key="garage" setScreen={setScreen} devices={devices} setDevices={setDevices} showGarageOptions={showGarageOptions} setShowGarageOptions={setShowGarageOptions} />}
-                {screen === 'chat' && <Chat key="chat" setScreen={setScreen} messages={messages} isAnalyzing={isAnalyzing} attachedFiles={attachedFiles} chatEndRef={chatEndRef} handleSendMessage={handleSendMessage} handleFileChange={handleFileChange} setMessages={setMessages}  isReadOnly={isChatReadOnly} removeAttachment={(idx) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} />}
+                {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} isLoading={isLoadingDevices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} onGuideClick={(title: string) => { setInitialChatQuery(title); setIsAnalyzing(true); setScreen('chat'); }} />}
+                {screen === 'garage' && <Garage key="garage" setScreen={setScreen} devices={devices} setDevices={setDevices} showGarageOptions={showGarageOptions} setShowGarageOptions={setShowGarageOptions} scannedModel={scannedModel} setScannedModel={setScannedModel} />}
+                {screen === 'chat' && <Chat key="chat" setScreen={setScreen} messages={messages} isAnalyzing={isAnalyzing} setIsAnalyzing={setIsAnalyzing} attachedFiles={attachedFiles} chatEndRef={chatEndRef} handleSendMessage={handleSendMessage} handleFileChange={handleFileChange} setMessages={setMessages} isReadOnly={isChatReadOnly} removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} initialQuery={initialChatQuery} setInitialQuery={setInitialChatQuery} />}
                 {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} />}
                 {screen === 'settings' && <Settings key="settings" setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />}
-                {screen === 'scan' && <ScanScreen onClose={() => setScreen('home')} onScan={() => { setIsAnalyzing(true); setScreen('chat'); }} />}
+                {screen === 'scan' && <ScanScreen key="scan" onClose={() => setScreen('home')} onScan={(model?: string) => { 
+                  if (model && model !== 'ocr_image') { 
+                    setScannedModel(model); 
+                    setScreen('garage'); 
+                  } else { 
+                    setIsAnalyzing(true); 
+                    setScreen('chat'); 
+                  } 
+                }} />}
                 {screen === 'theme-select' && (<ThemeSelect key="theme-select"setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />)}
                 {screen === 'profile' && (<Profile key="profile" setScreen={setScreen} />)}  
+                {screen === 'report' && (<DiagnosticReport key="report" setScreen={setScreen} />)}
+                {screen === 'share' && (<ShareView key="share" setScreen={setScreen} />)}
+                {screen === 'settings-notifications' && <SettingsSubpage key="s-notif" title="알림 설정" setScreen={setScreen} />}
+                {screen === 'settings-language' && <SettingsSubpage key="s-lang" title="언어 설정" setScreen={setScreen} />}
+                {screen === 'settings-privacy' && <SettingsSubpage key="s-priv" title="개인정보 처리방침" setScreen={setScreen} />}
+                {screen === 'settings-help' && <SettingsSubpage key="s-help" title="고객 센터 / 도움말" setScreen={setScreen} />}
               </AnimatePresence>
             </main>
 

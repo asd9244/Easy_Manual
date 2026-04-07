@@ -23,10 +23,12 @@ interface HomeProps {
   devices: Device[];
   sliderRef: React.RefObject<HTMLDivElement | null>;
   sliderConstraints: { left: number; right: number };
+  isLoading?: boolean;
+  onGuideClick?: (title: string) => void;
 }
 
 // 2. renderHome 대신 'Home'이라는 이름의 컴포넌트로 만들기.
-export const Home: React.FC<HomeProps> = ({ setScreen,devices }) => {
+export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGuideClick }) => {
   return (
     <div className="max-w-3xl mx-auto space-y-10 text-left">
       
@@ -48,24 +50,40 @@ export const Home: React.FC<HomeProps> = ({ setScreen,devices }) => {
       <section>
         <div className="flex justify-between items-center mb-4 px-1">
           <h3 className="text-sm font-bold text-slate-700">기기 상태 대시보드</h3>
-          <button className="text-theme-primary text-sm font-bold hover:opacity-80 transition-opacity">전체 보기</button>
+          <button 
+            onClick={() => setScreen('garage')}
+            className="text-theme-primary text-sm font-bold hover:opacity-80 transition-opacity"
+          >
+            전체 보기
+          </button>
         </div>
 
         {/* 새롭게 바뀐 카드들 */}
         <div className="space-y-4">
-            {/* 💡 진짜 devices 창고에서 데이터를 꺼내서 카드를 찍어낸다! */}
-            {devices.map(device => (
-              <DeviceStatusCard 
-                key={device.id}
-                title={device.name} 
-                model={device.model} 
-                icon={device.icon}
-                status="정상" 
-                lastCheck="오늘" 
-                filterStatus="양호" 
-                repairCount="0회" 
-              />
-            ))}
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center p-8 bg-white/50 rounded-2xl border border-dashed border-slate-200">
+                <div className="w-8 h-8 border-4 border-theme-primary border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-4 text-sm font-bold text-slate-400">기기 목록을 불러오는 중...</p>
+              </div>
+            ) : devices.length > 0 ? (
+              /* 💡 진짜 devices 창고에서 데이터를 꺼내서 카드를 찍어낸다! */
+              devices.map(device => (
+                <DeviceStatusCard 
+                  key={device.id}
+                  title={device.name} 
+                  model={device.model} 
+                  icon={device.icon || WashingMachine} // fallback icon
+                  status="정상" 
+                  lastCheck="오늘" 
+                  filterStatus="양호" 
+                  repairCount="0회" 
+                />
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center p-8 bg-white/50 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-sm font-bold text-slate-400">등록된 기기가 없습니다.</p>
+              </div>
+            )}
             
             <button 
               onClick={() => setScreen('garage')} 
@@ -111,6 +129,7 @@ export const Home: React.FC<HomeProps> = ({ setScreen,devices }) => {
             <motion.div 
               key={i}
               whileTap={{ scale: 0.99 }}
+              onClick={() => onGuideClick && onGuideClick(guide.title)}
               className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-slate-50 hover:border-theme-primary/30 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-4">
