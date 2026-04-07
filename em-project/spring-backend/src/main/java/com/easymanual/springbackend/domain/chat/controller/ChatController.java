@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.easymanual.springbackend.domain.chat.dto.ChatAskRequest;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateRequest;
+import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateResponse;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.security.Principal;
 import java.util.List;
@@ -73,6 +77,22 @@ public class ChatController {
         ChatMessageResponse response = chatService.askQuestion(roomId, email, request);
 
         // 3. AI의 답변이 담긴 DTO를 HTTP 상태 코드 200(OK)과 함께 클라이언트에게 반환합니다.
+        return ResponseEntity.ok(response);
+    }
+
+    // 채팅방 신규 생성 API
+    @PostMapping("/rooms")
+    public ResponseEntity<ChatRoomCreateResponse> createChatRoom(
+            @RequestBody ChatRoomCreateRequest request,
+            Principal principal) {
+
+        // 인증 객체에서 이메일을 추출합니다.
+        String email = principal.getName();
+
+        // 서비스 계층을 호출하여 채팅방을 생성하고 결과를 받습니다.
+        ChatRoomCreateResponse response = chatService.createChatRoom(email, request);
+
+        // HTTP 200 상태 코드와 함께 생성된 방 번호를 반환합니다.
         return ResponseEntity.ok(response);
     }
 }

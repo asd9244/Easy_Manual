@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: pixie-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: pixie
+      # PostgreSQL 18+ 권장 데이터 경로 설정
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  neo4j:
+    image: neo4j:5
+    container_name: pixie-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      # Neo4j 5.x 보안 정책에 맞춰 8자리로 변경
+      NEO4J_AUTH: neo4j/12341234
+    volumes:
+      - neo4j_data:/data
+    restart: always
+
+volumes:
+  postgres_data:
+  neo4j_data:

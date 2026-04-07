@@ -14,6 +14,10 @@ import com.easymanual.springbackend.domain.chat.dto.AiChatRequest;
 import com.easymanual.springbackend.domain.chat.dto.AiChatResponse;
 import com.easymanual.springbackend.domain.chat.dto.ChatAskRequest;
 import org.springframework.web.reactive.function.client.WebClient;
+import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateRequest;
+import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateResponse;
+import com.easymanual.springbackend.domain.device.entity.UserDevice;
+import com.easymanual.springbackend.domain.device.repository.UserDeviceRepository;
 
 import java.util.List;
 
@@ -27,6 +31,7 @@ public class ChatService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final WebClient webClient;
+    private final UserDeviceRepository userDeviceRepository;
 
     // 데이터의 변경(CUD) 없이 조회(Read)만 수행하므로 readOnly = true 옵션을 주어 성능을 최적화합니다.
     @Transactional(readOnly = true)
@@ -114,5 +119,33 @@ public class ChatService {
 
         // 6. 최종적으로 저장된 AI의 메시지 엔티티를 응답 DTO로 변환하여 컨트롤러로 반환합니다.
         return new ChatMessageResponse(aiMessage);
+    }
+
+
+    // 채팅방 신규 생성 비즈니스 로직
+    @Transactional
+    public ChatRoomCreateResponse createChatRoom(String email, ChatRoomCreateRequest request) {
+
+        // 1. 프론트엔드가 전달한 기기 ID로 DB에서 UserDevice 엔티티를 조회합니다.
+        UserDevice userDevice = userDeviceRepository.findById(request.getUserDeviceId())
+                .orElseThrow(() -> new IllegalArgumentException("해당 기기를 찾을 수 없습니다."));
+
+        // 2. 보안 검증: 해당 기기가 현재 로그인한 유저의 소유인지 확인합니다.
+        if (!userDevice.getUser().getEmail().equals(email)) {
+            throw new IllegalArgumentException("해당 기기에 접근할 권한이 없습니다.");
+        }
+
+        // 3. 새로운 ChatRoom 엔티티를 생성합니다.
+        // 제목(title)은 프론트엔드 요청 4번에 따라 첫 질문 시 업데이트할 예정이므로 임시 제목을 넣습니다.
+        ChatRoom newChatRoom = ChatRoom.builder()
+                .userDevice(userDevice)
+                .title("새로운 대화")
+                .build();
+
+        // 4. DB에 영구 저장(Persist)합니다.
+        ChatRoom savedChatRoom = chatRoomRepository.save(newChatRoom);
+
+        // 5. 생성된 채팅방의 ID를 DTO에 담아 반환합니다.
+        return new ChatRoomCreateResponse(savedChatRoom.getId());
     }
 }
