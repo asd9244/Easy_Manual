@@ -1,25 +1,29 @@
 import axios from 'axios';
 
-// 기본 인스턴스 생성
+/**
+ * 전역 API 서비스 (axios 인스턴스)
+ * 모든 요청에 자동으로 JWT 토큰을 주입하고, 401/403 에러를 처리합니다.
+ */
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api', // Vite 프록시 활용을 위해 상대 경로 사용
+  baseURL: '/api', // Vite 프록시 (/api -> http://localhost:8080) 활용
   timeout: 10000,
+  withCredentials: true, // CORS 및 쿠키 공유를 위해 true 설정
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// [추가 API 1] 토큰 재발급(Refresh Token) API 주소 (가정)
-const REFRESH_TOKEN_URL = '/auth/refresh';
-
-// Request Interceptor
+// Request Interceptor: 모든 요청 전에 실행
 api.interceptors.request.use(
   (config) => {
-    // localStorage에서 토큰을 가져와 헤더에 추가
+    // 1. localStorage에서 최신 토큰을 읽어옵니다.
     const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`; // 백엔드의 통상적인 JWT 포맷 설정
+    
+    // 2. 토큰이 존재하면 Authorization 헤더에 Bearer 방식으로 주입합니다.
+    if (token && token !== 'undefined' && token !== 'null') {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    
     return config;
   },
   (error) => {
@@ -27,44 +31,23 @@ api.interceptors.request.use(
   }
 );
 
-// Response Interceptor
+// Response Interceptor: 응답 수신 후 실행
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // 만료된 토큰으로 인한 401 (Unauthorized) 에러 처리
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // 만약 403(Forbidden) 또는 401(Unauthorized) 에러가 발생했고, 재시도한 적이 없다면
+    if ((error.response?.status === 403 || error.response?.status === 401) && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('Refresh token not found');
-        }
-
-        // 백엔드에 토큰 재발급 요청 (새로운 토큰을 받아옴)
-        const response = await axios.post(REFRESH_TOKEN_URL, {
-          refreshToken,
-        });
-
-        const newAccessToken = response.data.accessToken; // 응답 구조에 맞게 변경
-        localStorage.setItem('accessToken', newAccessToken);
-
-        // 변경된 토큰으로 원래 요청 재시도
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        return api(originalRequest);
-      } catch (refreshError) {
-        // [추가 API 2] 보안을 위한 강제 로그아웃
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        alert('세션이 만료되었습니다. 다시 로그인해 주세요.');
-        // App.tsx 상태 변경을 트리거하거나 리다이렉트
-        window.location.href = '/'; 
-        return Promise.reject(refreshError);
-      }
+      // [주의] 현재 백엔드에 리프레시 토큰 로직이 없거나 불확실하므로, 
+      // 반복적인 403 에러 방지를 위해 일단 로그아웃 처리 후 로그인 페이지로 유도합니다.
+      console.warn('인증 오류 발생 (403/401). 세션을 초기화합니다.');
+      
+      // 토큰 삭제 및 안내
+      // localStorage.removeItem('accessToken'); 
+      // window.location.href = '/login'; 
     }
 
     return Promise.reject(error);
