@@ -53,6 +53,11 @@ public class UserService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("가입되지 않은 이메일입니다."));
 
+        // 유저의 상태(status)가 DELETED(탈퇴)인 경우, 비밀번호 검사 전에 즉시 예외를 발생시켜 로그인을 차단합니다.
+        if (user.getStatus() == User.UserStatus.DELETED) {
+            throw new IllegalArgumentException("탈퇴한 회원입니다. 로그인이 불가능합니다.");
+        }
+
         // 2. 비밀번호 확인 (매우 중요!)
         // DB에는 암호화된 복잡한 비밀번호가 들어있으므로, passwordEncoder.matches() 라는 전용 도구로 비교해야 합니다.
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
