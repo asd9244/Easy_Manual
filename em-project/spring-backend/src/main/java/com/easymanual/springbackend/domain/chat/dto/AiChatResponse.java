@@ -25,4 +25,8 @@ public class AiChatResponse {
     // 이제 롬복이 getAiAnswer() 라는 메서드를 정상적으로 만들어줍니다!
     @JsonProperty("ai_answer")
     private String aiAnswer;
+
+    // FastAPI가 보내주는 매뉴얼 원본 이미지 URL을 바인딩합니다.
+    @JsonProperty("manual_image_url")
+    private String manualImageUrl;
 }

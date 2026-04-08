@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### 코드 모음기능 ###
+extract_spring_code.py
+spring_code_context.txt
