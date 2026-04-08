@@ -136,6 +136,7 @@ public class ChatService {
                 .senderType(ChatMessage.SenderType.AI)
                 .message(aiResponse.getAiAnswer())
                 .referencedPage(aiResponse.getFoundPage())
+                .manualImageUrl(aiResponse.getManualImageUrl())
                 .build();
         chatMessageRepository.save(aiMessage);
 

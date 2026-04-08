@@ -15,7 +15,9 @@ public class ChatMessageResponse {
     private String message; // 실제 대화 내용 (텍스트)
     private String mediaUrl; // 첨부된 사진/음성 파일의 S3 주소 (없으면 null)
     private Integer referencedPage; // AI가 참고한 매뉴얼 페이지 번호 (없으면 null)
+    private String manualImageUrl; // 유저가 올린 사진 URL
     private LocalDateTime createdAt; // 메시지를 보낸 정확한 시간
+
 
     // ChatMessage 엔티티 객체를 매개변수로 받아 DTO 객체의 필드에 값을 할당하는 생성자입니다.
     public ChatMessageResponse(ChatMessage chatMessage) {
@@ -25,6 +27,7 @@ public class ChatMessageResponse {
         this.message = chatMessage.getMessage();
         this.mediaUrl = chatMessage.getMediaUrl();
         this.referencedPage = chatMessage.getReferencedPage();
+        this.manualImageUrl = chatMessage.getManualImageUrl();
         this.createdAt = chatMessage.getCreatedAt();
     }
 }

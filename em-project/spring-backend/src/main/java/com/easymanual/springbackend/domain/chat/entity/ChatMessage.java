@@ -36,13 +36,19 @@ public class ChatMessage extends BaseTimeEntity {
     @Column
     private Integer referencedPage;
 
+    // AI가 참고한 매뉴얼 원본 이미지의 URL을 저장하는 컬럼입니다.
+    // 유저가 올린 사진(mediaUrl)과 구분하기 위해 별도의 컬럼으로 관리합니다.
+    @Column(length = 1000)
+    private String manualImageUrl;
+
     @Builder
-    public ChatMessage(ChatRoom chatRoom, SenderType senderType, String message, String mediaUrl, Integer referencedPage) {
+    public ChatMessage(ChatRoom chatRoom, SenderType senderType, String message, String mediaUrl, Integer referencedPage, String manualImageUrl) {
         this.chatRoom = chatRoom;
         this.senderType = senderType;
         this.message = message;
         this.mediaUrl = mediaUrl;
         this.referencedPage = referencedPage;
+        this.manualImageUrl = manualImageUrl; // 🌟 빌더에 필드 추가
     }
 
     public enum SenderType { USER, AI }
