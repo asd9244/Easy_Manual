@@ -36,8 +36,9 @@ import { Profile } from './pages/Profile/Profile';
 import { DiagnosticReport } from '@/src/pages/Report/DiagnosticReport';
 import { ShareView } from '@/src/pages/Share/ShareView';
 import { SettingsSubpage } from '@/src/pages/Settings/SettingsSubpage';
-
-
+import { Toast } from '@/src/components/common/Toast';
+import { deviceService } from '@/src/services/deviceService';
+import { authService } from '@/src/services/authService';
 
 export default function App() {
   // --- 전역 상태 관리 ---
@@ -64,6 +65,7 @@ export default function App() {
   const [sliderConstraints, setSliderConstraints] = useState({ left: 0, right: 0 });
   // 채팅 입력창이 읽기 전용인지 여부
   const [isChatReadOnly, setIsChatReadOnly] = useState(false);
+  const [nickname, setNickname] = useState('사용자');
 
   // --- 테마 적용 로직 ---
   useEffect(() => {
@@ -72,24 +74,24 @@ export default function App() {
     document.documentElement.style.setProperty('--theme-secondary', theme.secondary);
   }, [currentTheme]);
 
-  // --- 기기 목록 가져오기 ---
+  // --- 유저 정보 및 기기 목록 가져오기 ---
   useEffect(() => {
-    const fetchDevices = async () => {
+    const fetchData = async () => {
+      if (!['home', 'garage', 'chat', 'profile'].includes(screen)) return;
+
+      // 1. 유저 정보
+      try {
+        const userRes = await api.get('/users/me');
+        if (userRes.data && userRes.data.nickname) {
+          setNickname(userRes.data.nickname);
+        }
+      } catch (err) { console.error("유저 정보 로드 실패:", err); }
+
+      // 2. 기기 목록
       setIsLoadingDevices(true);
       try {
-        const response = await api.get('/devices');
-        if (response.data && Array.isArray(response.data)) {
-          // 백엔드 명세에 맞게 매핑
-          const mappedDevices = response.data.map((d: any) => ({
-            id: String(d.id),
-            name: d.alias || d.model,
-            model: d.model,
-            alias: d.alias,
-            image: d.image || 'https://picsum.photos/seed/washer/400/400',
-            icon: d.icon
-          }));
-          setDevices(mappedDevices);
-        }
+        const fetchedDevices = await deviceService.getMyDevices();
+        setDevices(fetchedDevices);
       } catch (error) {
         console.error("기기 목록 불러오기 실패:", error);
       } finally {
@@ -97,12 +99,11 @@ export default function App() {
       }
     };
     
-    // 로그인된 유저가 home이나 garage 등에 진입할 때 호출 (단순화를 위해 마운트 시 동작)
-    fetchDevices();
-  }, [screen]); // 화면 이동 시 목록 리프레시를 위해 screen 의존성 추가 (필요에 따라 조절)
+    fetchData();
+  }, [screen]);
 
   // --- 슬라이더 제약 조건 계산 로직 ---
- useEffect(() => {
+  useEffect(() => {
     if (!sliderRef.current) return;
     const updateConstraints = () => {
       if (sliderRef.current) {
@@ -115,11 +116,7 @@ export default function App() {
     const observer = new ResizeObserver(updateConstraints);
     observer.observe(sliderRef.current);
     return () => observer.disconnect();
-  }, [screen]); // 화면이 바뀔 때마다 다시 계산
-  
-
-
-
+  }, [screen]);
   
 //  모바일 하단 메뉴용
 const NavItem = ({ id, icon: Icon, label }: any) => {
@@ -139,7 +136,7 @@ const NavItem = ({ id, icon: Icon, label }: any) => {
         <motion.div
           layoutId="mobile-active-dot"
           className="absolute -bottom-3 w-1.5 h-1.5 bg-theme-primary rounded-full"
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
         />
       )}
     </button>
@@ -168,7 +165,7 @@ const SidebarItem = ({ id, icon: Icon, label }: any) => {
         <motion.div
           layoutId="sidebar-active-dot"
           className="absolute right-4 w-1.5 h-1.5 bg-white rounded-full"
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
         />
       )}
     </button>
@@ -183,6 +180,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden text-sm bg-fixie-mist text-fixie-steel font-sans selection:bg-theme-primary/30">
+      <Toast />
       <AnimatePresence mode="wait">
         {/* 1. 독립 화면들 */}
         {screen === 'splash' && <SplashScreen onComplete={() => setScreen('tutorial')} />}
@@ -223,9 +221,9 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
               onClick={() => setScreen('profile')}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-wing-gradient flex items-center justify-center text-white font-bold">U</div>
+                <div className="w-10 h-10 rounded-full bg-wing-gradient flex items-center justify-center text-white font-bold">{nickname.substring(0,1).toUpperCase()}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold truncate">사용자님</p>
+                  <p className="text-sm font-bold truncate">{nickname}님</p>
                   <p className="text-xs text-slate-400 truncate">Premium Member</p>
                 </div>
               </div>
@@ -277,4 +275,3 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
     </div>
   );
 }
-
