@@ -78,66 +78,68 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen })
       </header>
 
       {/* 2. PDF 출력용 A4 캔버스 래퍼 (반응형 줌 적용) */}
-      <div className="p-4 overflow-x-auto no-scrollbar pb-32">
+      <div className="p-4 overflow-x-auto no-scrollbar pb-32 flex justify-center">
         <div 
           ref={reportRef} 
-          className="bg-white shadow-lg mx-auto p-10 text-slate-800"
+          className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-[40px] text-slate-800 flex flex-col"
           style={{ width: '210mm', minHeight: '297mm', boxSizing: 'border-box' }} // A4 dimensions
         >
-          {/* 리포트 헤더 */}
-          <div className="border-b-[6px] border-slate-900 pb-8 mb-10 flex justify-between items-end">
+          {/* 리포트 헤더 - 간격 미세 조정 */}
+          <div className="border-b-[4px] border-slate-900 pb-[30px] mb-[40px] flex justify-between items-end">
             <div>
-              <div className="flex items-center gap-3 text-theme-primary mb-3">
-                <div className="w-12 h-12 bg-theme-primary/10 rounded-2xl flex items-center justify-center">
-                  <FileText size={32} />
+              <div className="flex items-center gap-4 text-theme-primary mb-3">
+                <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-lg">
+                  <FixieLogo size={36} />
                 </div>
-                <h2 className="text-3xl font-black tracking-tight text-slate-900">FIXIE AI SOLUTION</h2>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter text-slate-900 leading-none">FIXIE</h2>
+                  <p className="text-[10px] text-theme-primary font-black uppercase tracking-[0.3em] mt-1">Diagnostic Intelligence</p>
+                </div>
               </div>
-              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest pl-1">Diagnostic Intelligence Report</p>
             </div>
-            <div className="text-right text-[11px] font-bold text-slate-500 space-y-1">
-              <p>ISSUED: {mockData.issueDate}</p>
-              <p className="text-theme-primary">REF: #FX-2026-04-{Math.floor(Math.random() * 1000)}</p>
+            <div className="text-right text-[10px] font-black text-slate-400 space-y-1 uppercase tracking-widest">
+              <p>Report ID: #FX-2026-04-{Math.floor(Math.random() * 1000)}</p>
+              <p>Issue Date: {mockData.issueDate}</p>
             </div>
           </div>
 
-          {/* 기기 정보 섹션 - 더 세련되게 */}
-          <section className="mb-10">
-            <h3 className="text-[13px] font-black text-slate-400 mb-4 uppercase tracking-[0.2em]">01. Device Context</h3>
-            <div className="grid grid-cols-2 gap-px bg-slate-200 rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+          {/* 기기 정보 섹션 - 그리드 1px 조정 */}
+          <section className="mb-[40px]">
+            <h3 className="text-[11px] font-black text-slate-300 mb-4 uppercase tracking-[0.25em]">01. Device Specifications</h3>
+            <div className="grid grid-cols-2 gap-[1px] bg-slate-100 rounded-2xl overflow-hidden border border-slate-100">
               <div className="bg-white p-6">
-                <p className="text-[10px] text-slate-400 font-black mb-1.5 uppercase">Category</p>
-                <p className="font-bold text-slate-800 text-lg">{mockData.deviceType}</p>
+                <p className="text-[9px] text-slate-400 font-black mb-2 uppercase tracking-wider">Classification</p>
+                <p className="font-bold text-slate-800 text-lg tracking-tight">{mockData.deviceType}</p>
               </div>
               <div className="bg-white p-6">
-                <p className="text-[10px] text-slate-400 font-black mb-1.5 uppercase">Model</p>
-                <p className="font-bold text-slate-800 text-lg">{mockData.modelName}</p>
+                <p className="text-[9px] text-slate-400 font-black mb-2 uppercase tracking-wider">Model Identifier</p>
+                <p className="font-bold text-slate-800 text-lg tracking-tight">{mockData.modelName}</p>
               </div>
             </div>
           </section>
 
-          {/* 증상 및 진단 섹션 - 강렬하게 */}
-          <section className="mb-10">
-            <h3 className="text-[13px] font-black text-slate-400 mb-4 uppercase tracking-[0.2em]">02. AI Diagnostic Result</h3>
-            <div className="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl">
-               <div className="absolute top-0 right-0 w-64 h-64 bg-theme-primary/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
-               <div className="relative z-10 space-y-6">
+          {/* 증상 및 진단 섹션 - 대비 강화 */}
+          <section className="mb-[40px]">
+            <h3 className="text-[11px] font-black text-slate-300 mb-4 uppercase tracking-[0.25em]">02. Intelligent Analysis</h3>
+            <div className="bg-slate-900 rounded-[32px] p-10 text-white relative overflow-hidden shadow-2xl">
+               <div className="absolute top-0 right-0 w-80 h-80 bg-theme-primary/10 rounded-full blur-[100px] -mr-40 -mt-40"></div>
+               <div className="relative z-10 space-y-8">
                  <div>
-                    <h4 className="flex items-center gap-2 text-red-400 text-xs font-black uppercase mb-3">
-                       <AlertTriangle size={14} /> Reported Symptom
+                    <h4 className="flex items-center gap-2 text-theme-primary text-[10px] font-black uppercase mb-4 tracking-widest">
+                       <AlertTriangle size={12} className="text-red-400" /> Detected Anomaly
                     </h4>
-                    <p className="text-xl font-bold leading-tight">
-                      "{mockData.symptom}"
+                    <p className="text-2xl font-bold leading-tight tracking-tight">
+                      {mockData.symptom}
                     </p>
                  </div>
                  
-                 <div className="h-px bg-white/10 w-full"></div>
+                 <div className="h-[1px] bg-white/5 w-full"></div>
 
                  <div>
-                    <h4 className="text-theme-primary text-xs font-black uppercase mb-3">
-                       Inferred Cause & Diagnosis
+                    <h4 className="text-theme-primary text-[10px] font-black uppercase mb-4 tracking-widest">
+                       Root Cause Diagnosis
                     </h4>
-                    <p className="text-slate-300 leading-relaxed text-sm font-medium">
+                    <p className="text-slate-400 leading-relaxed text-[15px] font-medium">
                       {mockData.aiDiagnosis}
                     </p>
                  </div>
@@ -145,16 +147,16 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen })
             </div>
           </section>
 
-          {/* 해결 방안 섹션 - 깔끔하게 */}
-          <section className="mb-12">
-            <h3 className="text-[13px] font-black text-slate-400 mb-4 uppercase tracking-[0.2em]">03. Recommended Action Steps</h3>
-            <div className="grid grid-cols-1 gap-4">
+          {/* 해결 방안 섹션 - 리스트 정밀화 */}
+          <section className="mb-[40px]">
+            <h3 className="text-[11px] font-black text-slate-300 mb-4 uppercase tracking-[0.25em]">03. Strategic Action Plan</h3>
+            <div className="space-y-3">
               {mockData.solutions.map((sol, i) => (
-                <div key={i} className="flex gap-5 items-center bg-slate-50 p-6 rounded-2xl border border-slate-100 transition-colors">
-                  <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white shrink-0 font-black text-xs">
-                    {i + 1}
+                <div key={i} className="flex gap-6 items-center bg-slate-50 p-6 rounded-2xl border border-slate-100 transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-900 shrink-0 font-black text-sm">
+                    {String(i + 1).padStart(2, '0')}
                   </div>
-                  <p className="text-slate-700 font-bold text-sm leading-relaxed">{sol}</p>
+                  <p className="text-slate-700 font-bold text-[14px] leading-snug">{sol}</p>
                 </div>
               ))}
             </div>

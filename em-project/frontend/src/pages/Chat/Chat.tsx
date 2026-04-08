@@ -64,99 +64,122 @@ interface ChatProps {
 
  
 // Chat 컴포넌트 정의
+import { chatService } from '@/src/services/chatService';
+
 export const Chat: React.FC<ChatProps> = ({setScreen, messages, setMessages, chatEndRef, removeAttachment, isAnalyzing, setIsAnalyzing, initialQuery, setInitialQuery }) => {
 const [inputText, setInputText] = useState('');
 const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
-const [isListening, setIsListening] = useState(false);
-
+const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
 const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 const [currentVideoUrl, setCurrentVideoUrl] = useState('');
-const hasProcessedInitialQuery = useRef(false); // [BUG FIX] Strict Mode 중복 호출 방지용
+const hasProcessedInitialQuery = useRef(false);
+
+const handleFeedback = async (messageId: string, isLike: boolean) => {
+  try {
+    await api.post('/chat/feedback', {
+      messageId,
+      feedback: isLike ? 'LIKE' : 'DISLIKE'
+    });
+    alert(isLike ? '좋은 답변 피드백 감사합니다.' : '답변 개선에 참고하겠습니다.');
+  } catch (error) {
+    console.error("피드백 전송 실패:", error);
+  }
+};
 
 // [UX] 전송 버튼 활성화 조건
 const canSend = inputText.trim().length > 0 || attachedFiles.length > 0;
 
-// 이미지 처리 통합 로직
-const processFiles = async (files: FileList | null) => {
-    if (!files) return;
-    setIsAnalyzing(true);
-    const resized = await Promise.all(Array.from(files).map(f => resizeImage(f)));
-    setAttachedFiles(prev => [...prev, ...resized]);
+// 채팅 스크롤 관리
+useEffect(() => {
+  chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+}, [messages]);
+
+useEffect(() => {
+  // initialQuery가 있으면 새 방을 만들고 시작
+  if (initialQuery && !hasProcessedInitialQuery.current) {
+    startNewChat(initialQuery);
+    hasProcessedInitialQuery.current = true;
+    if (setInitialQuery) setInitialQuery('');
+  }
+}, [initialQuery]);
+
+const startNewChat = async (query: string) => {
+  setIsAnalyzing(true);
+  try {
+    // 1. 새 채팅방 생성 (제목은 쿼리 내용으로)
+    const newRoom = await chatService.createChatRoom(query.substring(0, 20));
+    setActiveRoomId(newRoom.id);
+    
+    // 2. 초기 메시지 전송
+    await onSendMessage(query, newRoom.id);
+  } catch (error) {
+    console.error("새 채팅 시작 실패:", error);
+  } finally {
     setIsAnalyzing(false);
-  };
+  }
+};
 
-// 채팅 스크롤 관리 (useEffect) 안으로 가져오기
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+const onSendMessage = async (customText?: string, targetRoomId?: number) => {
+  if (isAnalyzing && !targetRoomId) return; 
+  
+  const userText = customText || inputText;
+  const userAttachments = [...attachedFiles];
+  
+  if (!userText.trim() && userAttachments.length === 0) return;
 
-  useEffect(() => {
-    // initialQuery가 있고 아직 처리되지 않았을 때만 실행
-    if (initialQuery && !hasProcessedInitialQuery.current) {
-      onSendMessage(initialQuery);
-      hasProcessedInitialQuery.current = true; // 처리됨 표시
-      if (setInitialQuery) setInitialQuery('');
-    }
-  }, [initialQuery]);
-
-  const handleFeedback = async (messageId: string, isLike: boolean) => {
-    try {
-      await api.post('/chat/feedback', {
-        messageId,
-        feedback: isLike ? 'LIKE' : 'DISLIKE'
-      });
-      alert(isLike ? '좋은 답변 피드백 감사합니다.' : '답변 개선에 참고하겠습니다.');
-    } catch (error) {
-      console.error("피드백 전송 실패:", error);
-    }
-  };
-
-  const onSendMessage = async (customText?: string) => {
-    // 분석 중이거나 내용이 없으면 전송 차단
-    if (isAnalyzing) return; 
-    
-    const userText = customText || inputText;
-    const userAttachments = [...attachedFiles];
-    
-    if (!userText.trim() && userAttachments.length === 0) return;
-
-    const newUserMsg: Message = { id: Date.now().toString(), senderType: 'USER', text: userText, attachments: userAttachments };
-    setMessages(prev => [...prev, newUserMsg]);
-    setInputText(''); 
-    setAttachedFiles([]);
+  // UI 즉시 반영
+  const newUserMsg: Message = { id: Date.now().toString(), senderType: 'USER', text: userText, attachments: userAttachments };
+  setMessages(prev => [...prev, newUserMsg]);
+  setInputText(''); 
+  setAttachedFiles([]);
+  
+  if (!targetRoomId && !activeRoomId) {
+    // 방이 없으면 생성 후 전송
     setIsAnalyzing(true);
-
     try {
-      // [백엔드 연결] 임시로 roomId 1 하드코딩
-      const roomId = 1;
-
-      const response = await api.post(`/chat/rooms/${roomId}/ask`, {
-        message: userText
-        // 현재 백엔드 DTO(ChatAskRequest)에는 이미지 필드가 없음
-      });
-
-      const data = response.data; // ChatMessageResponse
-      
-      const fixieMsg: Message = { 
-        id: String(data.id || Date.now() + 1), 
-        senderType: 'AI', 
-        text: data.message || '답변을 생성할 수 없습니다.', 
-        type: 'guide',
-        referencedPage: data.referencedPage
-      };
-      setMessages(prev => [...prev, fixieMsg]);
-    } catch (error: any) {
-      console.error("AI 질문 실패:", error);
-      const errorMsg: Message = { 
-        id: String(Date.now() + 1), 
-        senderType: 'AI', 
-        text: `서버 응답 오류: ${error.response?.data?.message || error.message || '알 수 없는 오류가 발생했습니다.'}` 
-      };
-      setMessages(prev => [...prev, errorMsg]);
+      const newRoom = await chatService.createChatRoom(userText.substring(0, 20));
+      setActiveRoomId(newRoom.id);
+      await performAsk(newRoom.id, userText);
+    } catch (error) {
+      handleChatError(error);
     } finally {
       setIsAnalyzing(false);
     }
+  } else {
+    // 이미 방이 있으면 바로 전송
+    setIsAnalyzing(true);
+    try {
+      await performAsk(targetRoomId || activeRoomId!, userText);
+    } catch (error) {
+      handleChatError(error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+};
+
+const performAsk = async (roomId: number, text: string) => {
+  const data = await chatService.askQuestion(roomId, text);
+  
+  const fixieMsg: Message = { 
+    id: String(data.id || Date.now() + 1), 
+    senderType: 'AI', 
+    text: data.message || '답변을 생성할 수 없습니다.', 
+    type: 'guide',
+    referencedPage: data.referencedPage
   };
+  setMessages(prev => [...prev, fixieMsg]);
+};
+
+const handleChatError = (error: any) => {
+  console.error("채팅 오류:", error);
+  const errorMsg: Message = { 
+    id: String(Date.now() + 1), 
+    senderType: 'AI', 
+    text: `오류가 발생했습니다: ${error.response?.data?.message || error.message}` 
+  };
+  setMessages(prev => [...prev, errorMsg]);
+};
 
   {/* 이미지 리사이징 함수 */}
   const resizeImage = (file: File, maxWidth: number = 800): Promise<string> => {
@@ -243,9 +266,9 @@ const processFiles = async (files: FileList | null) => {
 
 
 
- {/* 안전 확인 박스 */}
+  {/* 안전 확인 박스 */}
   return (
-    <div className="flex flex-col h-[calc(100dvh-5rem)] md:h-dvh bg-white md:bg-fixie-mist md:rounded-3xl md:shadow-xl overflow-hidden relative">      
+    <div className="flex flex-col h-[100dvh] md:h-dvh bg-white md:bg-fixie-mist md:rounded-3xl md:shadow-xl overflow-hidden relative">      
       {/* 상단 헤더 */}
       <header className="p-4 bg-white flex items-center justify-between border-b border-slate-50 z-10">        
         <div className="flex items-center gap-3">

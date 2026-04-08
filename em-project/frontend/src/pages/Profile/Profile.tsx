@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '@/src/api/apiService';
+import { authService } from '@/src/services/authService';
+import { useToastStore } from '@/src/store/useToastStore';
 import { ArrowLeft, Camera } from 'lucide-react';
 import { Screen } from '@/src/types/index';
 
@@ -8,20 +10,47 @@ interface ProfileProps {
 }
 
 export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
-  const [nickname, setNickname] = useState('사용자님');
+  const [nickname, setNickname] = useState('');
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const { showToast } = useToastStore();
+
+  // 최초 로드 시 서버로부터 유저 정보 호출
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await api.get('/users/me');
+        if (response.data && response.data.nickname) {
+          setNickname(response.data.nickname);
+        }
+      } catch (error) {
+        console.error("유저 정보 로드 실패:", error);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
+    fetchUser();
+  }, []);
 
   const handleSave = async () => {
+    if (!nickname.trim()) return showToast('닉네임을 입력해주세요.', 'error');
+    
     setIsSaving(true);
     try {
-      // 백엔드 명세서에 맞게 /users/me로 변경
-      await api.put('/users/me', { nickname });
-      alert('프로필이 성공적으로 업데이트 되었습니다!');
+      const response = await api.put('/users/me', { nickname });
+      // 서버에서 반환된 최신 데이터로 상태 갱신
+      if (response.data && response.data.nickname) {
+        setNickname(response.data.nickname);
+      }
+      showToast('프로필이 성공적으로 업데이트 되었습니다! 🎉', 'success');
+      
+      // 세션이나 다른 컴포넌트 동기화를 위해 페이지 리프레시 혹은 상태 트리거 (권장)
+      // window.location.reload(); // 가장 확실한 동기화 방법 중 하나
     } catch (error: any) {
       console.error("프로필 업데이트 실패:", error);
       const msg = error.response?.data?.message || '업데이트에 실패했습니다.';
-      alert(msg);
+      showToast(msg, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -32,27 +61,28 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
 
     setIsWithdrawing(true);
     try {
-      // 1. 서버에 탈퇴 요청 (DELETE /api/users/me) - Vite 프록시 터널 이용
-      const response = await api.delete('/users/me');
+      // 1. 서비스 레이어를 통한 탈퇴 요청 (DELETE /api/users/me)
+      const result = await authService.withdraw();
 
-      // 2. 서버 응답 코드 엄격하게 확인 (200 OK 또는 204 No Content)
-      if (response.status === 200 || response.status === 204) {
+      // 2. 결과 확인 및 후속 조치 (성공 시에만 클린업 진행)
+      if (result.success) {
         console.log("회원 탈퇴 성공 (서버)");
         
-        // 3. 성공 시 localStorage 싹 밀어버리기
-        localStorage.clear();
+        // 3. 성공 후 로컬 데이터 정리
+        authService.logout();
         
+        // 4. 성공 알림 (브라우저 정책상 이동 전 짧게 보여주거나 생략될 수 있음)
         alert('회원 탈퇴가 안전하게 처리되었습니다. 그동안 이용해 주셔서 감사합니다.');
         
-        // 4. 강제 새로고침(Full Reload)으로 모든 인메모리 상태 파기 및 초기화
+        // 5. 페이지 강제 이동 및 초기화
         window.location.replace('/');
       } else {
-        throw new Error(`탈퇴 실패 (상태 코드: ${response.status})`);
+        // 실패 시 Toast 알림 (사용자 요청 사항)
+        showToast(result.message || '탈퇴 도중 오류가 발생했습니다.', 'error');
       }
     } catch (error: any) {
-      console.error("회원 탈퇴 실패:", error);
-      const msg = error.response?.data?.message || '회원 탈퇴 도중 오류가 발생했습니다. 다시 시도해 주세요.';
-      alert(msg);
+      console.error("회원 탈퇴 처리 중 예외 발생:", error);
+      showToast('처리 도중 예상치 못한 오류가 발생했습니다.', 'error');
     } finally {
       setIsWithdrawing(false);
     }

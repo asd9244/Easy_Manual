@@ -12,9 +12,8 @@ import {
   Search 
 } from 'lucide-react';
 import { Device, Screen } from '@/src/types/index';
-import { api } from '@/src/api/apiService';
+import { deviceService } from '@/src/services/deviceService';
 
-// 1. 필요한 데이터와 함수들을 부모(App.tsx)로부터 받기 위한 설계도
 interface GarageProps {
   setScreen: (screen: Screen) => void;
   devices: Device[];
@@ -53,8 +52,7 @@ export const Garage: React.FC<GarageProps> = ({
     }
   }, [scannedModel, isSearching]);
 
-  // 검색 API 연동 (Debounce 적용 가능, 여기서는 문자열 변경 시마다 백엔드 조회 가정)
-  // [주의] 백엔드에 /api/devices/search 엔드포인트가 있다고 가정
+  // 검색 API 연동
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (query.trim().length === 0) {
@@ -62,37 +60,33 @@ export const Garage: React.FC<GarageProps> = ({
       return;
     }
     try {
-      const response = await api.get(`/devices/search`, { params: { query } });
-      setSearchResults(response.data);
+      const results = await deviceService.searchModels(query);
+      setSearchResults(results);
     } catch (error) {
       console.error("모델 검색 실패:", error);
-      // fallback mock (실제론 안 씀)
-      const DUMMY_MODELS = [{ model: 'LG 휘센 에어컨 FQ17SADWE2' }];
-      setSearchResults(DUMMY_MODELS.filter(m => m.model.includes(query.toUpperCase())));
     }
   };
 
   const handleRegisterDevice = async (model: string) => {
     setIsRegistering(true);
     try {
-      const response = await api.post('/devices', {
-        model,
-        alias: model // 기본 별명으로 모델명 사용
-      });
-      // response.data 가 Device 객체라고 가정
-      const newDevice = {
-        id: String(response.data.id || Date.now()),
-        name: response.data.alias || model,
-        model: response.data.model || model,
-        image: 'https://picsum.photos/seed/purifier/400/400'
+      const responseData = await deviceService.registerDevice(model);
+      
+      const newDevice: Device = {
+        id: String(responseData.id),
+        name: responseData.alias || model,
+        model: responseData.model || model,
+        image: responseData.image || 'https://picsum.photos/seed/appliance/400/400',
+        icon: deviceService.getIconByModel(responseData.model || model)
       };
+      
       setDevices(prev => [...prev, newDevice]);
       setIsSearching(false);
       setSearchQuery('');
-      alert("성공적으로 기기가 등록되었습니다!");
+      alert("성공적으로 기기가 등록되었습니다! 🎉");
     } catch (error) {
       console.error("기기 등록 실패:", error);
-      alert("기기 등록에 실패했습니다.");
+      alert("기기 등록에 실패했습니다. 이미 등록된 기기인지 확인해 주세요.");
     } finally {
       setIsRegistering(false);
     }
@@ -303,24 +297,59 @@ export const Garage: React.FC<GarageProps> = ({
                   />
                 </div>
 
-                {/* 검색 결과 리스트 */}
-                <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
-                  {searchQuery.length > 0 ? (
-                    searchResults.length > 0 ? (
-                      searchResults.map((device, idx) => (
+                {/* 검색 결과 목록 */}
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 custom-scrollbar">
+                  {searchResults.length > 0 ? (
+                    searchResults.map((item, idx) => (
+                      <motion.button
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        key={idx}
+                        onClick={() => handleRegisterDevice(item.model)}
+                        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-theme-primary/5 rounded-2xl border border-slate-100 transition-all group"
+                      >
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-slate-700 group-hover:text-theme-primary transition-colors">{item.model}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider">{item.category || 'Appliance'}</p>
+                        </div>
+                        <Plus size={18} className="text-slate-300 group-hover:text-theme-primary transition-colors" />
+                      </motion.button>
+                    ))
+                  ) : searchQuery.trim() !== '' ? (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="py-10 text-center"
+                    >
+                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Search size={24} className="text-slate-300" />
+                      </div>
+                      <p className="text-slate-500 font-bold mb-1">검색 결과가 없습니다</p>
+                      <p className="text-xs text-slate-400 mb-6 px-10">찾으시는 모델이 목록에 없나요?<br/>직접 정보를 입력하여 등록할 수 있습니다.</p>
+                      
+                      {/* 수동 입력 폼 토글/버튼 */}
+                      <div className="space-y-4 px-4 text-left">
+                        <div className="h-[1px] bg-slate-100 w-full mb-6"></div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 ml-1 uppercase">Model Name</label>
+                          <input 
+                            type="text"
+                            placeholder="예: LG 휘센 에어컨"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 mt-1.5 focus:outline-none focus:ring-2 focus:ring-theme-primary/30 font-bold text-sm"
+                          />
+                        </div>
                         <button 
-                          key={idx} 
-                          disabled={isRegistering}
-                          onClick={() => handleRegisterDevice(device.model || device)}
-                          className="w-full text-left p-4 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100 flex justify-between items-center"
+                          onClick={() => handleRegisterDevice(searchQuery)}
+                          disabled={isRegistering || !searchQuery.trim()}
+                          className="w-full h-12 bg-fixie-steel text-white font-bold rounded-xl shadow-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
                         >
-                          <span className="font-bold text-slate-700">{device.model || device}</span>
-                          <span className="text-xs text-theme-primary opacity-0 group-hover:opacity-100">등록하기</span>
+                          {isRegistering ? "등록 중..." : "이 모델 직접 등록하기"}
                         </button>
-                      ))
-                    ) : (
-                      <div className="text-center text-slate-400 py-10 text-sm font-bold">검색 결과가 없습니다 😢</div>
-                    )
+                      </div>
+                    </motion.div>
                   ) : (
                     <div className="text-center text-slate-400 py-10 text-sm font-bold">모델명이나 브랜드를 입력해주세요.</div>
                   )}
