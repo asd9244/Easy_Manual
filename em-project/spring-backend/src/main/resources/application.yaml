@@ -1,29 +1,55 @@
 server:
-  port: 8080 # FastAPI가 8000을 쓰므로 Spring은 8080을 씁니다.
+  port: 8080
 
 spring:
   application:
     name: backend-core
 
-  # 1. PostgreSQL DB 연결 설정
   datasource:
-    url: jdbc:postgresql://localhost:5432/pixie
-    username: postgres      # 🌟 본인의 PostgreSQL 아이디 (보통 postgres)
-    password: 1234          # 🌟 본인의 PostgreSQL 비밀번호
+    # 🌟 수정됨: .env 파일에서 값을 가져옵니다.
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
-  # 2. JPA (ORM) 설정
   jpa:
     hibernate:
-      # 🌟 핵심: update로 설정하면, 아까 짠 Entity 코드를 보고 Spring이 알아서 테이블을 만들어줍니다!
       ddl-auto: update
-    show-sql: true          # 콘솔창에 실행되는 SQL 쿼리를 보여줌
+    show-sql: true
     properties:
       hibernate:
-        format_sql: true    # SQL 쿼리를 한 줄이 아니라 예쁘게 줄바꿈해서 보여줌
-        default_batch_fetch_size: 1000 # 실무 꿀팁: N+1 쿼리 성능 문제 방지용
+        format_sql: true
+        default_batch_fetch_size: 1000
 
-  # 3. (선택) 나중에 쓸 JWT 비밀키 미리 세팅
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            # 🌟 수정됨: .env 파일에서 값을 가져옵니다.
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - email
+              - profile
+          kakao:
+            # 🌟 수정됨: .env 파일에서 값을 가져옵니다.
+            client-id: ${KAKAO_CLIENT_ID}
+            client-secret: ${KAKAO_CLIENT_SECRET}
+            redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
+            authorization-grant-type: authorization_code
+            client-authentication-method: client_secret_post
+            client-name: Kakao
+            scope:
+              - profile_nickname
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
 jwt:
-  secret: "PixieEasyManualProjectSecretKeyForJwtAuthentication2026"
-  expiration: 86400000 # 24시간 (밀리초)
+  # 🌟 수정됨: .env 파일에서 값을 가져옵니다.
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION}

@@ -21,3 +21,6 @@ node_modules/
 
 # 의존성 폴더
 node_modules/
+
+# 비밀키, ai키 등등
+.env
