@@ -119,7 +119,7 @@ export const SettingsSubpage: React.FC<SettingsSubpageProps> = ({ title, setScre
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 text-left pb-20 w-full">
+    <div className="max-w-3xl mx-auto space-y-6 text-left pb-20 w-full px-4 md:px-0">
       <header className="flex items-center gap-4 mb-6 px-1">
         <button 
           onClick={() => setScreen('settings')} 
@@ -128,7 +128,7 @@ export const SettingsSubpage: React.FC<SettingsSubpageProps> = ({ title, setScre
           <ChevronLeft size={20} className="text-slate-600" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
+          <h1 className="text-xl font-bold text-slate-800">{title}</h1>
         </div>
       </header>
 

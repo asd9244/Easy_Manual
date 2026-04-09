@@ -1,21 +1,22 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export const FixieLogo = ({ 
-  size = 100, 
-  ripple = false, 
+export const FixieLogo = ({
+  size = 100,
+  ripple = false,
   rainbow = false,
-  src, 
-  customSvg 
-}: { 
-  size?: number, 
-  ripple?: boolean, 
+  src,
+  customSvg
+}: {
+  size?: number,
+  ripple?: boolean,
   rainbow?: boolean,
-  src?: string, 
-  customSvg?: React.ReactNode 
+  color?: string,
+  src?: string,
+  customSvg?: React.ReactNode
 }) => {
   const rainbowColors = [
-    'var(--theme-primary)', 'var(--theme-secondary)', 'var(--theme-primary)', 
+    'var(--theme-primary)', 'var(--theme-secondary)', 'var(--theme-primary)',
     'var(--theme-secondary)', 'var(--theme-primary)', 'var(--theme-secondary)', 'var(--theme-primary)',
   ];
 
@@ -50,12 +51,12 @@ export const FixieLogo = ({
           </>
         )}
       </AnimatePresence>
-      <motion.div 
+      <motion.div
         className="relative z-10"
         animate={{ y: [0, -10, 0] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       >
-        <div 
+        <div
           className="rounded-full bg-wing-gradient flex items-center justify-center shadow-lg overflow-hidden"
           style={{ width: size, height: size }}
         >

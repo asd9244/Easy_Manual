@@ -30,7 +30,7 @@ interface HomeProps {
 // 2. renderHome 대신 'Home'이라는 이름의 컴포넌트로 만들기.
 export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGuideClick }) => {
   return (
-    <div className="max-w-7xl mx-auto space-y-10 text-left px-4 md:px-8">
+    <div className="max-w-3xl mx-auto space-y-10 text-left px-4 md:px-8">
       
       {/* 1. 상단 헤더 & 프로필 */}
       <header className="flex justify-between items-start">
@@ -38,7 +38,7 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
           <h2 className="text-sm font-bold text-slate-500 mb-1 flex items-center gap-1">
             안녕하세요 👋
           </h2>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">내 대시보드</h1>
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight">내 대시보드</h1>
         </div>
         {/* 우측 상단 프로필 이미지 영역 */}
         <div className="w-12 h-12 rounded-full bg-wing-gradient flex items-center justify-center text-white shadow-lg shadow-theme-primary/20 cursor-pointer hover:scale-105 transition-transform">
@@ -86,7 +86,7 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
             )}
             
             <button 
-              onClick={() => setScreen('garage')} 
+              onClick={() => setScreen('scan')} 
               className="w-full py-4 mt-2 border-2 border-dashed border-white/30 rounded-3xl flex items-center justify-center gap-2 text-slate-400 font-bold hover:bg-white/20 hover:border-theme-primary hover:text-theme-primary transition-all duration-300 backdrop-blur-sm"
             >
               <Plus size={20} />
