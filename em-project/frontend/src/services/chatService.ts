@@ -22,11 +22,10 @@ export const chatService = {
   /**
    * 채팅방 생성
    */
-  createChatRoom: async (title: string, deviceId?: string) => {
+  createChatRoom: async (userDeviceId: string | number) => {
     try {
       const response = await api.post('/chat/rooms', { 
-        title, 
-        deviceId: deviceId ? Number(deviceId) : null 
+        userDeviceId: Number(userDeviceId)
       });
       return response.data; // { id: ... }
     } catch (error) {
@@ -47,7 +46,9 @@ export const chatService = {
           senderType: m.senderType, 
           text: m.message,
           timestamp: m.createdAt,
-          type: m.senderType === 'AI' ? 'guide' : undefined
+          type: m.senderType === 'AI' ? 'guide' : undefined,
+          referencedPage: m.referencedPage,
+          manualImageUrl: m.manualImageUrl
         }));
       }
       return [];
@@ -60,9 +61,12 @@ export const chatService = {
   /**
    * AI에게 질문하기
    */
-  askQuestion: async (roomId: number, message: string) => {
+  askQuestion: async (roomId: number, message: string, mediaUrl?: string) => {
     try {
-      const response = await api.post(`/chat/rooms/${roomId}/ask`, { message });
+      const response = await api.post(`/chat/rooms/${roomId}/ask`, { 
+        message,
+        mediaUrl: mediaUrl || null
+      });
       return response.data; // ChatMessageResponse
     } catch (error) {
       console.error("AI 질문 실패:", error);

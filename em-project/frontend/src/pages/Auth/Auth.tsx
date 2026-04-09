@@ -83,7 +83,7 @@ export const AuthScreen = ({ onLogin }: any) => {
           <div className="mt-4 space-y-4 w-full">
             {/* 구글 로그인 버튼 (SVG 아이콘 삽입) */}
             <button 
-              onClick={() => window.location.href = '/api/oauth2/authorization/google'} 
+              onClick={() => window.location.href = '/oauth2/authorization/google'} 
               className="w-full h-14 bg-white border border-slate-200 rounded-2xl flex items-center justify-center font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors relative"
             >
               <svg className="w-5 h-5 absolute left-6" viewBox="0 0 24 24">
@@ -97,7 +97,7 @@ export const AuthScreen = ({ onLogin }: any) => {
 
             {/* 카카오 로그인 버튼 (SVG 아이콘 삽입) */}
             <button 
-              onClick={() => window.location.href = '/api/oauth2/authorization/kakao'} 
+              onClick={() => window.location.href = '/oauth2/authorization/kakao'} 
               className="w-full h-14 bg-[#FEE500] rounded-2xl flex items-center justify-center font-bold text-[#191919] shadow-sm hover:bg-[#FDD800] transition-colors relative"
             >
               <svg className="w-5 h-5 absolute left-6" viewBox="0 0 24 24" fill="#191919">
