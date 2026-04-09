@@ -32,8 +32,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 프론트엔드 주소 허용
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        // 프론트엔드 주소 허용 (localhost 와 127.0.0.1 둘 다 허용)
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://127.0.0.1:3000"));
         // GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용
         configuration.setAllowedMethods(List.of("*"));
         // 모든 헤더(Authorization 등) 허용
