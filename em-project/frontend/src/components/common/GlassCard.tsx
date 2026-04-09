@@ -21,7 +21,7 @@ export const GlassCard = ({ children, className = "", onClick }: GlassCardProps)
       className={`
         transition-all duration-300
         bg-transparent p-0 mb-0 shadow-none border-b border-slate-100 rounded-none
-        md:glass md:rounded-3xl md:p-6 md:mb-4 md:border md:border-slate-100 
+        md:glass md:rounded-3xl md:p-6 md:mb-4 md:border md:border-white/20 md:backdrop-blur-xl 
         md:shadow-sm md:hover:shadow-lg md:hover:border-theme-primary/20
         ${className}
       `}
