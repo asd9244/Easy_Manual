@@ -10,7 +10,8 @@ import {
   FileText,
   ShieldCheck,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  Image as ImageIcon
 } from 'lucide-react';
 import { FixieLogo } from '@/src/components/common/FixieLogo';
 import { Message, Screen } from '@/src/types/index';
@@ -59,6 +60,8 @@ interface ChatProps {
   setIsAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
   initialQuery?: string;
   setInitialQuery?: React.Dispatch<React.SetStateAction<string>>;
+  devices?: any[]; // 기기 목록 추가
+  roomId?: number | null; // 추가
  }
 
 
@@ -66,7 +69,7 @@ interface ChatProps {
 // Chat 컴포넌트 정의
 import { chatService } from '@/src/services/chatService';
 
-export const Chat: React.FC<ChatProps> = ({setScreen, messages, setMessages, chatEndRef, removeAttachment, isAnalyzing, setIsAnalyzing, initialQuery, setInitialQuery }) => {
+export const Chat: React.FC<ChatProps> = ({setScreen, messages, setMessages, chatEndRef, removeAttachment, isAnalyzing, setIsAnalyzing, initialQuery, setInitialQuery, devices, roomId }) => {
 const [inputText, setInputText] = useState('');
 const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
 const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
@@ -103,11 +106,32 @@ useEffect(() => {
   }
 }, [initialQuery]);
 
+// [추가] roomId가 있으면 대화 내역 불러오기
+useEffect(() => {
+  if (roomId) {
+    setActiveRoomId(roomId);
+    loadRoomMessages(roomId);
+  }
+}, [roomId]);
+
+const loadRoomMessages = async (id: number) => {
+  setIsAnalyzing(true);
+  try {
+    const history = await chatService.getMessages(id);
+    setMessages(history);
+  } catch (error) {
+    console.error("대화 내역 로드 실패:", error);
+  } finally {
+    setIsAnalyzing(false);
+  }
+};
+
 const startNewChat = async (query: string) => {
   setIsAnalyzing(true);
   try {
-    // 1. 새 채팅방 생성 (제목은 쿼리 내용으로)
-    const newRoom = await chatService.createChatRoom(query.substring(0, 20));
+    // 1. 새 채팅방 생성 (현재 선택된 기기 혹은 첫 번째 기기 활용)
+    const deviceId = devices && devices.length > 0 ? devices[0].id : 1; 
+    const newRoom = await chatService.createChatRoom(deviceId);
     setActiveRoomId(newRoom.id);
     
     // 2. 초기 메시지 전송
@@ -137,9 +161,10 @@ const onSendMessage = async (customText?: string, targetRoomId?: number) => {
     // 방이 없으면 생성 후 전송
     setIsAnalyzing(true);
     try {
-      const newRoom = await chatService.createChatRoom(userText.substring(0, 20));
+      const deviceId = devices && devices.length > 0 ? devices[0].id : 1;
+      const newRoom = await chatService.createChatRoom(deviceId);
       setActiveRoomId(newRoom.id);
-      await performAsk(newRoom.id, userText);
+      await performAsk(newRoom.id, userText, userAttachments[0]);
     } catch (error) {
       handleChatError(error);
     } finally {
@@ -149,7 +174,7 @@ const onSendMessage = async (customText?: string, targetRoomId?: number) => {
     // 이미 방이 있으면 바로 전송
     setIsAnalyzing(true);
     try {
-      await performAsk(targetRoomId || activeRoomId!, userText);
+      await performAsk(targetRoomId || activeRoomId!, userText, userAttachments[0]);
     } catch (error) {
       handleChatError(error);
     } finally {
@@ -158,15 +183,16 @@ const onSendMessage = async (customText?: string, targetRoomId?: number) => {
   }
 };
 
-const performAsk = async (roomId: number, text: string) => {
-  const data = await chatService.askQuestion(roomId, text);
+const performAsk = async (roomId: number, text: string, mediaUrl?: string) => {
+  const data = await chatService.askQuestion(roomId, text, mediaUrl);
   
   const fixieMsg: Message = { 
     id: String(data.id || Date.now() + 1), 
     senderType: 'AI', 
     text: data.message || '답변을 생성할 수 없습니다.', 
     type: 'guide',
-    referencedPage: data.referencedPage
+    referencedPage: data.referencedPage,
+    manualImageUrl: data.manualImageUrl
   };
   setMessages(prev => [...prev, fixieMsg]);
 };
@@ -319,13 +345,30 @@ const handleChatError = (error: any) => {
               )}
               
               
-              {/* 가이드 타입 메시지 (비디오, 위치 이미지 포함) */}
-              {msg.type === 'guide' && (
-                <div className="mt-3 space-y-3">
+              {/* 가이드 타입 메시지 (매뉴얼 이미지, 비디오, 페이지 참고 등 포함) */}
+              {msg.senderType === 'AI' && (
+                <div className="mt-2 space-y-3">
                   
-                  {/* 나중에 들어갈 동영상 자리 (미리 만들어두기) */}
-                  {msg.videoUrl && (
-                    <div className="relative overflow-hidden rounded-2xl aspect-video bg-slate-800 shadow-sm group">
+                  {/* 백엔드에서 온 매뉴얼 위치 이미지 */}
+                  {msg.manualImageUrl && (
+                    <div className="mb-2">
+                      <p className="text-[11px] font-bold text-theme-primary mb-1.5 flex items-center gap-1">
+                         <ImageIcon size={12} /> 매뉴얼 위치 이미지
+                      </p>
+                      <img 
+                        src={msg.manualImageUrl} 
+                        alt="Manual Guide" 
+                        className="w-full rounded-2xl border border-white/20 shadow-sm"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  )}
+
+                  {msg.type === 'guide' && (
+                    <>
+                      {/* 나중에 들어갈 동영상 자리 (미리 만들어두기) */}
+                      {msg.videoUrl && (
+                        <div className="relative overflow-hidden rounded-2xl aspect-video bg-slate-800 shadow-sm group">
                       
                       {/* 실제 동영상이 들어갈 태그 */}
                       <video src={msg.videoUrl} className="w-full h-full object-cover opacity-80" />
@@ -350,8 +393,19 @@ const handleChatError = (error: any) => {
                       */}
                     </div>
                   )}
+
+                  {/* 참고 페이지 정보 */}
+                  {msg.referencedPage && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100/50 rounded-full w-max border border-slate-100">
+                      <FileText size={12} className="text-slate-400" />
+                      <span className="text-[10px] font-bold text-slate-500">참고: P. {msg.referencedPage}</span>
+                    </div>
+                  )}
+
                   {/* 안전 확인 박스 */}
                   <SafetyCheck text="전원을 뽑았나요?" />
+                    </>
+                  )}
                 </div>
               )}
               

@@ -29,6 +29,7 @@ export interface Message {
   videoUrl?: string; // 옵션
   locatorImage?: string; // 옵션
   mediaUrl?: string; // S3 주소 등을 담을 사진/음성 첨부 기능
-  referencedPage?: string; // AI의 답변 출처를 표기하기 위해
+  referencedPage?: number | string; // AI의 답변 출처를 표기하기 위해
+  manualImageUrl?: string; // 백엔드에서 AI가 찾은 매뉴얼 내 위치 이미지
   attachments?: string[]; // 프론트엔드 UI용 배열
 }

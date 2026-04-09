@@ -31,6 +31,7 @@ import { ThemeSelect } from '@/src/pages/Settings/ThemeSelect';
 import { SplashScreen } from '@/src/pages/SplashScreen/SplashScreen';
 import { TutorialScreen } from '@/src/pages/TutorialScreen/tutorialScreen';
 import { AuthScreen } from '@/src/pages/Auth/Auth';
+import { OAuthRedirectHandler } from '@/src/pages/Auth/OAuthRedirectHandler';
 import { ScanScreen } from '@/src/pages/Scan/Scan'; 
 import { Profile } from './pages/Profile/Profile';
 import { DiagnosticReport } from '@/src/pages/Report/DiagnosticReport';
@@ -59,6 +60,36 @@ export default function App() {
   // 파이프라인 제어용 상태
   const [scannedModel, setScannedModel] = useState<string>('');
   const [initialChatQuery, setInitialChatQuery] = useState<string>('');
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+
+  // 버튼 클릭 시 채팅방 ID 초기화 (홈/가라지 등 이동할 때)
+  const handleMenuClick = (id: Screen) => {
+    setScreen(id);
+    setIsChatReadOnly(false);
+    if (id !== 'chat') setSelectedRoomId(null);
+  };
+
+  //  모바일 하단 메뉴용 (App 내부에 정의하여 상태 공유)
+  const NavItem = ({ id, icon: Icon, label }: any) => {
+    const isActive = screen === id;
+    return (
+      <button 
+        onClick={() => handleMenuClick(id)}
+        className={`relative flex flex-col items-center gap-1 transition-colors duration-200 ${
+          isActive ? 'text-theme-primary' : 'text-slate-400 hover:text-slate-600'
+        }`}
+      >
+        <Icon size={24} />
+        <span className="text-[10px] font-bold">{label}</span>
+        {isActive && (
+          <motion.div
+            layoutId="mobile-active-dot"
+            className="absolute -bottom-3 w-1.5 h-1.5 bg-theme-primary rounded-full"
+          />
+        )}
+      </button>
+    );
+  };
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -118,40 +149,13 @@ export default function App() {
     return () => observer.disconnect();
   }, [screen]);
   
-//  모바일 하단 메뉴용
-const NavItem = ({ id, icon: Icon, label }: any) => {
-  const isActive = screen === id;
-  return (
-    <button 
-      onClick={() => { setScreen(id); setIsChatReadOnly(false); }}
-      className={`relative flex flex-col items-center gap-1 transition-colors duration-200 ${
-        isActive ? 'text-theme-primary' : 'text-slate-400 hover:text-slate-600'
-      }`}
-    >
-      <Icon size={24} />
-      <span className="text-[10px] font-bold">{label}</span>
-      
-      {/* 모바일 마커(점) 애니메이션 */}
-      {isActive && (
-        <motion.div
-          layoutId="mobile-active-dot"
-          className="absolute -bottom-3 w-1.5 h-1.5 bg-theme-primary rounded-full"
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        />
-      )}
-    </button>
-  );
-};
 
 // 데스크탑 사이드바 메뉴용 
 const SidebarItem = ({ id, icon: Icon, label }: any) => {
   const isActive = screen === id;
   return (
     <button 
-      onClick={() => {
-        setScreen(id);
-        setIsChatReadOnly(false);
-      }}  
+      onClick={() => handleMenuClick(id)}  
       className={`relative w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-300 ${
         isActive ? 'bg-wing-gradient text-white shadow-md' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
       }`}
@@ -182,10 +186,23 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
     <div className="min-h-screen w-full overflow-x-hidden text-sm bg-fixie-mist text-fixie-steel font-sans selection:bg-theme-primary/30">
       <Toast />
       <AnimatePresence mode="wait">
-        {/* 1. 독립 화면들 */}
-        {screen === 'splash' && <SplashScreen onComplete={() => setScreen('tutorial')} />}
-        {screen === 'tutorial' && <TutorialScreen step={tutorialStep} setStep={setTutorialStep} onComplete={() => setScreen('auth')} />}
-        {screen === 'auth' && <AuthScreen onLogin={() => setScreen('home')} />}
+        {/* 소셜 로그인 성공 후 리다이렉트 처리 (URL 감지) */}
+        {window.location.pathname === '/oauth2/redirect' ? (
+          <OAuthRedirectHandler 
+            onLogin={() => {
+              // 1. URL 파라미터 청소 (주소창 깔끔하게)
+              window.history.replaceState({}, '', '/');
+              // 2. 홈으로 즉시 이동
+              setScreen('home');
+            }} 
+          />
+        ) : (
+          <>
+            {screen === 'splash' && <SplashScreen onComplete={() => setScreen('tutorial')} />}
+            {screen === 'tutorial' && <TutorialScreen step={tutorialStep} setStep={setTutorialStep} onComplete={() => setScreen('auth')} />}
+            {screen === 'auth' && <AuthScreen onLogin={() => setScreen('home')} />}
+          </>
+        )}
 
         {/* 2. 메인 레이아웃 (사이드바 + 메인 콘텐츠) */}
         {showNav && (
@@ -235,8 +252,8 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
               <AnimatePresence mode="wait">
                 {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} isLoading={isLoadingDevices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} onGuideClick={(title: string) => { setInitialChatQuery(title); setIsAnalyzing(true); setScreen('chat'); }} />}
                 {screen === 'garage' && <Garage key="garage" setScreen={setScreen} devices={devices} setDevices={setDevices} showGarageOptions={showGarageOptions} setShowGarageOptions={setShowGarageOptions} scannedModel={scannedModel} setScannedModel={setScannedModel} />}
-                {screen === 'chat' && <Chat key="chat" setScreen={setScreen} messages={messages} isAnalyzing={isAnalyzing} setIsAnalyzing={setIsAnalyzing} attachedFiles={attachedFiles} chatEndRef={chatEndRef} handleSendMessage={handleSendMessage} handleFileChange={handleFileChange} setMessages={setMessages} isReadOnly={isChatReadOnly} removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} initialQuery={initialChatQuery} setInitialQuery={setInitialChatQuery} />}
-                {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} />}
+                {screen === 'chat' && <Chat key="chat" setScreen={setScreen} messages={messages} isAnalyzing={isAnalyzing} setIsAnalyzing={setIsAnalyzing} attachedFiles={attachedFiles} chatEndRef={chatEndRef} handleSendMessage={handleSendMessage} handleFileChange={handleFileChange} setMessages={setMessages} isReadOnly={isChatReadOnly} removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} initialQuery={initialChatQuery} setInitialQuery={setInitialChatQuery} devices={devices} roomId={selectedRoomId} />}
+                {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} onRoomSelect={(id: number) => setSelectedRoomId(id)} />}
                 {screen === 'settings' && <Settings key="settings" setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />}
                 {screen === 'scan' && <ScanScreen key="scan" onClose={() => setScreen('home')} onScan={(model?: string) => { 
                   if (model && model !== 'ocr_image') { 
@@ -259,7 +276,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
             </main>
 
             <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-2 grid grid-cols-5 items-center justify-items-center z-50">              
-            <NavItem id="home" icon={HomeIcon} label="홈" />
+              <NavItem id="home" icon={HomeIcon} label="홈" />
               <NavItem id="chat" icon={MessageCircle} label="픽시 가이드" />
               <div className="relative -top-6">
                 <button onClick={() => setScreen('scan')} className="w-14 h-14 rounded-full bg-wing-gradient flex items-center justify-center text-white shadow-lg shadow-theme-primary/30 active:scale-95 transition-transform">

@@ -14,9 +14,10 @@ interface HistoryProps {
   setHistoryFilter: (filter: 'all' | 'completed' | 'visit') => void;
   setScreen: (screen: Screen) => void;
   setIsChatReadOnly: (readOnly: boolean) => void;
+  onRoomSelect?: (id: number) => void; // 추가
 }
 
-export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilter, setScreen, setIsChatReadOnly }: HistoryProps) => {
+export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilter, setScreen, setIsChatReadOnly, onRoomSelect }: HistoryProps) => {
   const [historyItems, setHistoryItems] = useState<any[]>([]);
 
   useEffect(() => {
@@ -99,10 +100,10 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
             onClick={() => {
-            // 실제로는 클릭한 ID에 맞는 메시지를 불러와야 하지만, 일단 이동부터!
-            setIsChatReadOnly(true); 
-            setScreen('chat');
-          }}
+              if (onRoomSelect) onRoomSelect(item.id);
+              setIsChatReadOnly(true); 
+              setScreen('chat');
+            }}
             className="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow"
           >
             <div className="flex justify-between items-start mb-4">
