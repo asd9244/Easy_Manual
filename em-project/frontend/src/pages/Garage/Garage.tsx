@@ -95,7 +95,7 @@ export const Garage: React.FC<GarageProps> = ({
 
 
   return (
-    <div className="space-y-8 no-scrollbar">
+    <div className="max-w-7xl mx-auto space-y-8 no-scrollbar px-4 md:px-8">
       <header className="flex items-center gap-4">
         {/* 모바일에서만 보이는 뒤로가기 버튼 */}
         <button 
@@ -118,9 +118,9 @@ export const Garage: React.FC<GarageProps> = ({
           <Reorder.Item 
             key={device.id} 
             value={device}
-            className="bg-white p-4 rounded-2xl flex items-center gap-4 shadow-sm border border-slate-50 cursor-grab active:cursor-grabbing"
+            className="bg-white/80 backdrop-blur-md p-4 rounded-3xl flex items-center gap-4 shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
           >
-            <div className="w-20 h-20 rounded-xl bg-slate-50 flex items-center justify-center text-theme-primary pointer-events-none">
+            <div className="w-20 h-20 rounded-2xl bg-slate-50/50 flex items-center justify-center text-theme-primary pointer-events-none">
               {device.icon ? (
                 <device.icon size={40} />
               ) : (
@@ -145,7 +145,7 @@ export const Garage: React.FC<GarageProps> = ({
       <div className="relative max-w-md w-full">
         <motion.button 
           onClick={() => setShowGarageOptions(!showGarageOptions)}
-          className={`w-full h-16 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all duration-300 z-20 relative ${
+          className={`w-full h-16 rounded-3xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all duration-300 z-20 relative ${
             showGarageOptions ? 'bg-fixie-steel text-white' : 'bg-wing-gradient text-white'
           }`}
           whileTap={{ scale: 0.98 }}
@@ -183,7 +183,7 @@ export const Garage: React.FC<GarageProps> = ({
                         }
                         setShowGarageOptions(false); // 버튼 누르면 옵션 메뉴는 닫기
                     }}
-                    className="w-full p-4 flex items-center gap-4 hover:bg-white rounded-2xl transition-all text-left hover:shadow-md group relative overflow-hidden"
+                    className="w-full p-4 flex items-center gap-4 hover:bg-white/80 rounded-3xl transition-all text-left hover:shadow-md group relative overflow-hidden"
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${opt.color}`}>
                       <opt.icon size={20} />
@@ -227,7 +227,7 @@ export const Garage: React.FC<GarageProps> = ({
                 <input 
                   type="text" 
                   defaultValue={editingDevice?.name} 
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-theme-primary/50"
+                  className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-theme-primary/50"
                 />
               </div>
               {/* 2. 액션 버튼들 (저장, 취소, 삭제) */}
@@ -293,7 +293,7 @@ export const Garage: React.FC<GarageProps> = ({
                     placeholder="예: 휘센, FQ17..." 
                     value={searchQuery}
                     onChange={(e) => handleSearch(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-theme-primary/50"
+                    className="w-full bg-slate-50/50 border border-slate-100 rounded-3xl pl-12 pr-4 py-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-theme-primary/50"
                   />
                 </div>
 
@@ -307,7 +307,7 @@ export const Garage: React.FC<GarageProps> = ({
                         transition={{ delay: idx * 0.05 }}
                         key={idx}
                         onClick={() => handleRegisterDevice(item.model)}
-                        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-theme-primary/5 rounded-2xl border border-slate-100 transition-all group"
+                        className="w-full flex items-center justify-between p-4 bg-slate-50/50 hover:bg-theme-primary/5 rounded-3xl border border-slate-100 transition-all group"
                       >
                         <div className="text-left">
                           <p className="text-sm font-bold text-slate-700 group-hover:text-theme-primary transition-colors">{item.model}</p>

@@ -30,7 +30,7 @@ interface HomeProps {
 // 2. renderHome 대신 'Home'이라는 이름의 컴포넌트로 만들기.
 export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGuideClick }) => {
   return (
-    <div className="max-w-3xl mx-auto space-y-10 text-left">
+    <div className="max-w-7xl mx-auto space-y-10 text-left px-4 md:px-8">
       
       {/* 1. 상단 헤더 & 프로필 */}
       <header className="flex justify-between items-start">
@@ -38,7 +38,7 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
           <h2 className="text-sm font-bold text-slate-500 mb-1 flex items-center gap-1">
             안녕하세요 👋
           </h2>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">내 대시보드</h1>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">내 대시보드</h1>
         </div>
         {/* 우측 상단 프로필 이미지 영역 */}
         <div className="w-12 h-12 rounded-full bg-wing-gradient flex items-center justify-center text-white shadow-lg shadow-theme-primary/20 cursor-pointer hover:scale-105 transition-transform">
@@ -61,7 +61,7 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
         {/* 새롭게 바뀐 카드들 */}
         <div className="space-y-4">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center p-8 bg-white/50 rounded-2xl border border-dashed border-slate-200">
+              <div className="flex flex-col items-center justify-center p-8 bg-white/20 backdrop-blur-lg rounded-3xl border border-dashed border-white/30">
                 <div className="w-8 h-8 border-4 border-theme-primary border-t-transparent rounded-full animate-spin"></div>
                 <p className="mt-4 text-sm font-bold text-slate-400">기기 목록을 불러오는 중...</p>
               </div>
@@ -80,14 +80,14 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
                 />
               ))
             ) : (
-              <div className="flex flex-col items-center justify-center p-8 bg-white/50 rounded-2xl border border-dashed border-slate-200">
+              <div className="flex flex-col items-center justify-center p-8 bg-white/20 backdrop-blur-lg rounded-3xl border border-dashed border-white/30">
                 <p className="text-sm font-bold text-slate-400">등록된 기기가 없습니다.</p>
               </div>
             )}
             
             <button 
               onClick={() => setScreen('garage')} 
-              className="w-full py-4 mt-2 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center gap-2 text-slate-400 font-bold hover:bg-slate-50 hover:border-theme-primary hover:text-theme-primary transition-all duration-300"
+              className="w-full py-4 mt-2 border-2 border-dashed border-white/30 rounded-3xl flex items-center justify-center gap-2 text-slate-400 font-bold hover:bg-white/20 hover:border-theme-primary hover:text-theme-primary transition-all duration-300 backdrop-blur-sm"
             >
               <Plus size={20} />
               새 기기 추가
@@ -107,7 +107,7 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
         <input 
           type="text" 
           placeholder="Fixie에게 무엇이든 물어보세요..." 
-          className="w-full h-16 bg-white rounded-2xl pl-14 pr-32 shadow-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-theme-primary/50 text-sm font-medium transition-shadow group-hover:shadow-md"
+          className="w-full h-16 bg-white/40 backdrop-blur-xl rounded-3xl pl-14 pr-32 shadow-sm border border-white/20 focus:outline-none focus:ring-2 focus:ring-theme-primary/50 text-sm font-medium transition-shadow group-hover:shadow-md"
         />
         <button onClick={() => setScreen('chat')} className="absolute right-3 top-1/2 -translate-y-1/2 bg-fixie-steel text-white w-10 h-10 md:w-auto md:h-auto md:px-6 md:py-2.5 rounded-full md:rounded-xl flex items-center justify-center font-bold text-sm hover:bg-slate-700 transition-colors shadow-md">
           <Send size={18} className="md:hidden -ml-0.5" />
@@ -130,7 +130,7 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
               key={i}
               whileTap={{ scale: 0.99 }}
               onClick={() => onGuideClick && onGuideClick(guide.title)}
-              className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-slate-50 hover:border-theme-primary/30 transition-colors cursor-pointer"
+              className="bg-white/40 backdrop-blur-xl p-4 rounded-3xl flex justify-between items-center shadow-sm border border-white/20 hover:border-theme-primary/30 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-4">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-inner ${guide.color}`}>

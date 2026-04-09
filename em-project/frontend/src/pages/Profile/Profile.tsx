@@ -89,7 +89,7 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 text-left pb-20 w-full">
+    <div className="max-w-3xl mx-auto space-y-8 text-left pb-20 w-full px-4 md:px-0">
       {/* 1. 헤더: 뒤로가기 버튼과 제목 */}
       <header className="flex items-center gap-4 px-1">
         <button onClick={() => setScreen('settings')} className="p-2 bg-white rounded-xl shadow-sm border border-slate-50 hover:bg-slate-50 transition-colors">
@@ -119,7 +119,7 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
             type="text" 
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            className="w-full h-14 bg-white border border-slate-100 rounded-2xl px-6 mt-2 focus:outline-none focus:ring-2 focus:ring-theme-primary/30 font-bold text-slate-700 shadow-sm"
+            className="w-full h-14 bg-white/80 backdrop-blur-md border border-slate-100 rounded-3xl px-6 mt-2 focus:outline-none focus:ring-2 focus:ring-theme-primary/30 font-bold text-slate-700 shadow-sm"
           />
         </div>
       </div>
@@ -128,7 +128,7 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
         <button 
           onClick={handleSave}
           disabled={isSaving || isWithdrawing}
-          className="w-full h-14 bg-wing-gradient text-white font-bold rounded-2xl shadow-lg shadow-theme-primary/20 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+          className="w-full h-14 bg-wing-gradient text-white font-bold rounded-3xl shadow-lg shadow-theme-primary/20 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
         >
           {isSaving ? "처리 중..." : "변경사항 저장"}
         </button>
@@ -140,7 +140,7 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
         <button 
           onClick={handleWithdraw}
           disabled={isSaving || isWithdrawing}
-          className="w-full p-4 text-red-400 font-bold text-sm hover:bg-red-50 rounded-2xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full p-4 text-red-400 font-bold text-sm hover:bg-red-50 rounded-3xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {isWithdrawing ? "탈퇴 처리 중..." : "회원 탈퇴하기"}
         </button>

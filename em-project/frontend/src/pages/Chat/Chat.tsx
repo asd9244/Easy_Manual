@@ -24,10 +24,10 @@ const SafetyCheck = ({ text }: { text: string }) => {
   return (
     <div 
       onClick={() => setIsChecked(!isChecked)}
-      className={`mt-3 flex items-center gap-3 p-3.5 border rounded-2xl cursor-pointer active:scale-[0.98] transition-all duration-300 ${
+      className={`mt-3 flex items-center gap-3 p-3.5 border rounded-3xl cursor-pointer active:scale-[0.98] transition-all duration-300 ${
         isChecked 
           ? 'bg-theme-primary/10 border-theme-primary' 
-          : 'bg-white border-theme-primary/30 hover:bg-slate-50' 
+          : 'bg-white/80 backdrop-blur-md border-white/20 hover:bg-white/90' 
       }`}
     >
       <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
@@ -268,15 +268,15 @@ const handleChatError = (error: any) => {
 
   {/* 안전 확인 박스 */}
   return (
-    <div className="flex flex-col h-[100dvh] md:h-dvh bg-white md:bg-fixie-mist md:rounded-3xl md:shadow-xl overflow-hidden relative">      
+    <div className="flex flex-col h-[100dvh] md:h-[calc(100dvh-40px)] md:my-5 max-w-7xl mx-auto bg-white md:bg-white/90 md:backdrop-blur-xl md:rounded-3xl md:shadow-2xl overflow-hidden relative border border-white/20">      
       {/* 상단 헤더 */}
-      <header className="p-4 bg-white flex items-center justify-between border-b border-slate-50 z-10">        
-        <div className="flex items-center gap-3">
-          <button onClick={() => setScreen('home')} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
+      <header className="p-5 md:p-7 bg-white/80 backdrop-blur-md flex items-center justify-between border-b border-white/20 z-10">        
+        <div className="flex items-center gap-4">
+          <button onClick={() => setScreen('home')} className="w-10 h-10 bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-500 hover:bg-white/80 transition-colors border border-white/20 shadow-sm">
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h3 className="font-bold text-slate-800 text-lg leading-tight">Fixie 가이드</h3>
+            <h3 className="font-bold text-slate-800 text-xl tracking-tight leading-tight">Fixie 가이드</h3>
             <span className="text-[11px] text-theme-primary font-bold">온라인 · 도움 준비 완료</span>
           </div>
         </div>
@@ -286,7 +286,7 @@ const handleChatError = (error: any) => {
       </header>
 
       {/* 메시지 리스트 영역 */}
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-32">
+    <div className="flex-1 overflow-y-auto p-5 md:p-8 space-y-6 no-scrollbar pb-36">
         {messages.map(msg => (
           <motion.div 
             key={msg.id}
@@ -304,8 +304,8 @@ const handleChatError = (error: any) => {
           {/* 메시지 컨텐츠 */}
           <div className={`max-w-[85%] p-1.5 relative ${
                 msg.senderType === 'USER' 
-                  ? 'bg-fixie-steel text-white rounded-3xl rounded-tr-none' 
-                  : 'bg-white text-slate-700 rounded-3xl rounded-tl-none border border-theme-primary/30 shadow-sm' 
+                  ? 'bg-fixie-steel text-white rounded-3xl rounded-tr-none shadow-md' 
+                  : 'bg-white/70 backdrop-blur-md text-slate-700 rounded-3xl rounded-tl-none border border-white/40 shadow-sm' 
           }`}>
 
             <div className="p-3">
@@ -385,7 +385,7 @@ const handleChatError = (error: any) => {
               <div className="absolute top-0 -left-4 w-72 h-72 bg-theme-primary rounded-full mix-blend-screen filter blur-3xl opacity-50 animate-blob" />
               <div className="absolute top-0 -right-4 w-72 h-72 bg-theme-secondary rounded-full mix-blend-screen filter blur-3xl opacity-50 animate-blob animation-delay-2000" />
             </div>
-            <div className="relative z-10 glass p-8 rounded-3xl flex flex-col items-center gap-4">
+            <div className="relative z-10 bg-white/40 backdrop-blur-xl border border-white/20 p-8 rounded-3xl flex flex-col items-center gap-4 shadow-xl">
               <FixieLogo size={60} rainbow={true} />
               <p className="text-sm font-bold text-fixie-steel/70 tracking-tight animate-pulse">FIXIE TIME: 분석 중...</p>
             </div>
@@ -399,8 +399,8 @@ const handleChatError = (error: any) => {
         absolute left-0 right-0 transition-all duration-300
         /* 📱 모바일: 바닥에 딱 붙고 그림자 없는 플랫 스타일 */
         bottom-0 p-3 bg-white border-t border-slate-50
-        /* 💻 데스크탑: 공중에 떠 있고 화려한 스타일 */
-        md:bottom-6 md:left-6 md:right-6 md:p-0 md:bg-transparent md:border-none
+        /* 💻 데스크탑: 공중에 떠 있고 화려한 스타일 (여백 강화) */
+        md:bottom-8 md:left-10 md:right-10 md:p-0 md:bg-transparent md:border-none
       `}>
         
         {/* 첨부파일 미리보기 (입력창 위에 동동 뜸) */}
@@ -428,9 +428,9 @@ const handleChatError = (error: any) => {
         <div className={`
           flex items-center gap-2 transition-all duration-300
           /* 모바일: 연한 회색 배경, 그림자 없음, 더 슬림하게 */
-          bg-slate-50 rounded-full p-1.5 pl-4 shadow-none border border-slate-100/50
+          bg-white/40 backdrop-blur-xl rounded-full p-1.5 pl-4 shadow-none border border-white/20
           /* 데스크탑: 흰색 배경, 화려한 그림자, 더 빵빵하게 */
-          md:bg-white md:p-2 md:pl-4 md:shadow-lg md:border-slate-100
+          md:bg-white/60 md:backdrop-blur-xl md:p-2 md:pl-4 md:shadow-lg md:border-white/30
         `}>
           
           {/* 마이크 버튼 (모바일에서 조금 작게) */}

@@ -31,7 +31,7 @@ export const DeviceStatusCard = ({
       onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500">
+          <div className="w-12 h-12 bg-white/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-slate-500">
             <Icon size={24} />
           </div>
           <div>

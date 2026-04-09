@@ -57,7 +57,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
   };
 
   return (
-    <div className="space-y-8 no-scrollbar pb-20">
+    <div className="max-w-7xl mx-auto space-y-8 no-scrollbar pb-20 px-4 md:px-8">
       <header className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-fixie-steel">질문 이력</h1>
         {/* 상단 공통 공유 버튼 (예: 제일 최근 질문 이력 공유) */}
@@ -79,10 +79,10 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
           <button
             key={cat.id}
             onClick={() => setHistoryFilter(cat.id as any)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            className={`px-4 py-2 rounded-3xl text-xs font-bold transition-all whitespace-nowrap ${
               historyFilter === cat.id 
                 ? 'bg-theme-primary text-white shadow-lg shadow-theme-primary/30' 
-                : 'bg-white text-slate-400 hover:text-slate-600'
+                : 'bg-white/80 backdrop-blur-md text-slate-400 hover:text-slate-600 border border-white/20'
             }`}
           >
             {cat.label}
@@ -103,7 +103,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
             setIsChatReadOnly(true); 
             setScreen('chat');
           }}
-            className="bg-white p-6 rounded-4xl shadow-sm border border-slate-50 flex flex-col"
+            className="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow"
           >
             <div className="flex justify-between items-start mb-4">
               <span className="text-xs font-bold text-slate-300 tracking-tight">{item.date}</span>
@@ -120,13 +120,13 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
             <div className="flex gap-3 mt-auto">
               <button 
                 onClick={handleGoToReport}
-                className="flex-1 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
+                className="flex-1 h-12 bg-white border border-slate-100 rounded-3xl flex items-center justify-center gap-2 text-sm font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
               >
                 <FileText size={18} className="text-slate-400" /> PDF 저장
               </button>
               <button 
                 onClick={(e) => handleShare(e, item.id || i)}
-                className="flex-1 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
+                className="flex-1 h-12 bg-white border border-slate-100 rounded-3xl flex items-center justify-center gap-2 text-sm font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
               >
                 <Share2 size={18} className="text-slate-400" /> 링크 공유
               </button>
