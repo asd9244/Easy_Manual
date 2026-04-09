@@ -95,7 +95,7 @@ export const Garage: React.FC<GarageProps> = ({
 
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 no-scrollbar px-4 md:px-8">
+    <div className="max-w-3xl mx-auto space-y-8 no-scrollbar px-4 md:px-8">
       <header className="flex items-center gap-4">
         {/* 모바일에서만 보이는 뒤로가기 버튼 */}
         <button 
@@ -104,7 +104,7 @@ export const Garage: React.FC<GarageProps> = ({
         >
           <ChevronRight className="rotate-180" />
         </button>
-        <h1 className="text-2xl font-bold">나의 가전</h1>
+        <h1 className="text-xl font-bold">나의 가전</h1>
       </header>
 
       {/* 기기 목록 (드래그로 순서 변경 가능) */}

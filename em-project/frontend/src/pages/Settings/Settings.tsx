@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Bell, 
@@ -12,6 +12,7 @@ import {
 import { Screen, ThemeType } from '@/src/types/index';
 import { Profile } from '../Profile/Profile';
 import { ThemeSelect } from './ThemeSelect';
+import { api } from '@/src/api/apiService';
 
 interface SettingsProps {
   setScreen: (screen: Screen) => void;
@@ -39,9 +40,35 @@ const SettingsItem = ({ icon: Icon, title, subtitle, onClick }: any) => (
 );
 
 export const Settings: React.FC<SettingsProps> = ({ setScreen }) => {
+  const [userInfo, setUserInfo] = useState({ nickname: 'User', email: '사용자@이메일.com' });
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await api.get('/users/me');
+        if (response.data) {
+          setUserInfo({
+            nickname: response.data.nickname || 'User',
+            email: response.data.email || '이메일 정보 없음'
+          });
+        }
+      } catch (error) {
+        console.error("유저 정보 로드 실패:", error);
+      }
+    };
+    fetchUser();
+
+    // 로컬 스토리지에 저장된 프론트엔드 전용 프로필 이미지 불러오기
+    const storedImage = localStorage.getItem('profileImage');
+    if (storedImage) {
+      setProfileImage(storedImage);
+    }
+  }, []);
+
   return (
     <div className="max-w-3xl mx-auto space-y-8 pb-20 w-full text-left">
-      <h1 className="text-2xl font-bold px-2 text-slate-800">설정</h1>
+      <h1 className="text-xl font-bold px-2 text-slate-800">설정</h1>
 
       {/* 1. 상단 프로필 카드 */}
       <div 
@@ -49,12 +76,16 @@ export const Settings: React.FC<SettingsProps> = ({ setScreen }) => {
         className="flex items-center gap-4 p-5 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"
         >
           
-        <div className="w-14 h-14 rounded-full bg-wing-gradient flex items-center justify-center text-white text-xl font-bold shadow-inner">
-          U
-        </div>
+        {profileImage ? (
+          <img src={profileImage} alt="Profile" className="w-14 h-14 rounded-full object-cover shadow-inner border border-slate-100" />
+        ) : (
+          <div className="w-14 h-14 rounded-full bg-wing-gradient flex items-center justify-center text-white text-xl font-bold shadow-inner uppercase">
+            {userInfo.nickname.charAt(0)}
+          </div>
+        )}
         <div className="flex-1 text-left">
-          <h3 className="font-bold text-slate-800">User</h3>
-          <p className="text-xs text-slate-400 mt-0.5">사용자@이메일.com</p>
+          <h3 className="font-bold text-slate-800">{userInfo.nickname}</h3>
+          <p className="text-xs text-slate-400 mt-0.5">{userInfo.email}</p>
         </div>
         <ChevronRight size={18} className="text-slate-300" />
       </div>

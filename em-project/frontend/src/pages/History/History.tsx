@@ -3,8 +3,12 @@ import { api } from '@/src/api/apiService';
 import { motion } from 'motion/react';
 import { 
   Share2, 
-  FileText 
+  FileText,
+  X
 } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
+import { DiagnosticReport } from '../Report/DiagnosticReport';
+import { SocialShareModal } from '../../components/common/SocialShareModal';
 import { Screen } from '@/src/types/index';
 
 
@@ -19,6 +23,9 @@ interface HistoryProps {
 
 export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilter, setScreen, setIsChatReadOnly, onRoomSelect }: HistoryProps) => {
   const [historyItems, setHistoryItems] = useState<any[]>([]);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [selectedShareUrl, setSelectedShareUrl] = useState('');
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -45,22 +52,21 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
     : historyItems.filter(item => item.status === historyFilter);
 
   const handleShare = (e: React.MouseEvent, id: string | number) => {
-    e.stopPropagation(); // 카드 클릭(채팅 이동) 이벤트 방지
-    const dummyUrl = `https://fixie.app/share/${id}`;
-    navigator.clipboard.writeText(dummyUrl).then(() => {
-      alert(`공유 링크가 클립보드에 복사되었습니다!\n${dummyUrl}\n(Mock 로직) 실제 서비스에서는 이 링크로 ShareView.tsx 화면이 열립니다.`);
-    });
+    e.stopPropagation(); 
+    setSelectedShareUrl(`https://fixie.app/share/${id}`);
+    setIsShareModalOpen(true);
   };
 
-  const handleGoToReport = (e: React.MouseEvent) => {
-    e.stopPropagation(); // 카드 클릭 방지
-    setScreen('report');
+  const handleGoToReport = (e: React.MouseEvent, id: string | number) => {
+    e.stopPropagation(); 
+    setSelectedShareUrl(`https://fixie.app/share/${id}`);
+    setIsReportModalOpen(true);
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 no-scrollbar pb-20 px-4 md:px-8">
+    <div className="max-w-3xl mx-auto space-y-8 no-scrollbar pb-20 px-4 md:px-8">
       <header className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-fixie-steel">질문 이력</h1>
+        <h1 className="text-xl font-bold text-fixie-steel">질문 이력</h1>
         {/* 상단 공통 공유 버튼 (예: 제일 최근 질문 이력 공유) */}
         <button 
           onClick={(e) => handleShare(e, 'latest')}
@@ -120,7 +126,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
             {/* 하단 액션 버튼 */}
             <div className="flex gap-3 mt-auto">
               <button 
-                onClick={handleGoToReport}
+                onClick={(e) => handleGoToReport(e, item.id || i)}
                 className="flex-1 h-12 bg-white border border-slate-100 rounded-3xl flex items-center justify-center gap-2 text-sm font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
               >
                 <FileText size={18} className="text-slate-400" /> PDF 저장
@@ -135,6 +141,31 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
           </motion.div>
         ))}
       </div>
+
+      {/* 진단 리포트 오버레이 모달 (Chat.tsx와 동일한 방식) */}
+      <AnimatePresence>
+        {isReportModalOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed inset-0 z-[150] bg-slate-50 overflow-y-auto"
+          >
+            <DiagnosticReport 
+              setScreen={setScreen} 
+              onClose={() => setIsReportModalOpen(false)} 
+              shareUrl={selectedShareUrl} 
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 프리미엄 SNS 공유 모달 */}
+      <SocialShareModal 
+        isOpen={isShareModalOpen} 
+        onClose={() => setIsShareModalOpen(false)} 
+        shareUrl={selectedShareUrl}
+      />
     </div>
   );
 };

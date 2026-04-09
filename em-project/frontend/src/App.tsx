@@ -186,33 +186,40 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
     <div className="min-h-screen w-full overflow-x-hidden text-sm bg-fixie-mist text-fixie-steel font-sans selection:bg-theme-primary/30">
       <Toast />
       <AnimatePresence mode="wait">
-        {/* 소셜 로그인 성공 후 리다이렉트 처리 (URL 감지) */}
         {window.location.pathname === '/oauth2/redirect' ? (
           <OAuthRedirectHandler 
+            key="oauth-handler"
             onLogin={() => {
-              // 1. URL 파라미터 청소 (주소창 깔끔하게)
               window.history.replaceState({}, '', '/');
-              // 2. 홈으로 즉시 이동
               setScreen('home');
             }} 
           />
-        ) : (
-          <>
+        ) : !showNav ? (
+          <motion.div 
+            key="auth-flow"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
             {screen === 'splash' && <SplashScreen onComplete={() => setScreen('tutorial')} />}
             {screen === 'tutorial' && <TutorialScreen step={tutorialStep} setStep={setTutorialStep} onComplete={() => setScreen('auth')} />}
             {screen === 'auth' && <AuthScreen onLogin={() => setScreen('home')} />}
-          </>
-        )}
-
-        {/* 2. 메인 레이아웃 (사이드바 + 메인 콘텐츠) */}
-        {showNav && (
-          <div className="flex min-h-screen">
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="main-app-layout"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex min-h-screen"
+          >
+            {/* 1. 사이드바 (데스크탑 전용) */}
             <aside className="hidden md:flex flex-col w-64 bg-white/50 backdrop-blur-xl border-r border-slate-100 p-6 fixed h-full z-50">
-              {/* 로고 영역 커스텀 클릭 -> 프로필 이동 */}
+              {/* 로고 영역 커스텀 클릭 -> 홈으로 이동 */}
               <div 
                 className="flex items-center gap-3 mb-12 cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => {
-                  setScreen('profile');
+                  setScreen('home');
                   setIsChatReadOnly(false);
                 }}
               >
@@ -252,7 +259,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
               <AnimatePresence mode="wait">
                 {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} isLoading={isLoadingDevices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} onGuideClick={(title: string) => { setInitialChatQuery(title); setIsAnalyzing(true); setScreen('chat'); }} />}
                 {screen === 'garage' && <Garage key="garage" setScreen={setScreen} devices={devices} setDevices={setDevices} showGarageOptions={showGarageOptions} setShowGarageOptions={setShowGarageOptions} scannedModel={scannedModel} setScannedModel={setScannedModel} />}
-                {screen === 'chat' && <Chat key="chat" setScreen={setScreen} messages={messages} isAnalyzing={isAnalyzing} setIsAnalyzing={setIsAnalyzing} attachedFiles={attachedFiles} chatEndRef={chatEndRef} handleSendMessage={handleSendMessage} handleFileChange={handleFileChange} setMessages={setMessages} isReadOnly={isChatReadOnly} removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} initialQuery={initialChatQuery} setInitialQuery={setInitialChatQuery} devices={devices} roomId={selectedRoomId} />}
+                {screen === 'chat' && <Chat key="chat" setScreen={setScreen} messages={messages} isAnalyzing={isAnalyzing} setIsAnalyzing={setIsAnalyzing} attachedFiles={attachedFiles} setAttachedFiles={setAttachedFiles} chatEndRef={chatEndRef} handleSendMessage={handleSendMessage} handleFileChange={handleFileChange} setMessages={setMessages} isReadOnly={isChatReadOnly} removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} initialQuery={initialChatQuery} setInitialQuery={setInitialChatQuery} devices={devices} roomId={selectedRoomId} />}
                 {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} onRoomSelect={(id: number) => setSelectedRoomId(id)} />}
                 {screen === 'settings' && <Settings key="settings" setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />}
                 {screen === 'scan' && <ScanScreen key="scan" onClose={() => setScreen('home')} onScan={(model?: string) => { 
@@ -260,6 +267,8 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                     setScannedModel(model); 
                     setScreen('garage'); 
                   } else { 
+                    // 채팅창으로 넘길 때 초기 쿼리 신호를 주어야 Chat 컴포넌트에서 로딩을 해제함
+                    setInitialChatQuery('ocr_image'); 
                     setIsAnalyzing(true); 
                     setScreen('chat'); 
                   } 
@@ -275,6 +284,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
               </AnimatePresence>
             </main>
 
+            {/* 하단 탭바 (모바일 전용) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-2 grid grid-cols-5 items-center justify-items-center z-50">              
               <NavItem id="home" icon={HomeIcon} label="홈" />
               <NavItem id="chat" icon={MessageCircle} label="픽시 가이드" />
@@ -286,7 +296,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
               <NavItem id="history" icon={HistoryIcon} label="이력" />
               <NavItem id="settings" icon={SettingsIcon} label="설정" />
             </nav>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/src/api/apiService';
 import { authService } from '@/src/services/authService';
 import { useToastStore } from '@/src/store/useToastStore';
@@ -10,7 +10,9 @@ interface ProfileProps {
 }
 
 export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
-  const [nickname, setNickname] = useState('');
+  const [nickname, setNickname] = useState('User');
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -31,7 +33,27 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
       }
     };
     fetchUser();
+    
+    // 로컬 스토리지에서 프로필 이미지 불러오기 (프론트엔드 임시 처리)
+    const storedImage = localStorage.getItem('profileImage');
+    if (storedImage) {
+      setProfileImage(storedImage);
+    }
   }, []);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setProfileImage(base64String);
+        localStorage.setItem('profileImage', base64String);
+        showToast('성공적으로 프로필 사진이 변경되었습니다! 🎉', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSave = async () => {
     if (!nickname.trim()) return showToast('닉네임을 입력해주세요.', 'error');
@@ -95,18 +117,32 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
         <button onClick={() => setScreen('settings')} className="p-2 bg-white rounded-xl shadow-sm border border-slate-50 hover:bg-slate-50 transition-colors">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold text-slate-800">프로필 수정</h1>
+        <h1 className="text-xl font-bold text-slate-800">프로필 수정</h1>
       </header>
 
       {/* 2. 프로필 이미지 수정 영역 */}
       <div className="flex flex-col items-center py-6">
         <div className="relative">
-          <div className="w-24 h-24 rounded-full bg-wing-gradient flex items-center justify-center text-white text-3xl font-bold shadow-xl border-4 border-white">
-            U
-          </div>
-          <button className="absolute bottom-0 right-0 p-2.5 bg-white rounded-full shadow-lg border border-slate-100 text-theme-primary hover:scale-110 transition-transform">
+          {profileImage ? (
+            <img src={profileImage} alt="Profile" className="w-24 h-24 rounded-full object-cover shadow-xl border-4 border-white" />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-wing-gradient flex items-center justify-center text-white text-3xl font-bold shadow-xl border-4 border-white uppercase">
+              {nickname.charAt(0)}
+            </div>
+          )}
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute bottom-0 right-0 p-2.5 bg-white rounded-full shadow-lg border border-slate-100 text-theme-primary hover:scale-110 transition-transform"
+          >
             <Camera size={16} />
           </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleImageChange} 
+            accept="image/*" 
+            className="hidden" 
+          />
         </div>
         <p className="mt-4 text-xs text-slate-400 font-black uppercase tracking-widest">Change Avatar</p>
       </div>

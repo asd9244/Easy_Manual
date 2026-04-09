@@ -1,10 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Camera, Scan as ScanIcon, QrCode } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 
 export const ScanScreen = ({ onClose, onScan }: any) => {
   const [mode, setMode] = useState<'ocr' | 'qr'>('ocr');
+  const [isLocalAnalyzing, setIsLocalAnalyzing] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const startCamera = async () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("카메라 접근 실패:", err);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (mode === 'ocr') {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [mode]);
 
   const handleQRScan = (result: any) => {
     if (result && result.length > 0) {
@@ -64,24 +100,34 @@ export const ScanScreen = ({ onClose, onScan }: any) => {
             <motion.div 
               key="ocr"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center"
+              className="absolute inset-0 flex items-center justify-center bg-black"
             >
-              <Camera size={56} className="text-white/10" />
+              {/* 실시간 카메라 비디오 */}
+              <video 
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover opacity-70"
+              />
+
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <Camera size={56} className="text-white/20" />
+              </div>
 
               {/* 스캔 가이드라인 */}
-              <div className="absolute top-8 left-8 w-12 h-12 border-t-2 border-l-2 border-theme-primary rounded-tl-3xl" />
-              <div className="absolute top-8 right-8 w-12 h-12 border-t-2 border-r-2 border-theme-primary rounded-tr-3xl" />
-              <div className="absolute bottom-8 left-8 w-12 h-12 border-b-2 border-l-2 border-theme-primary rounded-bl-3xl" />
-              <div className="absolute bottom-8 right-8 w-12 h-12 border-b-2 border-r-2 border-theme-primary rounded-br-3xl" />
+              <div className="absolute top-8 left-8 w-12 h-12 border-t-2 border-l-2 border-theme-primary rounded-tl-3xl z-10" />
+              <div className="absolute top-8 right-8 w-12 h-12 border-t-2 border-r-2 border-theme-primary rounded-tr-3xl z-10" />
+              <div className="absolute bottom-8 left-8 w-12 h-12 border-b-2 border-l-2 border-theme-primary rounded-bl-3xl z-10" />
+              <div className="absolute bottom-8 right-8 w-12 h-12 border-b-2 border-r-2 border-theme-primary rounded-br-3xl z-10" />
 
               {/* 위아래 스캔 레이저 라인 애니메이션 */}
               <motion.div
-                className="absolute left-8 right-8 h-px bg-theme-primary shadow-[0_0_15px_var(--theme-primary)]"
+                className="absolute left-8 right-8 h-px bg-theme-primary shadow-[0_0_15px_var(--theme-primary)] z-10"
                 animate={{ top: ['15%', '85%', '15%'] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
               />
 
-              <p className="absolute bottom-6 w-full text-center text-white/60 text-[11px] font-bold tracking-wide">
+              <p className="absolute bottom-6 w-full text-center text-white/80 text-[11px] font-bold tracking-wide z-10">
                 가전제품 또는 라벨에 카메라를 가져다 대세요
               </p>
             </motion.div>
@@ -105,15 +151,39 @@ export const ScanScreen = ({ onClose, onScan }: any) => {
       <AnimatePresence>
         {mode === 'ocr' && (
           <motion.div 
-            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, height: 0 }} 
+            animate={{ opacity: 1, height: 'auto' }} 
+            exit={{ opacity: 0, height: 0 }}
             className="flex justify-center pt-2"
           >
             <button
-              onClick={() => onScan('ocr_image')}
-              className="flex items-center gap-2 px-10 py-4 bg-wing-gradient text-white rounded-full font-bold shadow-lg shadow-theme-primary/30 hover:scale-105 active:scale-95 transition-all"
+              onClick={async () => {
+                if (isLocalAnalyzing) return;
+                setIsLocalAnalyzing(true);
+                // 지능형 분석 연출을 위한 딜레이 (1.5초)
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                setIsLocalAnalyzing(false);
+                onScan('ocr_image');
+              }}
+              disabled={isLocalAnalyzing}
+              className="flex items-center gap-3 px-10 py-4 bg-wing-gradient text-white rounded-full font-bold shadow-lg shadow-theme-primary/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-70 disabled:scale-100"
             >
-              <ScanIcon size={20} />
-              분석 시작
+              {isLocalAnalyzing ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <ScanIcon size={20} />
+                  </motion.div>
+                  기기 분석 중...
+                </>
+              ) : (
+                <>
+                  <ScanIcon size={20} />
+                  분석 시작
+                </>
+              )}
             </button>
           </motion.div>
         )}
