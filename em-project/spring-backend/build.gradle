@@ -31,7 +31,6 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
-    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 
 
     // JWT 토큰을 만들고 해독하기 위한 라이브러리 (0.12.x 버전)

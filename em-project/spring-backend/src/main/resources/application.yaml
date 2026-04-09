@@ -5,6 +5,8 @@ spring:
   application:
     name: backend-core
 
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     # 🌟 수정됨: .env 파일에서 값을 가져옵니다.
     url: ${DB_URL}
