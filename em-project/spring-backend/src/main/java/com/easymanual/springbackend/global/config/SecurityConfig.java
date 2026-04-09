@@ -58,16 +58,18 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/swagger-resources/**",
-                                "/webjars/**"
+                                "/webjars/**",
+                                "/error" // 추가: 내부 에러 발생 시 403으로 마스킹되는 현상 방지
                         ).permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/oauth2/**",       // 추가: 소셜 로그인 요청 진입점 허용
+                                "/login/oauth2/**"  // 추가: 소셜 로그인 인증 코드 반환점 허용
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
-                // OAuth2 소셜 로그인 설정 활성화
                 .oauth2Login(oauth2 -> oauth2
-                        // 소셜 로그인 성공 시 유저 정보를 처리할 커스텀 서비스(CustomOAuth2UserService)를 등록합니다.
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
-                        // 소셜 로그인 및 DB 저장까지 모두 성공하면 실행될 커스텀 핸들러(OAuth2SuccessHandler)를 등록합니다.
                         .successHandler(oAuth2SuccessHandler)
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
