@@ -4,6 +4,7 @@ import com.easymanual.springbackend.domain.user.dto.OAuth2UserInfo;
 import com.easymanual.springbackend.domain.user.entity.User;
 import com.easymanual.springbackend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -73,12 +75,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             user.updateNickname(nickname);
         }
 
-        // 7. 최종적으로 Spring Security가 인증 처리를 완료할 수 있도록,
-        // 유저의 이메일(식별자)과 원본 데이터(attributes)를 담은 DefaultOAuth2User 객체를 반환합니다.
+        // [수정 2] 원본 attributes는 불변(Immutable) 객체일 수 있으므로, 수정 가능한 HashMap으로 복사합니다.
+        // 그리고 구글이든 카카오든 상관없이 최상단에 "email" 키를 명시적으로 주입합니다.
+        Map<String, Object> modifiedAttributes = new HashMap<>(attributes);
+        modifiedAttributes.put("email", email);
+
+        // [수정 1] 빈 리스트 대신 실제 권한(ROLE_USER) 객체를 생성하여 주입합니다.
         return new DefaultOAuth2User(
-                Collections.emptyList(), // 권한(Role) 리스트 (현재는 빈 리스트 전달)
-                attributes, // 소셜 서버가 준 원본 데이터
-                // 구글은 "email", 카카오는 "id"를 식별자 키로 사용하므로, provider에 따라 동적으로 키를 지정합니다.
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")),
+                modifiedAttributes,
                 "google".equals(provider) ? "email" : "id"
         );
     }

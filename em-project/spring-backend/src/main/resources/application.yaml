@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: backend-core
+  
+  output:
+    ansi:
+      enabled: ALWAYS
 
   config:
     import: optional:file:.env[.properties]
@@ -55,3 +59,8 @@ jwt:
   # 🌟 수정됨: .env 파일에서 값을 가져옵니다.
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION}
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG

@@ -33,9 +33,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // 3. 추출한 이메일을 기반으로 우리 서버 전용 JWT 토큰을 생성합니다.
         String token = jwtProvider.createToken(email);
 
-        // 4. 프론트엔드(React/Next.js)가 토큰을 받을 수 있도록 리다이렉트할 URL을 조립합니다.
-        // 예: http://localhost:3000/oauth2/redirect?token=eyJhbGci...
-        String targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/oauth2/redirect")
+        // 4. 클라이언트가 처음 요청한 도메인(localhost 또는 127.0.0.1)을 그대로 유지하며 리다이렉트합니다.
+        String serverName = request.getServerName();
+        String targetUrl = UriComponentsBuilder.fromUriString("http://" + serverName + ":3000/oauth2/redirect")
                 .queryParam("token", token)
                 .build().toUriString();
 
@@ -43,16 +43,12 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 
-    // 소셜 제공자(Provider)에 따라 다르게 응답되는 JSON 구조에서 이메일을 안전하게 추출하는 헬퍼 메서드입니다.
+    // [수정] CustomOAuth2UserService에서 무조건 최상단에 "email"을 주입하도록 보장했으므로,
+    // 분기 처리 없이 바로 "email" 키로 값을 추출합니다.
     private String extractEmail(OAuth2User oAuth2User) {
-        // 구글의 경우 최상단에 "email" 키가 존재합니다.
-        if (oAuth2User.getAttributes().containsKey("email")) {
-            return (String) oAuth2User.getAttributes().get("email");
-        }
-        // 카카오의 경우 "kakao_account" 객체 내부에 "email" 키가 존재합니다.
-        if (oAuth2User.getAttributes().containsKey("kakao_account")) {
-            java.util.Map<String, Object> kakaoAccount = (java.util.Map<String, Object>) oAuth2User.getAttributes().get("kakao_account");
-            return (String) kakaoAccount.get("email");
+        Object emailObj = oAuth2User.getAttributes().get("email");
+        if (emailObj != null) {
+            return (String) emailObj;
         }
         throw new IllegalArgumentException("이메일 정보를 찾을 수 없습니다.");
     }
