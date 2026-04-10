@@ -12,8 +12,7 @@ import java.util.Optional;
 public interface ManualRepository extends JpaRepository<Manual, Long> {
 
     // JPQL(Java Persistence Query Language)을 사용하여 커스텀 쿼리를 작성합니다.
-    // coveredModelNames 컬럼에는 "모델A, 모델B, 모델C" 형태의 문자열이 저장되어 있으므로,
-    // LIKE 연산자를 사용하여 클라이언트가 입력한 모델명이 포함되어 있는지 부분 일치 검색을 수행합니다.
-    @Query("SELECT m FROM Manual m WHERE m.coveredModelNames LIKE %:modelName%")
+    // models 테이블과 JOIN하여 클라이언트가 입력한 모델명이 포함되어 있는지 검색합니다.
+    @Query("SELECT DISTINCT m FROM Manual m JOIN m.models mod WHERE mod.name LIKE %:modelName%")
     Optional<Manual> findByModelNameContaining(@Param("modelName") String modelName);
 }
