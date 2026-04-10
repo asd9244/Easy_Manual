@@ -21,6 +21,19 @@ export interface Device {
   icon?: any;
 }
 
+export interface DeviceModel {
+  id: number;
+  name: string;
+  qrCodeUrl: string;
+}
+
+export interface ManualSearchResponse {
+  manualId: number;
+  productType: string;
+  representativeModelName: string;
+  models: DeviceModel[];
+}
+
 export interface Message {
   id: string; // 혹은 number
   senderType: 'USER' | 'AI'; // 백엔드의 senderType(USER/AI)에 대응

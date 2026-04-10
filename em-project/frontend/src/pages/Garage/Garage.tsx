@@ -7,7 +7,6 @@ import {
   Plus, 
   Type, 
   QrCode, 
-  ScanText,
   Trash2,
   Search 
 } from 'lucide-react';
@@ -84,13 +83,15 @@ export const Garage: React.FC<GarageProps> = ({
       setIsSearching(false);
       setSearchQuery('');
       alert("성공적으로 기기가 등록되었습니다! 🎉");
-    } catch (error) {
-      console.error("기기 등록 실패:", error);
-      alert("기기 등록에 실패했습니다. 이미 등록된 기기인지 확인해 주세요.");
+    } catch (error: any) {
+      console.error("기기 등록 에러 내역:", error);
+      alert(error.message || "기기 등록에 실패했습니다.");
     } finally {
       setIsRegistering(false);
     }
   };
+
+
 
 
 
@@ -167,8 +168,7 @@ export const Garage: React.FC<GarageProps> = ({
               >
                 {[
                   { icon: Type, label: "모델명 직접 입력", color: "bg-blue-50 text-blue-500" },
-                  { icon: QrCode, label: "QR 코드 스캔", color: "bg-orange-50 text-orange-500" },
-                  { icon: ScanText, label: "OCR 라벨 스캔", color: "bg-theme-secondary/10 text-theme-secondary", ocr: true }
+                  { icon: QrCode, label: "QR 코드 스캔", color: "bg-orange-50 text-orange-500" }
                 ].map((opt, i) => (
                   <motion.button 
                     key={i}
@@ -176,7 +176,9 @@ export const Garage: React.FC<GarageProps> = ({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.1 }}
                     onClick={() => {
-                        if (opt.ocr) {
+                        if (opt.ocr || opt.label === "QR 코드 스캔") {
+                          if (opt.label === "QR 코드 스캔") localStorage.setItem('scanInitialMode', 'qr');
+                          else localStorage.setItem('scanInitialMode', 'ocr');
                           setScreen('scan'); // 라벨 스캔 누르면 스캔 화면으로
                         } else if (opt.label === "모델명 직접 입력") {
                           setIsSearching(true); // 직접 입력 누르면 검색창 열기!
@@ -189,11 +191,6 @@ export const Garage: React.FC<GarageProps> = ({
                       <opt.icon size={20} />
                     </div>
                     <span className="font-bold text-fixie-steel">{opt.label}</span>
-                    {opt.ocr && (
-                      <motion.div 
-                        className="absolute inset-0 bg-linear-to-r from-transparent via-theme-secondary/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
-                      />
-                    )}
                   </motion.button>
                 ))}
               </motion.div>
@@ -298,23 +295,49 @@ export const Garage: React.FC<GarageProps> = ({
                 </div>
 
                 {/* 검색 결과 목록 */}
-                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
                   {searchResults.length > 0 ? (
-                    searchResults.map((item, idx) => (
-                      <motion.button
+                    searchResults.map((item: any, idx: number) => (
+                      <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: idx * 0.05 }}
-                        key={idx}
-                        onClick={() => handleRegisterDevice(item.model)}
-                        className="w-full flex items-center justify-between p-4 bg-slate-50/50 hover:bg-theme-primary/5 rounded-3xl border border-slate-100 transition-all group"
+                        key={item.manualId || idx}
+                        className="w-full p-4 bg-slate-50/50 rounded-3xl border border-slate-100 space-y-3"
                       >
-                        <div className="text-left">
-                          <p className="text-sm font-bold text-slate-700 group-hover:text-theme-primary transition-colors">{item.model}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider">{item.category || 'Appliance'}</p>
+                        {/* 매뉴얼 헤더 영역 */}
+                        <div className="text-left border-b border-slate-200/50 pb-3 pl-1">
+                          <p className="text-[10px] font-black text-theme-primary uppercase tracking-wider">{item.productType || 'Appliance'}</p>
+                          <p className="text-sm font-bold text-slate-800 mt-0.5">{item.representativeModelName || '제품명 없음'}</p>
                         </div>
-                        <Plus size={18} className="text-slate-300 group-hover:text-theme-primary transition-colors" />
-                      </motion.button>
+                        
+                        {/* 세부 지원 모델 및 개별 QR 리스트 영역 */}
+                        <div className="space-y-2">
+                          {(item.models || []).map((mod: any) => (
+                            <div key={mod.id} className="flex items-center justify-between bg-white p-2.5 rounded-2xl shadow-sm border border-white hover:border-theme-primary/20 transition-all group">
+                              <div className="flex items-center gap-3">
+                                {mod.qrCodeUrl ? (
+                                  <div className="w-10 h-10 p-1 bg-white rounded-xl border border-slate-100 shadow-sm flex items-center justify-center shrink-0">
+                                    <img src={mod.qrCodeUrl} alt="QR Code" className="max-w-full max-h-full object-contain" />
+                                  </div>
+                                ) : (
+                                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                                    <QrCode size={16} className="text-slate-300" />
+                                  </div>
+                                )}
+                                <p className="text-xs font-bold text-slate-600 group-hover:text-theme-primary transition-colors line-clamp-1">{mod.name}</p>
+                              </div>
+                              <button 
+                                onClick={() => handleRegisterDevice(mod.name)}
+                                className="w-8 h-8 rounded-full bg-slate-50 hover:bg-theme-primary flex items-center justify-center text-slate-400 hover:text-white transition-all shrink-0 ml-2"
+                                title="이 기기로 등록하기"
+                              >
+                                <Plus size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
                     ))
                   ) : searchQuery.trim() !== '' ? (
                     <motion.div 
@@ -326,29 +349,9 @@ export const Garage: React.FC<GarageProps> = ({
                         <Search size={24} className="text-slate-300" />
                       </div>
                       <p className="text-slate-500 font-bold mb-1">검색 결과가 없습니다</p>
-                      <p className="text-xs text-slate-400 mb-6 px-10">찾으시는 모델이 목록에 없나요?<br/>직접 정보를 입력하여 등록할 수 있습니다.</p>
-                      
-                      {/* 수동 입력 폼 토글/버튼 */}
-                      <div className="space-y-4 px-4 text-left">
-                        <div className="h-[1px] bg-slate-100 w-full mb-6"></div>
-                        <div>
-                          <label className="text-[10px] font-black text-slate-400 ml-1 uppercase">Model Name</label>
-                          <input 
-                            type="text"
-                            placeholder="예: LG 휘센 에어컨"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 mt-1.5 focus:outline-none focus:ring-2 focus:ring-theme-primary/30 font-bold text-sm"
-                          />
-                        </div>
-                        <button 
-                          onClick={() => handleRegisterDevice(searchQuery)}
-                          disabled={isRegistering || !searchQuery.trim()}
-                          className="w-full h-12 bg-fixie-steel text-white font-bold rounded-xl shadow-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
-                        >
-                          {isRegistering ? "등록 중..." : "이 모델 직접 등록하기"}
-                        </button>
-                      </div>
+                      <p className="text-xs text-slate-400 mb-6 px-10">
+                        찾으시는 모델명이 올바른지 다시 확인해 주세요.<br/>(등록된 매뉴얼이 있는 기기만 추가할 수 있습니다)
+                      </p>
                     </motion.div>
                   ) : (
                     <div className="text-center text-slate-400 py-10 text-sm font-bold">모델명이나 브랜드를 입력해주세요.</div>
