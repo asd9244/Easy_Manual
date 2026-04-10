@@ -21,14 +21,14 @@ export const OAuthRedirectHandler: React.FC<OAuthRedirectHandlerProps> = ({ onLo
       // 2. 토큰을 localStorage에 저장합니다.
       localStorage.setItem('accessToken', token);
       console.log("토큰 저장 완료. 홈으로 이동합니다.");
-      
+
       // 3. 부모 컴포넌트(App.tsx)의 로그인 성공 상태를 업데이트합니다.
       // (즉시 이동을 위해 인위적인 지연 없이 바로 호출합니다.)
       onLogin();
     } else {
       console.error("토큰을 찾을 수 없습니다. 로그인 페이지로 돌아갑니다.");
       // 토큰이 없으면 다시 인증 화면으로 보냅니다.
-      window.location.href = '/'; 
+      // window.location.href = '/'; 
     }
   }, [onLogin]);
 
@@ -41,7 +41,7 @@ export const OAuthRedirectHandler: React.FC<OAuthRedirectHandlerProps> = ({ onLo
         <h2 className="text-xl font-bold text-slate-700">로그인 중입니다...</h2>
         <p className="text-sm text-slate-400 font-medium">잠시만 기다려주세요</p>
       </div>
-      
+
       {/* 장식용 애니메이션 바 */}
       <div className="w-48 h-1.5 bg-slate-200 rounded-full overflow-hidden relative">
         <div className="absolute inset-0 bg-wing-gradient w-1/2 rounded-full animate-progress-indefinite"></div>
