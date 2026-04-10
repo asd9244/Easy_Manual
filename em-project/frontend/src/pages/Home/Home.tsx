@@ -25,10 +25,12 @@ interface HomeProps {
   sliderConstraints: { left: number; right: number };
   isLoading?: boolean;
   onGuideClick?: (title: string) => void;
+  setSelectedRoomId?: (id: number | null) => void; 
+  setSelectedDeviceId?: (id: number | null) => void; // 추가: 기기 ID 설정을 위한 prop
 }
 
 // 2. renderHome 대신 'Home'이라는 이름의 컴포넌트로 만들기.
-export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGuideClick }) => {
+export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGuideClick, setSelectedRoomId, setSelectedDeviceId }) => {
   return (
     <div className="max-w-3xl mx-auto space-y-10 text-left px-4 md:px-8">
       
@@ -77,6 +79,12 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
                   lastCheck="오늘" 
                   filterStatus="양호" 
                   repairCount="0회" 
+                  onChatClick={() => {
+                    // 기기 ID를 기반으로 채팅 진입 (방은 Chat 내에서 생성)
+                    setSelectedRoomId && setSelectedRoomId(null);
+                    setSelectedDeviceId && setSelectedDeviceId(Number(device.id));
+                    setScreen('chat');
+                  }}
                 />
               ))
             ) : (
@@ -97,25 +105,7 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
 
       </section>
 
-      {/* 3. 검색 바 (질문하기) */}
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-          <div className="w-6 h-6 rounded-md bg-theme-primary/20 flex items-center justify-center text-theme-primary">
-            <span className="font-bold text-xs italic">F</span>
-          </div>
-        </div>
-        <input 
-          type="text" 
-          placeholder="Fixie에게 무엇이든 물어보세요..." 
-          className="w-full h-16 bg-white/40 backdrop-blur-xl rounded-3xl pl-14 pr-32 shadow-sm border border-white/20 focus:outline-none focus:ring-2 focus:ring-theme-primary/50 text-sm font-medium transition-shadow group-hover:shadow-md"
-        />
-        <button onClick={() => setScreen('chat')} className="absolute right-3 top-1/2 -translate-y-1/2 bg-fixie-steel text-white w-10 h-10 md:w-auto md:h-auto md:px-6 md:py-2.5 rounded-full md:rounded-xl flex items-center justify-center font-bold text-sm hover:bg-slate-700 transition-colors shadow-md">
-          <Send size={18} className="md:hidden -ml-0.5" />
-          <span className="hidden md:block">질문하기</span>
-        </button>
-      </div>
-
-      {/* 4. 자주 찾는 가이드 TOP 5 */}
+      {/* 4. 자주 찾는 가이드 TOP 5 (검색바 제거됨) */}
       <section className="pb-8">
         <h3 className="font-bold text-lg mb-4 px-1 text-slate-700">자주 찾는 가이드 TOP 5</h3>
         <div className="space-y-3">

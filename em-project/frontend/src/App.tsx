@@ -66,12 +66,16 @@ export default function App() {
   const [scannedModel, setScannedModel] = useState<string>('');
   const [initialChatQuery, setInitialChatQuery] = useState<string>('');
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null); // 추가: 기기 기반 채팅 진입을 위해 기기 ID 관리
 
   // 버튼 클릭 시 채팅방 ID 초기화 (홈/가라지 등 이동할 때)
   const handleMenuClick = (id: Screen) => {
     setScreen(id);
     setIsChatReadOnly(false);
-    if (id !== 'chat') setSelectedRoomId(null);
+    if (id !== 'chat') {
+      setSelectedRoomId(null);
+      setSelectedDeviceId(null); // 다른 탭 이동 시 기기 선택 정보도 초기화
+    }
   };
 
   //  모바일 하단 메뉴용 (App 내부에 정의하여 상태 공유)
@@ -127,7 +131,18 @@ export default function App() {
       setIsLoadingDevices(true);
       try {
         const fetchedDevices = await deviceService.getMyDevices();
-        setDevices(fetchedDevices);
+        // 로컬스토리지에 저장된 변경 사항이 있으면 병합 (백엔드 수정 불가 대응)
+        const localData = localStorage.getItem('local_devices');
+        if (localData) {
+          const localDevices = JSON.parse(localData);
+          const merged = fetchedDevices.map((d: any) => {
+            const local = localDevices.find((ld: any) => ld.id === d.id);
+            return local ? { ...d, name: local.name } : d;
+          });
+          setDevices(merged);
+        } else {
+          setDevices(fetchedDevices);
+        }
       } catch (error) {
         console.error("기기 목록 불러오기 실패:", error);
       } finally {
@@ -262,17 +277,19 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
             {/* 메인 콘텐츠 영역 */}
             <main className={`flex-1 ${showNav ? 'md:ml-64' : ''} ${screen === 'chat' ? 'p-0 pb-20 md:p-6' : 'p-6 pb-32'}`}>              
               <AnimatePresence mode="wait">
-                {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} isLoading={isLoadingDevices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} onGuideClick={(title: string) => { setInitialChatQuery(title); setIsAnalyzing(true); setScreen('chat'); }} />}
+                {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} isLoading={isLoadingDevices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} onGuideClick={(title: string) => { setInitialChatQuery(title); setIsAnalyzing(true); setScreen('chat'); }} setSelectedRoomId={setSelectedRoomId} setSelectedDeviceId={setSelectedDeviceId} />}
                 {screen === 'garage' && <Garage key="garage" setScreen={setScreen} devices={devices} setDevices={setDevices} showGarageOptions={showGarageOptions} setShowGarageOptions={setShowGarageOptions} scannedModel={scannedModel} setScannedModel={setScannedModel} />}
-                {screen === 'chat' && <Chat key="chat" setScreen={setScreen} messages={messages} isAnalyzing={isAnalyzing} setIsAnalyzing={setIsAnalyzing} attachedFiles={attachedFiles} setAttachedFiles={setAttachedFiles} chatEndRef={chatEndRef} handleSendMessage={handleSendMessage} handleFileChange={handleFileChange} setMessages={setMessages} isReadOnly={isChatReadOnly} removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} initialQuery={initialChatQuery} setInitialQuery={setInitialChatQuery} devices={devices} roomId={selectedRoomId} />}
-                {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} onRoomSelect={(id: number) => setSelectedRoomId(id)} />}
+                {screen === 'chat' && <Chat key="chat" setScreen={setScreen} messages={messages} isAnalyzing={isAnalyzing} setIsAnalyzing={setIsAnalyzing} attachedFiles={attachedFiles} setAttachedFiles={setAttachedFiles} chatEndRef={chatEndRef} handleSendMessage={handleSendMessage} handleFileChange={handleFileChange} setMessages={setMessages} isReadOnly={isChatReadOnly} removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} initialQuery={initialChatQuery} setInitialQuery={setInitialChatQuery} devices={devices} roomId={selectedRoomId} deviceId={selectedDeviceId} />}
+                {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} onRoomSelect={(id: number) => { setSelectedRoomId(id); setSelectedDeviceId(null); }} />}
+
                 {screen === 'settings' && <Settings key="settings" setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />}
                 {screen === 'scan' && <ScanScreen key="scan" onClose={() => setScreen('home')} onScan={(model?: string) => { 
                   if (model) { 
                     const existingDevice = devices.find(d => d.model === model || d.name === model);
                     if (existingDevice) {
                       // 스마트 스캔: 이미 등록된 기기면 즉시 해당 기기의 채팅창으로 이동!
-                      setSelectedRoomId(Number(existingDevice.id));
+                      setSelectedDeviceId(Number(existingDevice.id));
+                      setSelectedRoomId(null); // 방 ID는 초기화하여 Chat 내에서 생성하도록 유도
                       setInitialChatQuery(''); // 별도 자동 질문 없이 채팅창 진입
                       setIsAnalyzing(true); // 멋진 진입 애니메이션 효과 실행
                       setScreen('chat');

@@ -16,12 +16,12 @@ export const deviceService = {
       if (response.data && Array.isArray(response.data)) {
         return response.data.map((d: any) => ({
           id: String(d.id),
-          name: d.alias || d.model,
-          model: d.model,
+          name: d.alias || d.representativeModelName,
+          model: d.representativeModelName,
           alias: d.alias,
           image: d.image || 'https://picsum.photos/seed/appliance/400/400',
           // 모델명에 따른 아이콘 매핑 (임시)
-          icon: deviceService.getIconByModel(d.model)
+          icon: deviceService.getIconByModel(d.representativeModelName || '')
         }));
       }
       return [];
