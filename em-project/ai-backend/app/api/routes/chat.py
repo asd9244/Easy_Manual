@@ -1,9 +1,12 @@
 import os
 import json
 import re
+import base64
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from langchain_ollama import OllamaEmbeddings, OllamaLLM
+from langchain_ollama import OllamaEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
@@ -11,11 +14,12 @@ load_dotenv()
 URI = os.getenv("NEO4J_URI")
 USER = os.getenv("NEO4J_USER")
 PASSWORD = os.getenv("NEO4J_PASSWORD")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 router = APIRouter()
 
 embeddings_model = OllamaEmbeddings(model="bge-m3", base_url="http://127.0.0.1:11434")
-llm = OllamaLLM(model="qwen2.5:7b", base_url="http://127.0.0.1:11434")
+llm = ChatGoogleGenerativeAI(model="gemini-3.1-pro-preview", google_api_key=GOOGLE_API_KEY, temperature=0.1)
 
 
 class ChatRequest(BaseModel):
@@ -60,7 +64,7 @@ def ask_manual(request: ChatRequest):
             "question": user_question,
             "found_page": None,
             "ai_answer": "해당 모델의 매뉴얼에서 관련 내용을 찾을 수 없습니다.",
-            "manual_image_url": None # 🌟 실패 시 null 반환
+            "manual_image_urls": [] # 🌟 실패 시 빈 리스트 반환
         }
 
     start_page = record["start_page"]
@@ -70,29 +74,57 @@ def ask_manual(request: ChatRequest):
 
     combined_text = "\n\n".join(texts_list)
 
-    prompt = f"""
-    너는 전자제품 고객센터의 전문 AI 비서야.
-    아래 제공된 [매뉴얼 내용]만 바탕으로 유저의 [질문]에 정확하고 친절하게 답변해줘.[매뉴얼 내용 (참고 페이지: {page_nums_list}p)]
-    {combined_text}[유저 질문]
-    {user_question}
-    """
+    # 🌟 이미지 처리를 위한 로직 추가
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    
+    content_blocks = [
+        {
+            "type": "text", 
+            "text": f"""너는 전자제품 고객센터의 최고 권위자이자 전문 AI 비서야.
+아래 제공된 [매뉴얼 내용(OCR 텍스트)]과 첨부된 [매뉴얼 원본 이미지]들을 꼼꼼하게 교차 검증해서,
+유저의 [질문]에 정확하고 친절하게 답변해줘. 표나 다이어그램, 일러스트 그림은 텍스트보다 이미지를 절대적으로 우선해서 분석해!
 
-    print(f"AI가 [{target_manual}]의 {page_nums_list}p 내용을 분석하여 답변을 생성 중입니다...")
+[매뉴얼 내용 (참고 페이지: {page_nums_list}p)]
+{combined_text}
 
-    ai_answer = llm.invoke(prompt)
+[유저 질문]
+{user_question}"""
+        }
+    ]
 
-    # 🌟 새로 추가된 기능: 대표 이미지 URL 조립
-    # 여러 페이지 중 가장 첫 번째 페이지(start_page)의 이미지를 대표 이미지로 사용합니다.
-    # 예: http://localhost:8000/manual_images/GMDS_.../page_45.png
-    primary_image_filename = image_filenames_list[0]
-    manual_image_url = f"http://localhost:8000/manual_images/{target_manual}/{primary_image_filename}"
+    # 검색된 이미지들을 base64로 변환해서 프롬프트 블록에 추가
+    for img_filename in image_filenames_list:
+        img_path = os.path.join(base_dir, "data", "processed_images", target_manual, img_filename)
+        if os.path.exists(img_path):
+            with open(img_path, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                content_blocks.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{encoded_string}"}
+                })
+
+    messages = [HumanMessage(content=content_blocks)]
+
+    print(f"AI가 [{target_manual}]의 {page_nums_list}p 내용을 시각(Multimodal) 정보와 함께 분석 중입니다...")
+
+    response = llm.invoke(messages)
+    if isinstance(response.content, list):
+        ai_answer = "".join([str(item.get("text", "")) for item in response.content if isinstance(item, dict) and "text" in item])
+    else:
+        ai_answer = str(response.content)
+
+    # 🌟 수정됨: 참조한 "모든" 페이지 이미지 URL 리스트 완성
+    manual_image_urls = [
+        f"http://localhost:8000/manual_images/{target_manual}/{img_filename}"
+        for img_filename in image_filenames_list
+    ]
 
     return {
         "manual_id": target_manual,
         "question": user_question,
         "found_page": start_page,
         "ai_answer": ai_answer,
-        "manual_image_url": manual_image_url # 🌟 조립된 이미지 URL을 Spring Boot로 전송!
+        "manual_image_urls": manual_image_urls # 🌟 리스트 자체를 반환 (프론트에서 스와이프로 볼 수 있게)
     }
 
 
@@ -138,7 +170,11 @@ def summarize_chat(request: SummaryRequest):
     print("AI가 대화 내역 리포트 요약을 시작합니다 (JSON 형식)...")
     
     try:
-        raw_answer = llm.invoke(prompt)
+        response = llm.invoke(prompt)
+        if isinstance(response.content, list):
+            raw_answer = "".join([str(item.get("text", "")) for item in response.content if isinstance(item, dict) and "text" in item])
+        else:
+            raw_answer = str(response.content)
         
         # 안전 장치: 모델이 혹시나 마크다운 블록(```json)을 붙였을 경우를 대비한 클렌징 로직
         cleaned_answer = raw_answer.strip()
