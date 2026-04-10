@@ -11,8 +11,7 @@ import lombok.Setter;
 @NoArgsConstructor
 public class DeviceRegisterRequest {
 
-    // 프론트엔드가 변경 없이 'model'이라는 키로 보내므로 Java 변수명도 완벽히 통일합니다.
-    private String model;
+    private String modelName;
 
     // 클라이언트가 설정한 기기의 식별용 별명 (예: "거실 에어컨")
     private String alias;
