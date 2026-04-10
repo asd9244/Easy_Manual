@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   ThumbsUp,
   ThumbsDown,
-  Image as ImageIcon
+  Image as ImageIcon,
+  WashingMachine
 } from 'lucide-react';
 import { FixieLogo } from '@/src/components/common/FixieLogo';
 import { Message, Screen } from '@/src/types/index';
@@ -60,7 +61,8 @@ interface ChatProps {
   initialQuery?: string;
   setInitialQuery?: React.Dispatch<React.SetStateAction<string>>;
   devices?: any[]; // 기기 목록 추가
-  roomId?: number | null; // 추가
+  roomId?: number | null; // 채팅방 ID
+  deviceId?: number | null; // 추가: 특정 기기로 채팅 시작 시 사용되는 기기 ID
 }
 
 
@@ -68,9 +70,11 @@ interface ChatProps {
 // Chat 컴포넌트 정의
 import { chatService } from '@/src/services/chatService';
 
-export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, chatEndRef, removeAttachment, isAnalyzing, setIsAnalyzing, attachedFiles, setAttachedFiles, initialQuery, setInitialQuery, devices, roomId }) => {
+export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, chatEndRef, removeAttachment, isAnalyzing, setIsAnalyzing, attachedFiles, setAttachedFiles, initialQuery, setInitialQuery, devices, roomId, deviceId }) => {
   const [inputText, setInputText] = useState('');
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
+  const [activeDeviceId, setActiveDeviceId] = useState<number | null>(deviceId || null); // 현재 대화 중인 기기 ID
+
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -80,6 +84,16 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
   const [isListening, setIsListening] = useState(false);
   const [tempTranscript, setTempTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
+
+  // 라이트박스(이미지 크게 보기) 상태
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // 멘션(@) 관련 상태
+  const [showMentionPopover, setShowMentionPopover] = useState(false);
+  const [mentionPosition, setMentionPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [mentionQuery, setMentionQuery] = useState(''); // 추가: 멘션 필터링을 위한 검색어
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFeedback = async (messageId: string, isLike: boolean) => {
     try {
@@ -118,8 +132,14 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     if (roomId) {
       setActiveRoomId(roomId);
       loadRoomMessages(roomId);
+      setActiveDeviceId(null); // 방 ID가 있으면 기기 ID 모드는 해제
+    } else if (deviceId) {
+      // 새로운 기기 대화 모드
+      setActiveRoomId(null);
+      setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?' }]);
+      setActiveDeviceId(deviceId);
     }
-  }, [roomId]);
+  }, [roomId, deviceId]);
 
   const loadRoomMessages = async (id: number) => {
     setIsAnalyzing(true);
@@ -214,10 +234,21 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
           await performAsk(-1, userText, userAttachments[0]);
         } else {
           // 기기가 있으면 정상적으로 방 생성
-          const deviceId = devices[0].id;
-          const newRoom = await chatService.createChatRoom(deviceId);
-          setActiveRoomId(newRoom.id);
-          await performAsk(newRoom.id, userText, userAttachments[0]);
+          const idToCreate = activeDeviceId || (devices && devices[0].id);
+          if (idToCreate) {
+            const newRoom = await chatService.createChatRoom(idToCreate);
+            if (newRoom && newRoom.roomId) {
+              targetRoomId = newRoom.roomId;
+              setActiveRoomId(newRoom.roomId);
+              
+              // 새 방에 대한 메시지 전송
+              await performAsk(newRoom.roomId, userText, userAttachments[0]);
+            } else {
+              throw new Error("채팅방 정보를 생성할 수 없습니다.");
+            }
+          } else {
+            throw new Error("기기 정보를 찾을 수 없습니다.");
+          }
         }
       } catch (error) {
         console.warn("방 생성 실패, 가상 세션으로 전환:", error);
@@ -421,6 +452,39 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     setIsVoiceModalOpen(false);
   };
 
+  // 멘션 팝업 연동을 위한 인풋 핸들러
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputText(value);
+
+    // 정규표현식으로 '@' 이후의 텍스트 추출 (예: "안녕하세요 @에어" -> "에어")
+    const mentionMatch = value.match(/@([^@\s]*)$/);
+    
+    if (mentionMatch) {
+      const query = mentionMatch[1]; // @ 뒤의 검색어
+      setMentionQuery(query);
+      
+      const rect = inputRef.current?.getBoundingClientRect();
+      if (rect) {
+        // 팝업 위치를 입력창 위로 동적으로 계산 (반응형 대응)
+        setMentionPosition({ top: rect.top - 10, left: rect.left }); 
+        setShowMentionPopover(true);
+      }
+    } else {
+      setShowMentionPopover(false);
+      setMentionQuery('');
+    }
+  };
+
+  const handleSelectMention = (deviceName: string) => {
+    // 현재 입력된 텍스트에서 마지막 @ 부분을 가전 이름으로 교체
+    const newValue = inputText.replace(/@([^@\s]*)$/, `@${deviceName} `);
+    setInputText(newValue);
+    setShowMentionPopover(false);
+    setMentionQuery('');
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
   {/* 안전 확인 박스 */ }
   return (
     <div className="flex flex-col h-[100dvh] md:h-[calc(100dvh-40px)] md:my-5 max-w-3xl mx-auto bg-white md:bg-white/90 md:backdrop-blur-xl md:rounded-3xl md:shadow-2xl overflow-hidden relative border border-white/20">
@@ -431,7 +495,23 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h3 className="font-bold text-slate-800 text-xl tracking-tight leading-tight">Fixie 가이드</h3>
+            <h3 className="font-bold text-slate-800 text-xl tracking-tight leading-tight">
+              {(() => {
+                if (activeRoomId && devices) {
+                  const device = devices.find(d => Number(d.id) === activeRoomId); // 여기서 activeRoomId가 device.id와 일치하지 않을 수 있음 (수정 필요)
+                  // 백엔드 구조상 ChatRoom 엔티티가 UserDevice를 들고 있으므로, 
+                  // 사실 roomId로 기기명을 바로 찾는 건 devices 목록에 roomId와 일치하는 device.id가 있을 때만 가능함.
+                  // 그래서 activeDeviceId를 우선시하거나, 로드된 메시지/방 정보에서 찾아야 함.
+                  const targetDevice = devices.find(d => Number(d.id) === (activeDeviceId || activeRoomId));
+                  return targetDevice ? `${targetDevice.name} 가이드` : 'Fixie 가이드';
+                }
+                if (activeDeviceId && devices) {
+                  const targetDevice = devices.find(d => Number(d.id) === activeDeviceId);
+                  return targetDevice ? `${targetDevice.name} 가이드` : 'Fixie 가이드';
+                }
+                return 'Fixie 가이드';
+              })()}
+            </h3>
             <span className="text-[11px] text-theme-primary font-bold">온라인 · 도움 준비 완료</span>
           </div>
         </div>
@@ -464,13 +544,37 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                 ? 'bg-fixie-steel text-white rounded-3xl rounded-tr-none shadow-md'
                 : 'bg-white/70 backdrop-blur-md text-slate-700 rounded-3xl rounded-tl-none border border-white/40 shadow-sm'
               }`}>
-
               <div className="p-3">
-                {/* 첨부 이미지 표시 */}
+
+                {/* 첨부 이미지 표시 (그리드 레이아웃 적용) */}
                 {msg.attachments && msg.attachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3">
+                  <div className={`
+                    grid gap-2 mb-3 max-w-[320px]
+                    ${msg.attachments.length === 1 ? 'grid-cols-1' : 
+                      msg.attachments.length === 2 ? 'grid-cols-2' : 
+                      msg.attachments.length >= 3 ? 'grid-cols-3' : ''}
+                  `}>
                     {msg.attachments.map((url, i) => (
-                      <img key={i} src={url} alt="Attachment" className="w-24 h-24 object-cover rounded-xl border border-white/20" referrerPolicy="no-referrer" />
+                      <div 
+                        key={i} 
+                        onClick={() => {
+                          setLightboxImages(msg.attachments || []);
+                          setLightboxIndex(i);
+                        }}
+                        className={`
+                          relative overflow-hidden rounded-xl border border-white/20 cursor-pointer hover:opacity-90 transition-opacity
+                          ${msg.attachments && msg.attachments.length >= 3 && i === 2 && msg.attachments.length > 3 ? 'after:content-["+'+(msg.attachments.length-3)+'"] after:absolute after:inset-0 after:bg-black/50 after:flex after:items-center after:justify-center after:text-white after:font-bold' : ''}
+                          ${msg.attachments && msg.attachments.length >= 3 && i >= 3 ? 'hidden' : ''}
+                          aspect-square
+                        `}
+                      >
+                        <img 
+                          src={url} 
+                          alt="Attachment" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer" 
+                        />
+                      </div>
                     ))}
                   </div>
                 )}
@@ -525,39 +629,78 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                           </div>
                         )}
 
-                        {/* 참고 페이지 정보 */}
-                        {msg.referencedPage && (
-                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100/50 rounded-full w-max border border-slate-100">
-                            <FileText size={12} className="text-slate-400" />
-                            <span className="text-[10px] font-bold text-slate-500">참고: P. {msg.referencedPage}</span>
-                          </div>
-                        )}
-
                         {/* 안전 확인 박스 */}
                         <SafetyCheck text="전원을 뽑았나요?" />
                       </>
+                    )}
+                    
+                    {/* [NEW] 실제 데이터가 있을 때만 매뉴얼 페이지 미리보기 표시 */}
+                    {msg.senderType === 'AI' && msg.manualImageUrl && (
+                      <div className="mt-3">
+                        <div className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1 uppercase tracking-tight">
+                          <FileText size={10} />
+                          Manual Preview
+                        </div>
+                        <div 
+                          className="w-full h-32 rounded-xl overflow-hidden border border-slate-200 cursor-zoom-in relative group"
+                          onClick={() => {
+                            setLightboxImages([msg.manualImageUrl!]);
+                            setLightboxIndex(0);
+                          }}
+                        >
+                          <img src={msg.manualImageUrl} alt="Manual" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                             <div className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-slate-700 shadow-lg">
+                               <FileText size={14} />
+                             </div>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
 
                 <p className="text-sm p-3 leading-relaxed">{msg.text}</p>
-                {/* 피드백 버튼*/}
-                {msg.senderType === 'AI' && msg.type === 'guide' && (
-                  <div className="flex gap-3 mt-3 pt-2 border-t border-slate-200/50">
-                    <button
-                      onClick={() => handleFeedback(msg.id, true)}
-                      className="flex items-center gap-1 text-slate-300 hover:text-theme-primary transition-colors group"
-                    >
-                      <ThumbsUp size={14} className="group-hover:scale-110 transition-transform" />
-                    </button>
-                    <button
-                      onClick={() => handleFeedback(msg.id, false)}
-                      className="flex items-center gap-1 text-slate-300 hover:text-red-400 transition-colors group"
-                    >
-                      <ThumbsDown size={14} className="group-hover:scale-110 transition-transform" />
-                    </button>
-                  </div>
-                )}
+
+
+                    {/* 피드백 및 매뉴얼 버튼 영역 */}
+                    {msg.senderType === 'AI' && (
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-200/50">
+                        <div className="flex gap-4">
+                          <button
+                            onClick={() => handleFeedback(msg.id, true)}
+                            className="flex items-center gap-1 text-slate-300 hover:text-theme-primary transition-colors group"
+                            title="도움이 되었어요"
+                          >
+                            <ThumbsUp size={15} className="group-hover:scale-110 transition-transform" />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(msg.id, false)}
+                            className="flex items-center gap-1 text-slate-300 hover:text-red-400 transition-colors group"
+                            title="부족한 답변이에요"
+                          >
+                            <ThumbsDown size={15} className="group-hover:scale-110 transition-transform" />
+                          </button>
+                        </div>
+
+                        {(msg.manualLink || msg.referencedPage || msg.manualImageUrl) && (
+                          <button 
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-primary/10 hover:bg-theme-primary text-theme-primary hover:text-white rounded-xl transition-all text-[11px] font-bold border border-theme-primary/10 shadow-sm"
+                            onClick={() => {
+                              if (msg.manualImageUrl) {
+                                setLightboxImages([msg.manualImageUrl]);
+                                setLightboxIndex(0);
+                              } else if (msg.manualLink) {
+                                window.open(msg.manualLink, '_blank');
+                              }
+                            }}
+                          >
+                            <FileText size={13} />
+                            {msg.referencedPage ? `매뉴얼 P.${msg.referencedPage}` : '매뉴얼 보기'}
+                          </button>
+                        )}
+                      </div>
+                    )}
               </div>
             </div>
           </motion.div>
@@ -611,14 +754,12 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
 
         {/* 메인 입력 알약(Pill) */}
         <div className={`
-          flex items-center gap-2 transition-all duration-300
-          /* 모바일: 연한 회색 배경, 그림자 없음, 더 슬림하게 */
+          flex items-center gap-2 transition-all duration-300 relative
           bg-white/40 backdrop-blur-xl rounded-full p-1 pl-4 shadow-none border border-white/20
-          /* 데스크탑: 흰색 배경, 화려한 그림자, 더 빵빵하게 */
           md:bg-white/60 md:backdrop-blur-xl md:p-2 md:pl-4 md:shadow-lg md:border-white/30
         `}>
 
-          {/* 마이크 버튼 (모바일에서 조금 작게) */}
+          {/* 마이크 버튼 */}
           <button
             onClick={() => setIsVoiceModalOpen(true)}
             className="p-2 text-theme-primary bg-theme-primary/10 rounded-full hover:bg-theme-primary/20 transition-colors"
@@ -632,13 +773,13 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
           </label>
 
           <input
+            ref={inputRef}
             type="text"
-            value={inputText} // 입력창에 입력한 텍스트가 State에 실시간으로 반영되도록
-            onChange={(e) => setInputText(e.target.value)} //쓸 때마다 State에 담기
+            value={inputText}
+            onChange={handleInputChange}
             placeholder="질문을 입력하세요..."
             className="flex-1 bg-transparent h-10 px-1 focus:outline-none text-[13px] md:text-sm text-slate-700 font-medium"
             onKeyDown={(e) => {
-              // 한글 입력 중인 경우 Enter 키 무시 (조합 중인 경우)
               if (e.nativeEvent.isComposing) return;
               if (e.key === 'Enter' && (inputText || attachedFiles.length > 0)) {
                 onSendMessage();
@@ -650,16 +791,58 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
           <button
             className="w-10 h-10 md:w-12 md:h-12 bg-wing-gradient rounded-full flex items-center justify-center text-white shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
             onClick={() => {
-              if (canSend) { // 보낼 수 있는 상태인지 확인하고
-                onSendMessage(); // 이미 State에 담긴 값을 전송!
-                // (입력창 비우기는 onSendMessage 함수 안에서 setInputText('')로 처리)
-              }
+              if (canSend) onSendMessage();
             }}
           >
             <Send className="w-4 h-4 md:w-4.5 md:h-4.5 -ml-0.5" />
           </button>
+
+          {/* 멘션(@) 기기 선택 팝업 (입력창 바로 위로 배치) */}
+          <AnimatePresence>
+            {showMentionPopover && (
+              <motion.div
+                initial={{ opacity: 0, y: 5, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 5, scale: 0.98 }}
+                className="absolute bottom-full left-0 mb-2 z-[100] bg-white/95 backdrop-blur-2xl border border-slate-200/60 rounded-2xl overflow-hidden w-64"
+              >
+                <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                  <p className="text-[10px] font-black text-theme-primary uppercase tracking-wider">가전 참조하기</p>
+                </div>
+                <div className="max-h-56 overflow-y-auto no-scrollbar">
+                  {devices && devices.length > 0 ? (
+                    devices
+                      .filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase()) || d.model.toLowerCase().includes(mentionQuery.toLowerCase()))
+                      .map((device) => (
+                        <button
+                          key={device.id}
+                          onClick={() => handleSelectMention(device.name)}
+                          className="w-full text-left px-4 py-3 hover:bg-theme-primary/10 transition-colors flex items-center gap-3 border-b border-slate-50 last:border-none"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400">
+                            <WashingMachine size={16} />
+                          </div>
+                          <div>
+                            <p className="text-[13px] font-bold text-slate-700">{device.name}</p>
+                            <p className="text-[10px] text-slate-400 font-medium">{device.model}</p>
+                          </div>
+                        </button>
+                      ))
+                  ) : (
+                    <div className="p-6 text-center">
+                      <p className="text-xs text-slate-400 font-medium">등록된 기기가 없습니다</p>
+                    </div>
+                  )}
+                  {devices && devices.length > 0 && devices.filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase())).length === 0 && (
+                    <div className="p-4 text-center text-xs text-slate-400">검색 결과가 없습니다</div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
+
 
       {/* 비디오 모달 팝업 */}
       <AnimatePresence>
@@ -770,6 +953,56 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
               onClose={() => setIsReportModalOpen(false)}
               shareUrl={activeRoomId ? `https://fixie.app/share/${activeRoomId}` : undefined}
             />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 이미지 라이트박스(슬라이드) 모달 */}
+      <AnimatePresence>
+        {lightboxImages.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4"
+          >
+            <button 
+              onClick={() => setLightboxImages([])}
+              className="absolute top-6 right-6 text-white/70 hover:text-white z-50 p-2"
+            >
+              <X size={32} />
+            </button>
+
+            {/* 좌우 이동 버튼 */}
+            {lightboxImages.length > 1 && (
+              <>
+                <button 
+                  onClick={() => setLightboxIndex((prev) => (prev - 1 + lightboxImages.length) % lightboxImages.length)}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-4 z-50 transition-colors"
+                >
+                  <ArrowLeft size={40} />
+                </button>
+                <button 
+                  onClick={() => setLightboxIndex((prev) => (prev + 1) % lightboxImages.length)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-4 z-50 transition-colors rotate-180"
+                >
+                  <ArrowLeft size={40} />
+                </button>
+              </>
+            )}
+
+            <div className="relative w-full h-full flex flex-col items-center justify-center gap-4">
+              <motion.img 
+                key={lightboxIndex}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                src={lightboxImages[lightboxIndex]} 
+                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+              />
+              <div className="text-white/70 font-bold text-sm bg-black/50 px-4 py-2 rounded-full">
+                {lightboxIndex + 1} / {lightboxImages.length}
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

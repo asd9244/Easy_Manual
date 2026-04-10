@@ -11,7 +11,8 @@ export const DeviceStatusCard = ({
   lastCheck = '2일 전',
   filterStatus = '30일 후',
   repairCount = '2회',
-  isWarning = false 
+  isWarning = false,
+  onChatClick // 채팅 버튼 클릭 핸들러 추가
 }: any) => {
   
   // 카드 확장 상태 관리
@@ -40,8 +41,33 @@ export const DeviceStatusCard = ({
           </div>
         </div>
 
-        {/* 상태 뱃지 */}
+        {/* 상태 및 채팅 버튼 */}
         <div className="flex items-center gap-2">
+          {/* 채팅 버튼 추가 */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation(); // 카드 확장 방지
+              onChatClick && onChatClick();
+            }}
+            className="w-10 h-10 bg-theme-primary/10 text-theme-primary rounded-xl flex items-center justify-center hover:bg-theme-primary hover:text-white transition-all shadow-sm group/btn"
+          >
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              <svg 
+                width="20" 
+                height="20" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className="transition-transform"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </motion.div>
+          </button>
+
           <div className={`px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${badgeStyle}`}>
             <div className={`w-1.5 h-1.5 rounded-full ${status === '정상' ? 'bg-theme-primary' : status === '점검 필요' ? 'bg-yellow-500' : 'bg-red-500'}`} />
             {status}

@@ -8,7 +8,8 @@ import {
   Type, 
   QrCode, 
   Trash2,
-  Search 
+  Search,
+  Camera
 } from 'lucide-react';
 import { Device, Screen } from '@/src/types/index';
 import { deviceService } from '@/src/services/deviceService';
@@ -37,6 +38,7 @@ export const Garage: React.FC<GarageProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [newNickname, setNewNickname] = useState(''); // 별명 수정을 위한 임시 상태
 
   useEffect(() => {
     if (scannedModel && isSearching) {
@@ -133,7 +135,10 @@ export const Garage: React.FC<GarageProps> = ({
               <p className="text-sm text-slate-500">{device.model}</p>
             </div>
             <button 
-              onClick={() => setEditingDevice(device)} 
+              onClick={() => {
+                setEditingDevice(device);
+                setNewNickname(device.name); // 모달 열 때 현재 이름으로 초기화
+              }} 
               className="p-2 text-slate-300 hover:text-theme-primary transition-colors relative z-10"
             >
               <Settings size={20} />
@@ -167,8 +172,9 @@ export const Garage: React.FC<GarageProps> = ({
                 className="absolute top-full mb-4 left-0 right-0 bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-4 space-y-2 z-20 border border-white/50"
               >
                 {[
-                  { icon: Type, label: "모델명 직접 입력", color: "bg-blue-50 text-blue-500" },
-                  { icon: QrCode, label: "QR 코드 스캔", color: "bg-orange-50 text-orange-500" }
+                  { icon: Type, label: "모델명 직접 입력", color: "bg-blue-50 text-blue-500", action: 'search' },
+                  { icon: Camera, label: "모델 라벨 스캔", color: "bg-purple-50 text-purple-500", action: 'ocr' },
+                  { icon: QrCode, label: "QR 코드 스캔", color: "bg-orange-50 text-orange-500", action: 'qr' }
                 ].map((opt, i) => (
                   <motion.button 
                     key={i}
@@ -176,14 +182,16 @@ export const Garage: React.FC<GarageProps> = ({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.1 }}
                     onClick={() => {
-                        if (opt.ocr || opt.label === "QR 코드 스캔") {
-                          if (opt.label === "QR 코드 스캔") localStorage.setItem('scanInitialMode', 'qr');
-                          else localStorage.setItem('scanInitialMode', 'ocr');
-                          setScreen('scan'); // 라벨 스캔 누르면 스캔 화면으로
-                        } else if (opt.label === "모델명 직접 입력") {
-                          setIsSearching(true); // 직접 입력 누르면 검색창 열기!
+                        if (opt.action === 'qr') {
+                          localStorage.setItem('scanInitialMode', 'qr');
+                          setScreen('scan');
+                        } else if (opt.action === 'ocr') {
+                          localStorage.setItem('scanInitialMode', 'ocr');
+                          setScreen('scan');
+                        } else if (opt.action === 'search') {
+                          setIsSearching(true);
                         }
-                        setShowGarageOptions(false); // 버튼 누르면 옵션 메뉴는 닫기
+                        setShowGarageOptions(false);
                     }}
                     className="w-full p-4 flex items-center gap-4 hover:bg-white/80 rounded-3xl transition-all text-left hover:shadow-md group relative overflow-hidden"
                   >
@@ -223,14 +231,28 @@ export const Garage: React.FC<GarageProps> = ({
                 <label className="text-xs font-bold text-slate-400 mb-2 block">기기 별명</label>
                 <input 
                   type="text" 
-                  defaultValue={editingDevice?.name} 
+                  value={newNickname} 
+                  onChange={(e) => setNewNickname(e.target.value)}
                   className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-theme-primary/50"
+                  placeholder="별명을 입력하세요"
                 />
               </div>
               {/* 2. 액션 버튼들 (저장, 취소, 삭제) */}
               <div className="flex flex-col gap-2">
                 <button 
-                  onClick={() => setEditingDevice(null)} 
+                  onClick={() => {
+                    // [변경 사항 저장] 기기 목록 업데이트
+                    const updatedDevices = devices.map(d => 
+                      d.id === editingDevice?.id ? { ...d, name: newNickname } : d
+                    );
+                    setDevices(updatedDevices);
+                    
+                    // 로컬스토리지에 임시 저장 (백엔드 수정 불가 제약사항 대응)
+                    localStorage.setItem('local_devices', JSON.stringify(updatedDevices));
+                    
+                    setEditingDevice(null);
+                    alert('기기 정보가 업데이트되었습니다.');
+                  }} 
                   className="w-full py-3 bg-wing-gradient text-white rounded-xl font-bold shadow-md hover:scale-[0.98] transition-transform"
                 >
                   변경사항 저장
@@ -265,14 +287,14 @@ export const Garage: React.FC<GarageProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-sm"
+              className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm"
             >
               <motion.div
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="bg-white w-full max-w-md h-[80vh] sm:h-auto sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl flex flex-col"
+                className="bg-white w-full max-w-md h-[85vh] sm:h-[600px] sm:max-h-[90vh] sm:rounded-3xl rounded-t-3xl p-6 shadow-2xl flex flex-col"
               >
                 {/* 헤더 & 닫기 버튼 */}
                 <div className="flex justify-between items-center mb-6">
@@ -294,8 +316,8 @@ export const Garage: React.FC<GarageProps> = ({
                   />
                 </div>
 
-                {/* 검색 결과 목록 */}
-                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 custom-scrollbar">
+                {/* 검색 결과 목록 (높이 제한 및 스크롤) */}
+                <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4 no-scrollbar">
                   {searchResults.length > 0 ? (
                     searchResults.map((item: any, idx: number) => (
                       <motion.div
