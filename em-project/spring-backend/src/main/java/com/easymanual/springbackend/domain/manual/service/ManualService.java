@@ -22,17 +22,28 @@ public class ManualService {
         Manual newManual = Manual.builder()
                 .manualCode(manualCode)
                 .productType(productType)
-                .coveredModelNames(coveredModelNames)
                 .representativeModelName(representativeModelName)
                 .build();
 
-        // 2. 프론트엔드 요구사항 2번: QR 코드 자동 생성
-        // 유저가 스캔했을 때 검색 API로 바로 넘길 수 있도록, 대표 모델명(또는 식별 코드)을 QR 내용으로 삽입합니다.
-        String qrContent = representativeModelName;
-        String generatedQrUrl = qrCodeUtil.generateAndSaveQrCode(qrContent);
-
-        // 3. 생성된 QR 이미지 URL을 엔티티에 세팅합니다.
-        newManual.updateQrCodeUrl(generatedQrUrl);
+        // 2. 콤마로 구분된 coveredModelNames를 순회하며 개별 Model 생성 및 QR 파싱
+        if (coveredModelNames != null && !coveredModelNames.isBlank()) {
+            String[] models = coveredModelNames.split(",");
+            for (String mName : models) {
+                String cleanName = mName.trim();
+                // 개별 모델명에 대해 QR 생성
+                String generatedQrUrl = qrCodeUtil.generateAndSaveQrCode(cleanName);
+                
+                // Model 엔티티 생성 및 연관관계 맺기
+                com.easymanual.springbackend.domain.manual.entity.Model newModel = 
+                    com.easymanual.springbackend.domain.manual.entity.Model.builder()
+                        .name(cleanName)
+                        .qrCodeUrl(generatedQrUrl)
+                        .manual(newManual)
+                        .build();
+                
+                newManual.addModel(newModel);
+            }
+        }
 
         // 4. DB에 영구 저장(Persist)하고 반환합니다.
         return manualRepository.save(newManual);

@@ -2,6 +2,7 @@ package com.easymanual.springbackend.domain.device.dto;
 
 import com.easymanual.springbackend.domain.manual.entity.Manual;
 import lombok.Getter;
+import java.util.stream.Collectors;
 
 @Getter
 public class ManualSearchResponse {
@@ -17,8 +18,16 @@ public class ManualSearchResponse {
     public ManualSearchResponse(Manual manual) {
         this.manualId = manual.getId();
         this.productType = manual.getProductType();
-        this.coveredModelNames = manual.getCoveredModelNames();
         this.representativeModelName = manual.getRepresentativeModelName();
-        this.qrCodeUrl = manual.getQrCodeUrl();
+        
+        if (manual.getModels() != null && !manual.getModels().isEmpty()) {
+            this.coveredModelNames = manual.getModels().stream()
+                .map(com.easymanual.springbackend.domain.manual.entity.Model::getName)
+                .collect(Collectors.joining(", "));
+            this.qrCodeUrl = manual.getModels().get(0).getQrCodeUrl();
+        } else {
+            this.coveredModelNames = "";
+            this.qrCodeUrl = "";
+        }
     }
 }
