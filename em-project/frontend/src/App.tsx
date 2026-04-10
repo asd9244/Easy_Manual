@@ -46,7 +46,12 @@ export default function App() {
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
-  const [screen, setScreen] = useState<Screen>('splash');
+  const [screen, setScreen] = useState<Screen>(() => {
+    if (window.location.pathname === '/oauth2/redirect') return 'splash';
+    const token = localStorage.getItem('accessToken');
+    if (token && token !== 'undefined' && token !== 'null') return 'home';
+    return 'splash';
+  });
   const [currentTheme, setCurrentTheme] = useState<ThemeType>('magician');
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
@@ -263,14 +268,19 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                 {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} onRoomSelect={(id: number) => setSelectedRoomId(id)} />}
                 {screen === 'settings' && <Settings key="settings" setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />}
                 {screen === 'scan' && <ScanScreen key="scan" onClose={() => setScreen('home')} onScan={(model?: string) => { 
-                  if (model && model !== 'ocr_image') { 
-                    setScannedModel(model); 
-                    setScreen('garage'); 
-                  } else { 
-                    // 채팅창으로 넘길 때 초기 쿼리 신호를 주어야 Chat 컴포넌트에서 로딩을 해제함
-                    setInitialChatQuery('ocr_image'); 
-                    setIsAnalyzing(true); 
-                    setScreen('chat'); 
+                  if (model) { 
+                    const existingDevice = devices.find(d => d.model === model || d.name === model);
+                    if (existingDevice) {
+                      // 스마트 스캔: 이미 등록된 기기면 즉시 해당 기기의 채팅창으로 이동!
+                      setSelectedRoomId(Number(existingDevice.id));
+                      setInitialChatQuery(''); // 별도 자동 질문 없이 채팅창 진입
+                      setIsAnalyzing(true); // 멋진 진입 애니메이션 효과 실행
+                      setScreen('chat');
+                    } else {
+                      // 미등록 기기면 기기 추가(Garage) 창으로 자동 이동하여 등록 유도
+                      setScannedModel(model); 
+                      setScreen('garage'); 
+                    }
                   } 
                 }} />}
                 {screen === 'theme-select' && (<ThemeSelect key="theme-select"setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />)}
