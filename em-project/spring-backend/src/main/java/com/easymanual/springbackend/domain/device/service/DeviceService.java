@@ -36,8 +36,8 @@ public class DeviceService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
 
-        // 2. 클라이언트가 요청 DTO에 담아 보낸 모델명(model)이 포함된 Manual 엔티티를 DB에서 조회합니다.
-        Manual manual = manualRepository.findByModelNameContaining(request.getModel())
+        // 2. 클라이언트가 요청 DTO에 담아 보낸 모델명(modelName)이 포함된 Manual 엔티티를 DB에서 조회합니다.
+        Manual manual = manualRepository.findByModelNameContaining(request.getModelName())
                 .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 모델명입니다."));
 
         // 3. 조회된 User와 Manual 엔티티를 연관관계로 설정하여 새로운 UserDevice 엔티티 객체를 생성합니다.
