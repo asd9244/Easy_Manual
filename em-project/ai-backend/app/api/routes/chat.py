@@ -1,6 +1,8 @@
 import os
+import json
+import re
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from langchain_ollama import OllamaEmbeddings, OllamaLLM
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
@@ -92,3 +94,76 @@ def ask_manual(request: ChatRequest):
         "ai_answer": ai_answer,
         "manual_image_url": manual_image_url # 🌟 조립된 이미지 URL을 Spring Boot로 전송!
     }
+
+
+class SummaryRequest(BaseModel):
+    chat_history: str = Field(
+        ..., 
+        title="전체 대화 이력", 
+        description="요약할 유저와 AI의 상담 전체 대화 내역입니다. 긴 텍스트를 그대로 넘겨주시면 됩니다.", 
+        example="유저: 에어컨 켤 때 드르륵거리는 소리가 나요.\\n비서: 먼지 필터가 장착되지 않아 나는 소리일 수 있습니다. 필터를 빼서 확인해 보시겠어요?"
+    )
+
+class SummaryResponse(BaseModel):
+    symptoms: str = Field(..., title="증상", description="사용자가 호소한 주요 증상에 대한 1~2줄 요약")
+    cause: str = Field(..., title="원인", description="상담 내용을 바탕으로 AI가 진단한 고장의 핵심 원인")
+    solutions: str = Field(..., title="해결방안", description="사용자 혼자서 조치할 수 있는 단계별 가이드라인 (번호를 매겨 반환됨)")
+
+@router.post(
+    "/summary", 
+    response_model=SummaryResponse,
+    summary="채팅 상담 내역 기반 진단 리포트 요약 생성 API 📝",
+    description="스프링 백엔드에서 사용자 채팅 이력을 하나로 모아 전송(`chat_history`)하면, 로컬 Qwen 모델 가동을 통해 **증상, 원인, 해결방안** 3파트로 분류된 아주 깔끔한 JSON 응답(`SummaryResponse`) 구조체로 요약하여 뱉어내는 AI 엔진입니다."
+)
+def summarize_chat(request: SummaryRequest):
+    prompt = f"""
+    너는 전자기기 수리 상담 내역을 분석하는 전문 AI 비서야.
+    아래 제공된 [대화 이력]을 분석해서 다음 3가지 항목으로 매우 간결하게 요약해줘.
+    
+    1. symptoms: 사용자가 호소한 주요 증상 (1~2줄)
+    2. cause: 기기 고장의 주요 원인 (1~2줄)
+    3. solutions: 조치해야 할 해결방안 리스트 (구체적인 번호 매기기)
+    
+    반드시 아래 JSON 형식으로만 답변해야 하며, 다른 설명이나 인사말은 절대 포함하지 마.
+    {{
+        "symptoms": "...",
+        "cause": "...",
+        "solutions": "..."
+    }}
+
+    [대화 이력]
+    {request.chat_history}
+    """
+    
+    print("AI가 대화 내역 리포트 요약을 시작합니다 (JSON 형식)...")
+    
+    try:
+        raw_answer = llm.invoke(prompt)
+        
+        # 안전 장치: 모델이 혹시나 마크다운 블록(```json)을 붙였을 경우를 대비한 클렌징 로직
+        cleaned_answer = raw_answer.strip()
+        if cleaned_answer.startswith("```json"):
+            cleaned_answer = cleaned_answer.replace("```json", "", 1)
+        if cleaned_answer.startswith("```"):
+            cleaned_answer = cleaned_answer.replace("```", "", 1)
+        if cleaned_answer.endswith("```"):
+            cleaned_answer = cleaned_answer[:cleaned_answer.rfind("```")]
+            
+        cleaned_answer = cleaned_answer.strip()
+        
+        # JSON 직렬화 해제
+        parsed_json = json.loads(cleaned_answer)
+        
+        return {
+            "symptoms": parsed_json.get("symptoms", "증상 요약 실패"),
+            "cause": parsed_json.get("cause", "원인 분석 실패"),
+            "solutions": parsed_json.get("solutions", "해결방안 요약 실패")
+        }
+        
+    except Exception as e:
+        print(f"JSON 파싱 실패: {e}\\n원본 답변: {raw_answer if 'raw_answer' in locals() else 'None'}")
+        return {
+            "symptoms": "AI 요약 생성 중 오류가 발생했습니다.",
+            "cause": "원인 분석 불가",
+            "solutions": f"상세 에러 내역 발생. 스프링 부트는 이 에러를 처리해야 함."
+        }
