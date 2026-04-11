@@ -131,12 +131,17 @@ public class ChatService {
                 .block();
 
         // 5. FastAPI로부터 받은 AI의 답변을 ChatMessage 엔티티로 생성하여 DB에 저장합니다.
+        // 프론트엔드의 멀티 이미지 스와이프 처리를 위해 리스트를 콤마(,)로 결합해 하나의 DB 문자열에 저장합니다. (스키마 변경 최소화)
+        String urlsString = (aiResponse.getManualImageUrls() != null && !aiResponse.getManualImageUrls().isEmpty())
+                ? String.join(",", aiResponse.getManualImageUrls())
+                : null;
+
         ChatMessage aiMessage = ChatMessage.builder()
                 .chatRoom(chatRoom)
                 .senderType(ChatMessage.SenderType.AI)
                 .message(aiResponse.getAiAnswer())
                 .referencedPage(aiResponse.getFoundPage())
-                .manualImageUrl(aiResponse.getManualImageUrl())
+                .manualImageUrl(urlsString)
                 .build();
         chatMessageRepository.save(aiMessage);
 

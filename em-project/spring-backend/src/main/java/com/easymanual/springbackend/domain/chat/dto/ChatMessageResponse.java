@@ -4,6 +4,8 @@ import com.easymanual.springbackend.domain.chat.entity.ChatMessage;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Arrays;
 
 // 클라이언트에게 반환할 개별 말풍선의 정보(메시지 내용, 보낸 사람, 미디어 URL, 참고 페이지, 보낸 시간)를 담는 데이터 전송 객체입니다.
 
@@ -15,7 +17,7 @@ public class ChatMessageResponse {
     private String message; // 실제 대화 내용 (텍스트)
     private String mediaUrl; // 첨부된 사진/음성 파일의 S3 주소 (없으면 null)
     private Integer referencedPage; // AI가 참고한 매뉴얼 페이지 번호 (없으면 null)
-    private String manualImageUrl; // 유저가 올린 사진 URL
+    private List<String> manualImageUrls; // 🌟 수정됨: AI가 참고한 매뉴얼 원본 이미지 URL 리스트
     private LocalDateTime createdAt; // 메시지를 보낸 정확한 시간
 
 
@@ -27,7 +29,14 @@ public class ChatMessageResponse {
         this.message = chatMessage.getMessage();
         this.mediaUrl = chatMessage.getMediaUrl();
         this.referencedPage = chatMessage.getReferencedPage();
-        this.manualImageUrl = chatMessage.getManualImageUrl();
+        
+        // 콤마로 저장된 DB 문자열을 리스트형태로 분리해서 프론트로 응답합니다.
+        if (chatMessage.getManualImageUrl() != null && !chatMessage.getManualImageUrl().isEmpty()) {
+            this.manualImageUrls = Arrays.asList(chatMessage.getManualImageUrl().split(","));
+        } else {
+            this.manualImageUrls = java.util.Collections.emptyList();
+        }
+        
         this.createdAt = chatMessage.getCreatedAt();
     }
 }
