@@ -12,7 +12,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   Image as ImageIcon,
-  WashingMachine
+  WashingMachine,
+  AtSign
 } from 'lucide-react';
 import { FixieLogo } from '@/src/components/common/FixieLogo';
 import { Message, Screen } from '@/src/types/index';
@@ -306,7 +307,8 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
       text: data.message || '답변을 생성할 수 없습니다.',
       type: 'guide',
       referencedPage: (data as any).referencedPage,
-      manualImageUrls: (data as any).manualImageUrls || [],
+      // 백엔드 네이밍 전략 이슈에 대비하여 카멜케이스와 스네이크케이스 모두 확인
+      manualImageUrls: (data as any).manualImageUrls || (data as any).manual_image_urls || [],
     };
     setMessages(prev => [...prev, fixieMsg]);
   };
@@ -504,14 +506,14 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
       // 기기를 명시적으로 바꿨으므로 기존 방 ID 초기화 (새 대화 세션 시작)
       setActiveRoomId(null);
 
-      // 사용자 경험을 위해 채팅창에 안내 메시지 추가
+      // 사용자 경험을 위해 기존 대화 내용을 비우고 새로운 안내 메시지만 표시 (별도 페이지 효과)
       const systemMsg: Message = {
         id: 'system-' + Date.now(),
         senderType: 'AI',
         text: `✨ 새로운 [${deviceName}] 가이드 대화를 시작합니다.`,
-        type: 'status' // 상태형 메시지 (필요 시 스타일 구분 가능)
+        type: 'status' 
       };
-      setMessages(prev => [...prev, systemMsg]);
+      setMessages([systemMsg]);
     }
     
     setShowMentionPopover(false);
@@ -552,6 +554,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
         <button
           onClick={() => setIsReportModalOpen(true)}
           className="w-10 h-10 bg-theme-primary/10 rounded-xl flex items-center justify-center text-theme-primary hover:bg-theme-primary/20 transition-colors"
+          title="진단 리포트"
         >
           <FileText size={20} />
         </button>
