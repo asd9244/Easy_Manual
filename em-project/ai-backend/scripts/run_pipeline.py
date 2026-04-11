@@ -10,9 +10,8 @@ sys.path.append(project_root)
 from app.services.pdf_service import convert_pdf_to_images
 from app.services.ocr_service import extract_text_from_pdf
 from app.services.toc_service import extract_toc_from_pdf
-from app.services.vectorize_service import run_vectorization
 from scripts.ingest_to_neo4j import run_pipeline as ingest_to_neo4j
-from scripts.finalize_db import run as finalize_db
+from scripts.build_sections import run as build_sections
 
 
 def run_total_pipeline(pdf_filename, model_name):
@@ -20,7 +19,7 @@ def run_total_pipeline(pdf_filename, model_name):
     모든 전처리 과정을 한 번에 실행하는 마스터 파이프라인
     """
     print(f"\n{'=' * 50}")
-    print(f"🔥 [{model_name}] 통합 전처리 파이프라인 가동 시작")
+    print(f"[{model_name}] 통합 전처리 파이프라인 가동 시작")
     print(f"{'=' * 50}\n")
 
     # 0. 경로 설정
@@ -41,17 +40,13 @@ def run_total_pipeline(pdf_filename, model_name):
     print("Step 3: 목차 계층 구조 추출 진행 중...")
     extract_toc_from_pdf(pdf_path, toc_output_dir, model_name)
 
-    # 4. Neo4j 데이터 적재 (Graph 생성)
-    print("Step 4: Neo4j 그래프 데이터 적재 진행 중...")
+    # 4. Neo4j 기본 적재 (Page는 이미지 파일명만, Topic 계층 구조)
+    print("Step 4: Neo4j 기본 그래프 적재 진행 중...")
     ingest_to_neo4j(model_name)
 
-    # 5. 벡터화 (BGE-M3 임베딩)
-    print("Step 5: 로컬 벡터화 및 인덱싱 진행 중...")
-    run_vectorization(model_name)
-
-    # 6. DB 마무리 (선 연결 및 키워드 인덱스)
-    print("Step 6: DB 최적화 및 선후 관계 연결 진행 중...")
-    finalize_db(model_name)
+    # 5. 섹션 생성 + 제미나이 사전 처리 + 임베딩 + 인덱스 (올인원)
+    print("Step 5: 섹션 생성 및 사전 처리 진행 중...")
+    build_sections(model_name)
 
     print(f"\n{'=' * 50}")
     print(f"✅ [{model_name}] 모든 전처리 공정이 완료되었습니다!")

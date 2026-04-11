@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -17,16 +19,14 @@ public class AiChatResponse {
     private String question;
 
     // 파이썬이 보내는 "found_page"를 자바의 foundPage 변수에 바인딩합니다.
-    // 이제 롬복이 getFoundPage() 라는 메서드를 정상적으로 만들어줍니다!
     @JsonProperty("found_page")
     private Integer foundPage;
 
     // 파이썬이 보내는 "ai_answer"를 자바의 aiAnswer 변수에 바인딩합니다.
-    // 이제 롬복이 getAiAnswer() 라는 메서드를 정상적으로 만들어줍니다!
     @JsonProperty("ai_answer")
     private String aiAnswer;
 
-    // FastAPI가 보내주는 매뉴얼 원본 이미지 URL을 바인딩합니다.
-    @JsonProperty("manual_image_url")
-    private String manualImageUrl;
+    // FastAPI가 보내주는 매뉴얼 원본 이미지 URL 리스트를 바인딩합니다.
+    @JsonProperty("manual_image_urls")
+    private List<String> manualImageUrls;
 }
