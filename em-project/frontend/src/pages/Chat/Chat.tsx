@@ -291,7 +291,6 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
 
     if (roomId === -1) {
       // 가상 룸(서버 에러 시)일 경우 프론트엔드 자체 폴백 답변 생성
-      // 지능형 서비스를 위해 약간의 딜레이 후 답변
       await new Promise(resolve => setTimeout(resolve, 800));
       data = {
         id: Date.now(),
@@ -301,15 +300,21 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
       data = await chatService.askQuestion(roomId, text, mediaUrl);
     }
 
+    // [개선] 백엔드 응답(data)으로부터 필드 추출 시 카멜케이스와 스네이크케이스 모두 대응
+    const referencedPage = (data as any).referencedPage || (data as any).referenced_page;
+    const manualImageUrls = (data as any).manualImageUrls || (data as any).manual_image_urls || [];
+    const aiMessage = (data as any).message || (data as any).ai_answer || data.text || '답변을 생성할 수 없습니다.';
+
     const fixieMsg: Message = {
       id: String(data.id || Date.now() + 1),
       senderType: 'AI',
-      text: data.message || '답변을 생성할 수 없습니다.',
+      text: aiMessage,
       type: 'guide',
-      referencedPage: (data as any).referencedPage,
-      // 백엔드 네이밍 전략 이슈에 대비하여 카멜케이스와 스네이크케이스 모두 확인
-      manualImageUrls: (data as any).manualImageUrls || (data as any).manual_image_urls || [],
+      referencedPage: referencedPage,
+      manualImageUrls: manualImageUrls,
+      mediaUrl: (data as any).mediaUrl || (data as any).media_url
     };
+    
     setMessages(prev => [...prev, fixieMsg]);
   };
 
@@ -492,7 +497,32 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     }
   };
 
-  const handleSelectMention = (deviceName: string) => {
+    const handleSelectMention = (deviceName: string) => {
+    if (deviceName === '매뉴얼 즉시 보기') {
+      // 현재 기기 정보가 있는 경우 바로 라이트박스 오픈
+      if (activeDeviceId && devices) {
+        const currentDevice = devices.find(d => Number(d.id) === activeDeviceId);
+        // 실제로는 기기 정보에 매뉴얼 URL이 있어야 함 (임시로 첫 AI 메시지에서 가져오거나 안내)
+        const lastAiMsg = [...messages].reverse().find(m => m.senderType === 'AI' && m.manualImageUrls && m.manualImageUrls.length > 0);
+        if (lastAiMsg?.manualImageUrls) {
+          setLightboxImages(lastAiMsg.manualImageUrls);
+          setLightboxIndex(0);
+        } else {
+          alert("현재 대화 중인 기기의 매뉴얼 정보를 찾을 수 없습니다. 분석 내용을 먼저 확인해 주세요.");
+        }
+      }
+      setShowMentionPopover(false);
+      setMentionQuery('');
+      return;
+    }
+
+    if (deviceName === '진단 리포트 열기') {
+      setIsReportModalOpen(true);
+      setShowMentionPopover(false);
+      setMentionQuery('');
+      return;
+    }
+
     // 현재 입력된 텍스트에서 마지막 @ 부분을 가전 이름으로 교체
     const newValue = inputText.replace(/@([^@\s]*)$/, `@${deviceName} `);
     setInputText(newValue);
@@ -708,42 +738,54 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                 <p className="text-sm p-3 leading-relaxed">{msg.text}</p>
 
 
-                    {/* 피드백 및 매뉴얼 버튼 영역 */}
+                    {/* 피드백 및 매뉴얼 버튼 영역 (강화됨) */}
                     {msg.senderType === 'AI' && (
-                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-200/50">
-                        <div className="flex gap-4">
-                          <button
-                            onClick={() => handleFeedback(msg.id, true)}
-                            className="flex items-center gap-1 text-slate-300 hover:text-theme-primary transition-colors group"
-                            title="도움이 되었어요"
+                      <div className="mt-4 pt-3 border-t border-slate-100">
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {/* 1. 매뉴얼 보기 버튼 (데이터 있을 때) */}
+                          {(msg.manualLink || msg.referencedPage || (msg.manualImageUrls && msg.manualImageUrls.length > 0)) && (
+                            <button 
+                              className="flex items-center gap-2 px-4 py-2 bg-theme-primary/10 hover:bg-theme-primary text-theme-primary hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-theme-primary/10"
+                              onClick={() => {
+                                if (msg.manualImageUrls && msg.manualImageUrls.length > 0) {
+                                  setLightboxImages(msg.manualImageUrls);
+                                  setLightboxIndex(0);
+                                } else if (msg.manualLink) {
+                                  window.open(msg.manualLink, '_blank');
+                                }
+                              }}
+                            >
+                              <FileText size={14} strokeWidth={2.5} />
+                              {msg.referencedPage ? `매뉴얼 P.${msg.referencedPage} 열기` : '상세 매뉴얼 보기'}
+                            </button>
+                          )}
+
+                          {/* 2. 진단 리포트 열기 버튼 (항상 노출하여 사용자 가이드) */}
+                          <button 
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-800 text-slate-600 hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-slate-200"
+                            onClick={() => setIsReportModalOpen(true)}
                           >
-                            <ThumbsUp size={15} className="group-hover:scale-110 transition-transform" />
-                          </button>
-                          <button
-                            onClick={() => handleFeedback(msg.id, false)}
-                            className="flex items-center gap-1 text-slate-300 hover:text-red-400 transition-colors group"
-                            title="부족한 답변이에요"
-                          >
-                            <ThumbsDown size={15} className="group-hover:scale-110 transition-transform" />
+                            <ShieldCheck size={14} strokeWidth={2.5} />
+                            AI 진단 리포트
                           </button>
                         </div>
 
-                        {(msg.manualLink || msg.referencedPage || (msg.manualImageUrls && msg.manualImageUrls.length > 0)) && (
-                          <button 
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-primary/10 hover:bg-theme-primary text-theme-primary hover:text-white rounded-xl transition-all text-[11px] font-bold border border-theme-primary/10 shadow-sm"
-                            onClick={() => {
-                              if (msg.manualImageUrls && msg.manualImageUrls.length > 0) {
-                                setLightboxImages(msg.manualImageUrls);
-                                setLightboxIndex(0);
-                              } else if (msg.manualLink) {
-                                window.open(msg.manualLink, '_blank');
-                              }
-                            }}
+                        {/* 피드백 하단 배치 */}
+                        <div className="flex items-center gap-3 px-1">
+                          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-tighter">Helpful?</span>
+                          <button
+                            onClick={() => handleFeedback(msg.id, true)}
+                            className="text-slate-300 hover:text-theme-primary transition-colors"
                           >
-                            <FileText size={13} />
-                            {msg.referencedPage ? `매뉴얼 P.${msg.referencedPage}` : '매뉴얼 보기'}
+                            <ThumbsUp size={14} />
                           </button>
-                        )}
+                          <button
+                            onClick={() => handleFeedback(msg.id, false)}
+                            className="text-slate-300 hover:text-red-400 transition-colors"
+                          >
+                            <ThumbsDown size={14} />
+                          </button>
+                        </div>
                       </div>
                     )}
               </div>
@@ -881,31 +923,58 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                   <p className="text-[10px] font-black text-theme-primary uppercase tracking-wider">가전 참조하기</p>
                 </div>
                 <div className="max-h-56 overflow-y-auto no-scrollbar">
-                  {devices && devices.length > 0 ? (
-                    devices
-                      .filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase()) || d.model.toLowerCase().includes(mentionQuery.toLowerCase()))
-                      .map((device) => (
-                        <button
-                          key={device.id}
-                          onClick={() => handleSelectMention(device.name)}
-                          className="w-full text-left px-4 py-3 hover:bg-theme-primary/10 transition-colors flex items-center gap-3 border-b border-slate-50 last:border-none"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400">
-                            <WashingMachine size={16} />
-                          </div>
-                          <div>
-                            <p className="text-[13px] font-bold text-slate-700">{device.name}</p>
-                            <p className="text-[10px] text-slate-400 font-medium">{device.model}</p>
-                          </div>
-                        </button>
-                      ))
-                  ) : (
-                    <div className="p-6 text-center">
-                      <p className="text-xs text-slate-400 font-medium">등록된 기기가 없습니다</p>
-                    </div>
-                  )}
-                  {devices && devices.length > 0 && devices.filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase())).length === 0 && (
-                    <div className="p-4 text-center text-xs text-slate-400">검색 결과가 없습니다</div>
+                  {/* 카테고리 1: 기능 호출 */}
+                  <div className="p-2 border-b border-slate-50">
+                    <button
+                      onClick={() => handleSelectMention('매뉴얼 즉시 보기')}
+                      className="w-full text-left px-3 py-2.5 hover:bg-theme-primary/5 rounded-xl transition-colors flex items-center gap-3"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-theme-primary/10 flex items-center justify-center text-theme-primary">
+                        <FileText size={16} />
+                      </div>
+                      <span className="text-[13px] font-black text-slate-700">매뉴얼 즉시 보기</span>
+                    </button>
+                    <button
+                      onClick={() => handleSelectMention('진단 리포트 열기')}
+                      className="w-full text-left px-3 py-2.5 hover:bg-theme-primary/5 rounded-xl transition-colors flex items-center gap-3"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-theme-secondary/10 flex items-center justify-center text-theme-secondary">
+                        <ShieldCheck size={16} />
+                      </div>
+                      <span className="text-[13px] font-black text-slate-700">진단 리포트 열기</span>
+                    </button>
+                  </div>
+
+                  {/* 카테고리 2: 기기 목록 */}
+                  <div className="p-2 bg-slate-50/30">
+                    <p className="px-3 py-1 text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">나의 가전 목록</p>
+                    {devices && devices.length > 0 ? (
+                      devices
+                        .filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase()) || d.model.toLowerCase().includes(mentionQuery.toLowerCase()))
+                        .map((device) => (
+                          <button
+                            key={device.id}
+                            onClick={() => handleSelectMention(device.name)}
+                            className="w-full text-left px-3 py-2.5 hover:bg-white rounded-xl hover:shadow-sm transition-all flex items-center gap-3"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400">
+                              <WashingMachine size={16} />
+                            </div>
+                            <div>
+                              <p className="text-[13px] font-bold text-slate-700 leading-tight">{device.name}</p>
+                              <p className="text-[10px] text-slate-400 font-medium">{device.model}</p>
+                            </div>
+                          </button>
+                        ))
+                    ) : (
+                      <div className="p-4 text-center">
+                        <p className="text-xs text-slate-300 font-medium">등록된 기기가 없습니다</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {devices && devices.length > 0 && devices.filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase())).length === 0 && mentionQuery && (
+                    <div className="p-4 text-center text-[11px] text-slate-400">검색 결과가 없습니다</div>
                   )}
                 </div>
               </motion.div>
