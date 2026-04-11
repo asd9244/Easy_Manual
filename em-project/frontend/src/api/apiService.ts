@@ -45,9 +45,9 @@ api.interceptors.response.use(
       // 반복적인 403 에러 방지를 위해 일단 로그아웃 처리 후 로그인 페이지로 유도합니다.
       console.warn('인증 오류 발생 (403/401). 세션을 초기화합니다.');
       
-      // 토큰 삭제 및 홈(초기화면)으로 리다이렉트
-      localStorage.removeItem('accessToken'); 
-      window.location.href = '/'; 
+      // accessToken만 삭제 (deleted_device_ids 등 다른 설정은 보존)
+      localStorage.removeItem('accessToken');
+      window.location.href = '/';
     }
 
     return Promise.reject(error);

@@ -8,14 +8,60 @@ import { SocialShareModal } from '@/src/components/common/SocialShareModal';
 
 interface DiagnosticReportProps {
   setScreen: (screen: Screen) => void;
+  roomId?: string; // 방 번호 프로퍼티 추가
   onClose?: () => void;
   shareUrl?: string; // 공유할 다이나믹 URL 추가
 }
 
-export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, onClose, shareUrl }) => {
+export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, roomId, onClose, shareUrl }) => {
   const reportRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [reportData, setReportData] = useState<any>(null);
+  const [loadingPhrase, setLoadingPhrase] = useState("AI가 대화 내용을 분석하고 있습니다...");
+
+  // 로딩 텍스트 애니메이션
+  React.useEffect(() => {
+    if (!isLoading) return;
+    const phrases = [
+      "AI가 대화 내용을 요약하고 있습니다...",
+      "매뉴얼 데이터베이스에서 해결책을 찾는 중...",
+      "기기 모델 정보를 식별하고 있습니다...",
+      "진단 근거데이터를 생성하고 있습니다...",
+      "최적의 조치 계획을 구성하는 중입니다..."
+    ];
+    let i = 0;
+    const interval = setInterval(() => {
+      i = (i + 1) % phrases.length;
+      setLoadingPhrase(phrases[i]);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  // 실데이터 로드
+  React.useEffect(() => {
+    const fetchData = async () => {
+      if (!roomId) {
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        setIsLoading(true);
+        const data = await deviceService.getDiagnosticReport(roomId);
+        setReportData(data);
+      } catch (error) {
+        console.error("리포트 데이터 로드 실패:", error);
+        // 실패 시 빈 데이터나 에러 상태 처리를 할 수 있지만, 
+        // 사용자 피드백에 따라 최소한의 UI는 보여주도록 합니다.
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [roomId]);
 
   // PDF 다운로드 기능
   const handleDownloadPdf = async () => {
@@ -23,19 +69,16 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, o
     setIsGenerating(true);
     
     try {
-      // 렌더링 품질을 위해 scale 옵션 사용
       const canvas = await html2canvas(reportRef.current, { 
-        scale: 3, // 고해상도 출력을 위해 배율 상향
+        scale: 3, 
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff'
       });
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Fixie_Report_${new Date().getTime()}.pdf`);
     } catch (error) {
@@ -46,19 +89,17 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, o
     }
   };
 
-  // Mock 데이터 (LG 세탁기 기준)
-  const mockData = {
-    deviceType: 'LG 트롬 드럼 세탁기',
-    modelName: 'F24WD',
-    issueDate: new Date().toLocaleDateString(),
-    symptom: '탈수 진행 시 심한 소음 및 진동 발생 (E1 에러)',
-    aiDiagnosis: '세탁창 내 세탁물 쏠림(편심) 현상으로 인한 드럼 회전 불균형이 주 원인입니다. 추가적으로 세탁기 하단 수평이 맞지 않아 공진이 발생하고 있을 확률이 높습니다.',
-    solutions: [
-      '세탁기를 일시정지하고 세탁물을 고르게 펴주세요.',
-      '이불 등 부피가 큰 세탁물의 경우 단독 세탁을 권장합니다.',
-      '수평계를 이용해 세탁기 수평을 다시 한 번 조절해주세요.',
-    ]
+  const displayData = reportData || {
+    deviceName: '기기 정보 분석 중',
+    modelName: '모델명 확인 중',
+    symptoms: '원격 진단 중...',
+    cause: 'AI가 원인을 분석하고 있습니다.',
+    solutions: '로딩 중...'
   };
+
+  const solutionList = typeof displayData.solutions === 'string' 
+    ? displayData.solutions.split('\n').filter((s: string) => s.trim().length > 0)
+    : [displayData.solutions];
 
   return (
     <div className="max-w-3xl mx-auto flex flex-col min-h-screen bg-slate-50 space-y-4">
@@ -123,7 +164,7 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, o
             </div>
             <div className="text-right text-[10px] font-black text-[#94a3b8] space-y-1 uppercase tracking-widest">
               <p>Report ID: #FX-2026-04-{Math.floor(Math.random() * 1000)}</p>
-              <p>Issue Date: {mockData.issueDate}</p>
+              <p>Issue Date: {new Date().toLocaleDateString()}</p>
             </div>
           </div>
 
@@ -133,11 +174,11 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, o
             <div className="grid grid-cols-2 gap-[1px] bg-[#f1f5f9] rounded-2xl overflow-hidden border border-[#f1f5f9]">
               <div className="bg-white p-6">
                 <p className="text-[9px] text-[#94a3b8] font-black mb-2 uppercase tracking-wider">Classification</p>
-                <p className="font-bold text-[#1e293b] text-lg tracking-tight">{mockData.deviceType}</p>
+                <p className="font-bold text-[#1e293b] text-lg tracking-tight">{displayData.deviceName}</p>
               </div>
               <div className="bg-white p-6">
                 <p className="text-[9px] text-[#94a3b8] font-black mb-2 uppercase tracking-wider">Model Identifier</p>
-                <p className="font-bold text-[#1e293b] text-lg tracking-tight">{mockData.modelName}</p>
+                <p className="font-bold text-[#1e293b] text-lg tracking-tight">{displayData.modelName}</p>
               </div>
             </div>
           </section>
@@ -159,7 +200,7 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, o
                        <AlertTriangle size={12} color="#f87171" /> Detected Anomaly
                     </h4>
                     <p className="text-2xl font-bold leading-tight tracking-tight">
-                      {mockData.symptom}
+                      {displayData.symptoms}
                     </p>
                  </div>
                  
@@ -170,7 +211,7 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, o
                        Root Cause Diagnosis
                     </h4>
                     <p className="text-[#94a3b8] leading-relaxed text-[15px] font-medium">
-                      {mockData.aiDiagnosis}
+                       {displayData.cause}
                     </p>
                  </div>
                </div>
@@ -181,7 +222,7 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, o
           <section className="mb-[40px]">
             <h3 className="text-[11px] font-black text-[#cbd5e1] mb-4 uppercase tracking-[0.25em]">03. Strategic Action Plan</h3>
             <div className="space-y-3">
-              {mockData.solutions.map((sol, i) => (
+              {solutionList.map((sol: string, i: number) => (
                 <div key={i} className="flex gap-6 items-center bg-[#f8fafc] p-6 rounded-2xl border border-[#f1f5f9] transition-colors">
                   <div 
                     className="w-10 h-10 rounded-xl bg-white border border-[#f1f5f9] flex items-center justify-center text-[#0f172a] shrink-0 font-black text-sm"
@@ -211,6 +252,35 @@ export const DiagnosticReport: React.FC<DiagnosticReportProps> = ({ setScreen, o
 
         </div>
       </div>
+
+      {/* 3. 프리미엄 로딩 오버레이 */}
+      {isLoading && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-xl transition-all duration-700">
+          <div className="relative mb-12">
+            {/* 고품격 그라데이션 글로우 애니메이션 */}
+            <div className="absolute inset-0 bg-gradient-to-r from-theme-primary to-[#7DE3D1] rounded-full blur-[40px] opacity-30 animate-pulse"></div>
+            <div className="relative w-24 h-24 flex items-center justify-center">
+              <Loader2 size={64} className="text-theme-primary animate-spin-slow" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <FixieLogo size={32} />
+              </div>
+            </div>
+          </div>
+          <div className="text-center space-y-4 px-6 max-w-sm">
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-tight">
+              품격 있는 <span className="text-theme-primary">AI 분석</span> 결과가<br />준비 중입니다
+            </h2>
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-slate-500 font-bold text-sm h-6 transition-all duration-500">
+                {loadingPhrase}
+              </p>
+              <div className="w-48 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-theme-primary animate-loading-progress rounded-full"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 프리미엄 SNS 공유 모달 연동 */}
       <SocialShareModal 

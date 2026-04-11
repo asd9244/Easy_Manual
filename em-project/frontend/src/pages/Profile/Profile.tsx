@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/src/api/apiService';
 import { authService } from '@/src/services/authService';
 import { useToastStore } from '@/src/store/useToastStore';
-import { ArrowLeft, Camera } from 'lucide-react';
+import { ArrowLeft, Camera, Loader2 } from 'lucide-react';
 import { Screen } from '@/src/types/index';
 
 interface ProfileProps {
@@ -16,6 +16,7 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const { showToast } = useToastStore();
 
   // 최초 로드 시 서버로부터 유저 정보 호출
@@ -41,17 +42,38 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
     }
   }, []);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    try {
+      // 1. 실제 서버 업로드 (POST /api/files/upload)
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await api.post('/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      // 백엔드는 URL 문자열을 직접 반환
+      const imageUrl = typeof response.data === 'string' ? response.data : response.data?.url;
+      if (imageUrl) {
+        setProfileImage(imageUrl);
+        localStorage.setItem('profileImage', imageUrl);
+        showToast('프로필 사진이 변경되었습니다! 🎉', 'success');
+      }
+    } catch (error) {
+      console.warn('서버 업로드 실패, 로컈 프리븷 모드로 폴백:', error);
+      // 서버 업로드 실패 시 base64로 임시 저장 (테스트 환경 호환)
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
         setProfileImage(base64String);
         localStorage.setItem('profileImage', base64String);
-        showToast('성공적으로 프로필 사진이 변경되었습니다! 🎉', 'success');
+        showToast('프로필 사진이 변경되었습니다! 🎉', 'success');
       };
       reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -132,9 +154,10 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
           )}
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="absolute bottom-0 right-0 p-2.5 bg-white rounded-full shadow-lg border border-slate-100 text-theme-primary hover:scale-110 transition-transform"
+            disabled={isUploadingImage}
+            className="absolute bottom-0 right-0 p-2.5 bg-white rounded-full shadow-lg border border-slate-100 text-theme-primary hover:scale-110 transition-transform disabled:opacity-50"
           >
-            <Camera size={16} />
+            {isUploadingImage ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
           </button>
           <input 
             type="file" 

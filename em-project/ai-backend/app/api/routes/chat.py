@@ -23,7 +23,7 @@ llm = ChatGoogleGenerativeAI(model="gemini-3.1-pro-preview", google_api_key=GOOG
 class ChatRequest(BaseModel):
     manual_id: str
     question: str
-    media_url: str = None  # 프론트엔드에서 전달받을 이미지 URL (선택 사항)
+    media_url: Optional[str] = None  # 프론트엔드에서 전달받을 이미지 URL (선택 사항)
 
 
 @router.post("/ask")

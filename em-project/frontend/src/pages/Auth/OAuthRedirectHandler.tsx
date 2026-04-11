@@ -26,7 +26,7 @@ export const OAuthRedirectHandler: React.FC<OAuthRedirectHandlerProps> = ({ onLo
       // (즉시 이동을 위해 인위적인 지연 없이 바로 호출합니다.)
       onLogin();
     } else {
-      console.error("토큰을 찾을 수 없습니다. 로그인 페이지로 돌아갑니다.");
+      console.info("OAuth 리다이렉트 URL 없음 (일반 접속). 로그인 화면 대기 중.");
       // 토큰이 없으면 다시 인증 화면으로 보냅니다.
       // window.location.href = '/'; 
     }

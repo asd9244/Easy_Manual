@@ -76,9 +76,9 @@ export const Garage: React.FC<GarageProps> = ({
       const newDevice: Device = {
         id: String(responseData.id),
         name: responseData.alias || model,
-        model: responseData.model || model,
+        model: responseData.representativeModelName || model,
         image: responseData.image || 'https://picsum.photos/seed/appliance/400/400',
-        icon: deviceService.getIconByModel(responseData.model || model)
+        icon: deviceService.getIconByModel(responseData.representativeModelName || model)
       };
       
       setDevices(prev => [...prev, newDevice]);
@@ -267,9 +267,21 @@ export const Garage: React.FC<GarageProps> = ({
                   </button>
                   <button 
                     onClick={() => {
-                      // [임시 로직] 목록에서 현재 기기를 빼고 다시 저장한다!
-                      setDevices(devices.filter(d => d.id !== editingDevice?.id));
+                      if (!editingDevice) return;
+                      
+                      // 1. 블랙리스트(삭제된 ID 목록) 업데이트 
+                      const deletedIdsJson = localStorage.getItem('deleted_device_ids');
+                      const deletedIds: string[] = deletedIdsJson ? JSON.parse(deletedIdsJson) : [];
+                      
+                      if (!deletedIds.includes(String(editingDevice.id))) {
+                        deletedIds.push(String(editingDevice.id));
+                        localStorage.setItem('deleted_device_ids', JSON.stringify(deletedIds));
+                      }
+                      
+                      // 2. UI 즉시 반영 (상위 상태 업데이트)
+                      setDevices(devices.filter(d => String(d.id) !== String(editingDevice.id)));
                       setEditingDevice(null);
+                      alert('기기가 삭제되었습니다. (백엔드 반영 전 로컬 처리)');
                     }}
                     className="flex items-center justify-center px-4 py-3 bg-red-50 text-red-500 rounded-xl font-bold hover:bg-red-100 transition-colors"
                   >

@@ -131,17 +131,23 @@ export default function App() {
       setIsLoadingDevices(true);
       try {
         const fetchedDevices = await deviceService.getMyDevices();
-        // 로컬스토리지에 저장된 변경 사항이 있으면 병합 (백엔드 수정 불가 대응)
+        
+        // 1. 삭제된 기기 필터링 (블랙리스트)
+        const deletedIdsJson = localStorage.getItem('deleted_device_ids');
+        const deletedIds: string[] = deletedIdsJson ? JSON.parse(deletedIdsJson) : [];
+        const filteredDevices = fetchedDevices.filter(d => !deletedIds.includes(String(d.id)));
+
+        // 2. 별명 등 변경 사항 병합
         const localData = localStorage.getItem('local_devices');
         if (localData) {
           const localDevices = JSON.parse(localData);
-          const merged = fetchedDevices.map((d: any) => {
-            const local = localDevices.find((ld: any) => ld.id === d.id);
+          const merged = filteredDevices.map((d: any) => {
+            const local = localDevices.find((ld: any) => String(ld.id) === String(d.id));
             return local ? { ...d, name: local.name } : d;
           });
           setDevices(merged);
         } else {
-          setDevices(fetchedDevices);
+          setDevices(filteredDevices);
         }
       } catch (error) {
         console.error("기기 목록 불러오기 실패:", error);

@@ -16,8 +16,8 @@ export const deviceService = {
       if (response.data && Array.isArray(response.data)) {
         return response.data.map((d: any) => ({
           id: String(d.id),
-          name: d.alias || d.representativeModelName,
-          model: d.representativeModelName,
+          name: d.alias || d.representativeModelName || '이름 없는 기기',
+          model: d.representativeModelName || '',
           alias: d.alias,
           image: d.image || 'https://picsum.photos/seed/appliance/400/400',
           // 모델명에 따른 아이콘 매핑 (임시)
@@ -45,6 +45,20 @@ export const deviceService = {
       // 백엔드에서 내려준 실제 에러 메시지를 꺼내서 던집니다.
       const errorMessage = error.response?.data?.message || error.response?.data || "기기 등록에 실패했습니다.";
       throw new Error(typeof errorMessage === 'string' ? errorMessage : "알 수 없는 오류가 발생했습니다.");
+    }
+  },
+
+  /**
+   * AI 진단 리포트 조회
+   * GET /api/reports/{roomId}
+   */
+  getDiagnosticReport: async (roomId: string) => {
+    try {
+      const response = await api.get(`/reports/${roomId}`);
+      return response.data;
+    } catch (error) {
+      console.error("진단 리포트 조회 실패:", error);
+      throw error;
     }
   },
 

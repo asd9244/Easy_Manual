@@ -26,6 +26,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedShareUrl, setSelectedShareUrl] = useState('');
+  const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -59,6 +60,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
 
   const handleGoToReport = (e: React.MouseEvent, id: string | number) => {
     e.stopPropagation(); 
+    setSelectedRoomId(String(id));
     setSelectedShareUrl(`https://fixie.app/share/${id}`);
     setIsReportModalOpen(true);
   };
@@ -153,6 +155,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
           >
             <DiagnosticReport 
               setScreen={setScreen} 
+              roomId={selectedRoomId}
               onClose={() => setIsReportModalOpen(false)} 
               shareUrl={selectedShareUrl} 
             />

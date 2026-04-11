@@ -74,6 +74,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
   const [inputText, setInputText] = useState('');
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [activeDeviceId, setActiveDeviceId] = useState<number | null>(deviceId || null); // 현재 대화 중인 기기 ID
+  const [selectedMentionDevice, setSelectedMentionDevice] = useState<string | null>(null); // @ 어노테이션으로 선택된 기기
 
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
@@ -107,8 +108,8 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     }
   };
 
-  // [UX] 전송 버튼 활성화 조건
-  const canSend = inputText.trim().length > 0 || attachedFiles.length > 0;
+  // [UX] 전송 버튼 활성화 조건: 기기 멘션 선택 + 텍스트 또는 첨부파일 필요
+  const canSend = (inputText.trim().length > 0 || attachedFiles.length > 0) && !!selectedMentionDevice;
 
   // 채팅 스크롤 관리 (안정성을 위해 requestAnimationFrame 사용)
   useEffect(() => {
@@ -170,9 +171,10 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
         try {
           setIsGuestMode(true);
           const guestRoom = await chatService.createChatRoom(0); // 0을 게스트 ID로 규약
-          setActiveRoomId(guestRoom.id);
+          const guestRoomId = guestRoom.roomId;
+          setActiveRoomId(guestRoomId);
           if (query !== 'ocr_image') {
-            await onSendMessage(query, guestRoom.id);
+            await onSendMessage(query, guestRoomId);
           }
         } catch (err) {
           console.warn("게스트 대화방 생성 실패, 가상 세션으로 전환:", err);
@@ -186,11 +188,13 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
       }
 
       // 1. 새 채팅방 생성 (정상 기기 등록자)
-      const deviceId = devices[0].id;
+      // activeDeviceId가 있으면 해당 기기로, 없으면 목록 첫 번째로 방 생성
+      const deviceId = activeDeviceId ? String(activeDeviceId) : devices[0].id;
       const newRoom = await chatService.createChatRoom(deviceId);
-      setActiveRoomId(newRoom.id);
+      const newRoomId = newRoom.roomId;
+      setActiveRoomId(newRoomId);
 
-      // 2. 초기 메시지 전송 (ocr_image인 경우 이미지는 이미 올라가 있는 상태로 가정하거나 안내)
+      // 2. 초기 메시지 전송
       if (query === 'ocr_image') {
         const ocrMsg: Message = {
           id: 'ocr-notice-' + Date.now(),
@@ -199,7 +203,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
         };
         setMessages(prev => [...prev, ocrMsg]);
       } else {
-        await onSendMessage(query, newRoom.id);
+        await onSendMessage(query, newRoomId);
       }
     } catch (error) {
       console.error("새 채팅 시작 실패:", error);
@@ -372,8 +376,8 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
         const formData = new FormData();
         formData.append('file', file);
 
-        // 예시 엔드포인트: /upload (미디어 전용 S3 업로드 API)
-        const response = await api.post('/upload', formData, {
+        // 백엔드 이미지 업로드 API (FileController: POST /api/files/upload)
+        const response = await api.post('/files/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
 
@@ -480,6 +484,14 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     // 현재 입력된 텍스트에서 마지막 @ 부분을 가전 이름으로 교체
     const newValue = inputText.replace(/@([^@\s]*)$/, `@${deviceName} `);
     setInputText(newValue);
+    setSelectedMentionDevice(deviceName); // 선택된 기기 저장 → 전송 버튼 활성화
+    
+    // 멘션된 기기로 activeDeviceId 업데이트 → 이 기기로 채팅방 생성됨
+    const mentionedDevice = devices?.find(d => d.name === deviceName);
+    if (mentionedDevice) {
+      setActiveDeviceId(Number(mentionedDevice.id));
+    }
+    
     setShowMentionPopover(false);
     setMentionQuery('');
     setTimeout(() => inputRef.current?.focus(), 0);
@@ -772,6 +784,23 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
             <Paperclip size={18} className="md:w-5 md:h-5" />
           </label>
 
+          {/* @ 어노테이션 버튼 (모바일 친화적) */}
+          <button
+            id="mention-btn"
+            onClick={() => {
+              setShowMentionPopover(prev => !prev);
+              setMentionQuery('');
+            }}
+            className={`p-2 rounded-full transition-all font-bold text-sm ${
+              selectedMentionDevice
+                ? 'text-white bg-theme-primary shadow-md shadow-theme-primary/30'
+                : 'text-slate-400 bg-slate-100 hover:bg-theme-primary/10 hover:text-theme-primary'
+            }`}
+            title="기기 멘션하기"
+          >
+            @
+          </button>
+
           <input
             ref={inputRef}
             type="text"
@@ -787,11 +816,20 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
             }}
           />
 
-          {/* 전송 버튼 */}
+          {/* 전송 버튼: 기기 멘션(@)이 선택되어야 활성화 */}
           <button
-            className="w-10 h-10 md:w-12 md:h-12 bg-wing-gradient rounded-full flex items-center justify-center text-white shadow-md hover:scale-105 active:scale-95 transition-all shrink-0"
+            id="send-btn"
+            disabled={!canSend}
+            className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-md transition-all shrink-0 ${
+              canSend
+                ? 'bg-wing-gradient hover:scale-105 active:scale-95 cursor-pointer'
+                : 'bg-slate-200 cursor-not-allowed opacity-60'
+            }`}
             onClick={() => {
-              if (canSend) onSendMessage();
+              if (canSend) {
+                onSendMessage();
+                setSelectedMentionDevice(null); // 전송 후 멘션 초기화
+              }
             }}
           >
             <Send className="w-4 h-4 md:w-4.5 md:h-4.5 -ml-0.5" />
@@ -950,6 +988,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
           >
             <DiagnosticReport
               setScreen={setScreen}
+              roomId={activeRoomId ? String(activeRoomId) : undefined}
               onClose={() => setIsReportModalOpen(false)}
               shareUrl={activeRoomId ? `https://fixie.app/share/${activeRoomId}` : undefined}
             />
