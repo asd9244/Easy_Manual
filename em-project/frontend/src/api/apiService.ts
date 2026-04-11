@@ -6,7 +6,7 @@ import axios from 'axios';
  */
 export const api = axios.create({
   baseURL: '/api', // Vite 프록시 (/api -> http://localhost:8080) 활용
-  timeout: 10000,
+  timeout: 60000,
   withCredentials: true, // CORS 및 쿠키 공유를 위해 true 설정
   headers: {
     'Content-Type': 'application/json',

@@ -19,6 +19,8 @@ import { FixieLogo } from '@/src/components/common/FixieLogo';
 import { Message, Screen } from '@/src/types/index';
 import { api } from '@/src/api/apiService';
 import { DiagnosticReport } from '../Report/DiagnosticReport';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 
 // 4. 채팅 페이지 JSX 구조
@@ -145,13 +147,30 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
       // 홈에서 기기 카드를 눌러서 진입한 경우
       setActiveRoomId(null);
       setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?', type: 'status' }]);
-      setIsAnalyzing(false); // [추가] 인사말 등장 시 분석 애니메이션 즉시 해제
+      setIsAnalyzing(true); // 방 생성 중에는 분석 모드로 진입 (전송 버튼 비활성화 유도)
       setActiveDeviceId(deviceId);
-      // 기기가 이미 선택되어 있으므로 @ 어노테이션 자동 세팅 → 전송 버튼 즉시 활성화
+
+      // 기기가 이미 선택되어 있으므로 @ 어노테이션 자동 세팅
       const preSelectedDevice = devices?.find(d => Number(d.id) === deviceId);
       if (preSelectedDevice) {
         setSelectedMentionDevice(preSelectedDevice.name);
       }
+
+      // [추가] 진입 시점에 방을 미리 생성하여 ID를 고정함
+      const initRoom = async () => {
+        try {
+          const resp = await chatService.createChatRoom(deviceId);
+          if (resp && resp.roomId) {
+            setActiveRoomId(resp.roomId);
+          }
+        } catch (e) {
+          console.error("방 미리 생성 실패:", e);
+          // 실패하더라도 나중에 전송 시점에 다시 시도할 수 있도록 에러만 기록
+        } finally {
+          setIsAnalyzing(false);
+        }
+      };
+      initRoom();
     }
   }, [roomId, deviceId, devices]);
 
@@ -247,34 +266,27 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     setAttachedFiles([]);
 
     if (!targetRoomId && !activeRoomId) {
-      // 방이 없으면 생성 후 전송 (기기 유무 상관없이 게스트 모드 허용)
+      // 방이 없으면 생성 후 전송
       setIsAnalyzing(true);
       try {
-        if (!devices || devices.length === 0) {
-          // 기기가 없으면 게스트 모드로 즉시 전환 및 가상 룸 생성
+        if (!devices || devices.length === 0 || !activeDeviceId) {
+          // 기기가 아예 없거나 선택되지 않은 경우는 게스트/폴백 모드
           setIsGuestMode(true);
           setActiveRoomId(-1);
           await performAsk(-1, userText, userAttachments[0]);
         } else {
-          // 기기가 있으면 정상적으로 방 생성
-          const idToCreate = activeDeviceId || (devices && devices[0].id);
-          if (idToCreate) {
-            const newRoom = await chatService.createChatRoom(idToCreate);
-            if (newRoom && newRoom.roomId) {
-              targetRoomId = newRoom.roomId;
-              setActiveRoomId(newRoom.roomId);
-              
-              // 새 방에 대한 메시지 전송
-              await performAsk(newRoom.roomId, userText, userAttachments[0]);
-            } else {
-              throw new Error("채팅방 정보를 생성할 수 없습니다.");
-            }
+          // 기기는 선택되어 있으나 아직 방이 안 만들어진 경우 (예: 진입 시 생성 실패 등)
+          const newRoom = await chatService.createChatRoom(activeDeviceId);
+          if (newRoom && newRoom.roomId) {
+            const newId = newRoom.roomId;
+            setActiveRoomId(newId);
+            await performAsk(newId, userText, userAttachments[0]);
           } else {
-            throw new Error("기기 정보를 찾을 수 없습니다.");
+            throw new Error("채팅방을 생성할 수 없습니다.");
           }
         }
       } catch (error) {
-        console.warn("방 생성 실패, 가상 세션으로 전환:", error);
+        console.warn("방 생성 중 오류:", error);
         setIsGuestMode(true);
         setActiveRoomId(-1);
         await performAsk(-1, userText, userAttachments[0]);
@@ -282,7 +294,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
         setIsAnalyzing(false);
       }
     } else {
-      // 이미 방이 있으면 바로 전송
+      // 이미 방이 있으면 (통상적인 경우) 바로 전송
       setIsAnalyzing(true);
       try {
         await performAsk(targetRoomId || activeRoomId!, userText, userAttachments[0]);
@@ -662,7 +674,11 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                 )}
 
                 {/* 메시지 텍스트 (사용자/AI 공통 노출) */}
-                <p className="text-sm leading-relaxed mb-1 px-1 whitespace-pre-wrap">{msg.text}</p>
+                <div className="text-sm leading-relaxed mb-1 px-1 whitespace-pre-wrap markdown-content">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.text}
+                  </ReactMarkdown>
+                </div>
 
                 {/* 가이드 타입 메시지 (매뉴얼 이미지, 비디오, 페이지 참고 등 포함) */}
                 {msg.senderType === 'AI' && (
