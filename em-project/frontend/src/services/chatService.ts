@@ -27,7 +27,10 @@ export const chatService = {
       const response = await api.post('/chat/rooms', { 
         userDeviceId: Number(userDeviceId)
       });
-      return response.data; // { roomId: number }
+      const data = response.data;
+      return {
+        roomId: data.roomId || data.room_id
+      };
     } catch (error) {
       console.error("채팅방 생성 실패:", error);
       throw error;

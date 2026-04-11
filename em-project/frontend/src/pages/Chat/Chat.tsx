@@ -61,9 +61,10 @@ interface ChatProps {
   setAttachedFiles: React.Dispatch<React.SetStateAction<string[]>>;
   initialQuery?: string;
   setInitialQuery?: React.Dispatch<React.SetStateAction<string>>;
-  devices?: any[]; // 기기 목록 추가
-  roomId?: number | null; // 채팅방 ID
-  deviceId?: number | null; // 추가: 특정 기기로 채팅 시작 시 사용되는 기기 ID
+  devices: any[];
+  isLoadingDevices: boolean;
+  roomId?: number | null;
+  deviceId?: number | null;
 }
 
 
@@ -71,7 +72,7 @@ interface ChatProps {
 // Chat 컴포넌트 정의
 import { chatService } from '@/src/services/chatService';
 
-export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, chatEndRef, removeAttachment, isAnalyzing, setIsAnalyzing, attachedFiles, setAttachedFiles, initialQuery, setInitialQuery, devices, roomId, deviceId }) => {
+export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, chatEndRef, removeAttachment, isAnalyzing, setIsAnalyzing, attachedFiles, setAttachedFiles, initialQuery, setInitialQuery, devices, isLoadingDevices, roomId, deviceId }) => {
   const [inputText, setInputText] = useState('');
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [activeDeviceId, setActiveDeviceId] = useState<number | null>(deviceId || null); // 현재 대화 중인 기기 ID
@@ -143,7 +144,8 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     } else if (deviceId) {
       // 홈에서 기기 카드를 눌러서 진입한 경우
       setActiveRoomId(null);
-      setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?' }]);
+      setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?', type: 'status' }]);
+      setIsAnalyzing(false); // [추가] 인사말 등장 시 분석 애니메이션 즉시 해제
       setActiveDeviceId(deviceId);
       // 기기가 이미 선택되어 있으므로 @ 어노테이션 자동 세팅 → 전송 버튼 즉시 활성화
       const preSelectedDevice = devices?.find(d => Number(d.id) === deviceId);
@@ -232,6 +234,12 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
 
     if (!userText.trim() && userAttachments.length === 0) return;
 
+    // 0. 로딩 중 방어
+    if (isLoadingDevices) {
+      // 기기 정보가 로드될 때까지는 전송을 잠시 막거나 대기
+      return;
+    }
+
     // UI 즉시 반영
     const newUserMsg: Message = { id: Date.now().toString(), senderType: 'USER', text: userText, attachments: userAttachments };
     setMessages(prev => [...prev, newUserMsg]);
@@ -290,11 +298,11 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     let data;
 
     if (roomId === -1) {
-      // 가상 룸(서버 에러 시)일 경우 프론트엔드 자체 폴백 답변 생성
+      // 가상 룸(서버 에러 시)일 경우
       await new Promise(resolve => setTimeout(resolve, 800));
       data = {
         id: Date.now(),
-        message: `현재 미등록 기기로 접속 중이라 상세 제원을 불러올 수 없지만, 일반적인 '${text}' 관련 해결 방법은 다음과 같습니다.\n\n1. 주변 청결 상태를 확인해 주세요.\n2. 전원을 껐다 켜서 시스템을 리셋해 보세요.\n3. 계속 문제가 발생하면 [가라지]에서 정식 기기 등록 후 정밀 분석을 받아보시길 권장합니다.`
+        message: `현재 기기 정보 확인이 어렵습니다. 잠시 후 다시 시도해 주시거나 [가라지]에서 기기 상태를 확인해 주세요.`
       };
     } else {
       data = await chatService.askQuestion(roomId, text, mediaUrl);
@@ -653,6 +661,8 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                   </div>
                 )}
 
+                {/* 메시지 텍스트 (사용자/AI 공통 노출) */}
+                <p className="text-sm leading-relaxed mb-1 px-1 whitespace-pre-wrap">{msg.text}</p>
 
                 {/* 가이드 타입 메시지 (매뉴얼 이미지, 비디오, 페이지 참고 등 포함) */}
                 {msg.senderType === 'AI' && (
@@ -732,20 +742,15 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
-
-                <p className="text-sm p-3 leading-relaxed">{msg.text}</p>
-
 
                     {/* 피드백 및 매뉴얼 버튼 영역 (강화됨) - 환영 인사가 아닐 때만 노출 */}
-                    {msg.senderType === 'AI' && msg.id !== '1' && (
+                    {msg.senderType === 'AI' && msg.id !== '1' && msg.id !== 'welcome' && (
                       <div className="mt-4 pt-3 border-t border-slate-100">
                         <div className="flex flex-wrap gap-2 mb-3">
                           {/* 1. 매뉴얼 보기 버튼 (데이터 있을 때) */}
                           {(msg.manualLink || msg.referencedPage || (msg.manualImageUrls && msg.manualImageUrls.length > 0)) && (
                             <button 
-                              className="flex items-center gap-2 px-4 py-2 bg-theme-primary/10 hover:bg-theme-primary text-theme-primary hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-theme-primary/10"
+                              className="flex items-center gap-2 px-4 py-3 bg-theme-primary/10 hover:bg-theme-primary text-theme-primary hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-theme-primary/10"
                               onClick={() => {
                                 if (msg.manualImageUrls && msg.manualImageUrls.length > 0) {
                                   setLightboxImages(msg.manualImageUrls);
@@ -763,7 +768,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                           {/* 2. 진단 리포트 열기 버튼 (환영 인사가 아닐 때만 노출) */}
                           {msg.id !== '1' && (
                             <button 
-                              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-800 text-slate-600 hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-slate-200"
+                              className="flex items-center gap-2 px-4 py-3 bg-slate-100 hover:bg-slate-800 text-slate-600 hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-slate-200"
                               onClick={() => setIsReportModalOpen(true)}
                             >
                               <ShieldCheck size={14} strokeWidth={2.5} />
@@ -790,6 +795,8 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
