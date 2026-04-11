@@ -48,7 +48,7 @@ export const chatService = {
           timestamp: m.createdAt,
           type: m.senderType === 'AI' ? 'guide' : undefined,
           referencedPage: m.referencedPage,
-          manualImageUrl: m.manualImageUrl
+          manualImageUrls: m.manualImageUrls || []
         }));
       }
       return [];
