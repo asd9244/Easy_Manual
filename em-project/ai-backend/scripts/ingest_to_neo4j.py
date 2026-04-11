@@ -26,16 +26,12 @@ def ingest_manual_to_graph(tx, model_name, ocr_data, toc_data):
     for page in ocr_data:
         tx.run("""
             MATCH (p:Product {name: $model_name})
-            // 🌟 핵심: product_name을 같이 묶어서 다른 매뉴얼과 섞이지 않게 방어!
             MERGE (pg:Page {product_name: $model_name, page_num: $page_num})
-            SET pg.text = $text,
-                pg.image_filename = $image_filename
-            // 제품과 페이지를 연결 (LG에어컨 -> 1페이지, 2페이지...)
+            SET pg.image_filename = $image_filename
             MERGE (p)-[:CONTAINS_PAGE]->(pg)
         """,
                model_name=model_name,
                page_num=page['page_num'],
-               text=page['text'],
                image_filename=page['image_filename'])
 
     # ==========================================
