@@ -69,9 +69,9 @@ export const Home: React.FC<HomeProps> = ({ setScreen, devices, isLoading, onGui
               </div>
             ) : devices.length > 0 ? (
               /* 💡 진짜 devices 창고에서 데이터를 꺼내서 카드를 찍어낸다! */
-              devices.map(device => (
+              devices.map((device, idx) => (
                 <DeviceStatusCard 
-                  key={device.id}
+                  key={device.id || `home-device-${idx}`}
                   title={device.name} 
                   model={device.model} 
                   icon={device.icon || WashingMachine} // fallback icon

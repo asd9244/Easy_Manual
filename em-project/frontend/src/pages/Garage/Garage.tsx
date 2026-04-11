@@ -117,9 +117,9 @@ export const Garage: React.FC<GarageProps> = ({
         onReorder={setDevices}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
       >
-        {devices.map(device => (
+        {devices.map((device, idx) => (
           <Reorder.Item 
-            key={device.id} 
+            key={`device-item-${device.id}-${idx}`} 
             value={device}
             className="bg-white/80 backdrop-blur-md p-4 rounded-3xl flex items-center gap-4 shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
           >
@@ -211,12 +211,14 @@ export const Garage: React.FC<GarageProps> = ({
     <AnimatePresence>
         {editingDevice && (
           <motion.div
+            key="device-edit-modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
           >
             <motion.div
+              key={`device-edit-modal-container-${editingDevice.id}`}
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 20 }}
@@ -266,22 +268,21 @@ export const Garage: React.FC<GarageProps> = ({
                     취소
                   </button>
                   <button 
-                    onClick={() => {
+                    onClick={async () => {
                       if (!editingDevice) return;
                       
-                      // 1. 블랙리스트(삭제된 ID 목록) 업데이트 
-                      const deletedIdsJson = localStorage.getItem('deleted_device_ids');
-                      const deletedIds: string[] = deletedIdsJson ? JSON.parse(deletedIdsJson) : [];
-                      
-                      if (!deletedIds.includes(String(editingDevice.id))) {
-                        deletedIds.push(String(editingDevice.id));
-                        localStorage.setItem('deleted_device_ids', JSON.stringify(deletedIds));
+                      if (window.confirm('기기를 삭제하시겠습니까? (과거 대화 내역은 보존됩니다)')) {
+                        try {
+                          await deviceService.deleteDevice(String(editingDevice.id));
+                          
+                          // UI 즉시 반영 (상위 상태 업데이트)
+                          setDevices(prev => prev.filter(d => String(d.id) !== String(editingDevice.id)));
+                          setEditingDevice(null);
+                          alert('정상적으로 삭제되었습니다.');
+                        } catch (err) {
+                          alert('기기 삭제 중 오류가 발생했습니다. 다시 시도해 주세요.');
+                        }
                       }
-                      
-                      // 2. UI 즉시 반영 (상위 상태 업데이트)
-                      setDevices(devices.filter(d => String(d.id) !== String(editingDevice.id)));
-                      setEditingDevice(null);
-                      alert('기기가 삭제되었습니다. (백엔드 반영 전 로컬 처리)');
                     }}
                     className="flex items-center justify-center px-4 py-3 bg-red-50 text-red-500 rounded-xl font-bold hover:bg-red-100 transition-colors"
                   >
@@ -347,8 +348,8 @@ export const Garage: React.FC<GarageProps> = ({
                         
                         {/* 세부 지원 모델 및 개별 QR 리스트 영역 */}
                         <div className="space-y-2">
-                          {(item.models || []).map((mod: any) => (
-                            <div key={mod.id} className="flex items-center justify-between bg-white p-2.5 rounded-2xl shadow-sm border border-white hover:border-theme-primary/20 transition-all group">
+                          {(item.models || []).map((mod: any, mIdx: number) => (
+                            <div key={mod.id || `mod-${idx}-${mIdx}`} className="flex items-center justify-between bg-white p-2.5 rounded-2xl shadow-sm border border-white hover:border-theme-primary/20 transition-all group">
                               <div className="flex items-center gap-3">
                                 {mod.qrCodeUrl ? (
                                   <div className="w-10 h-10 p-1 bg-white rounded-xl border border-slate-100 shadow-sm flex items-center justify-center shrink-0">

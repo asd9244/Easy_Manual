@@ -14,8 +14,11 @@ export const deviceService = {
     try {
       const response = await api.get('/devices');
       if (response.data && Array.isArray(response.data)) {
-        return response.data.map((d: any) => ({
-          id: String(d.id),
+        return response.data.map((d: any, idx: number) => ({
+          // [수정] id가 없거나 빈 값("")일 경우에도 절대 중복되지 않는 고유값 생성
+          id: (d.id !== undefined && d.id !== null && String(d.id).trim() !== "") 
+            ? String(d.id) 
+            : `device-ref-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
           name: d.alias || d.representativeModelName || '이름 없는 기기',
           model: d.representativeModelName || '',
           alias: d.alias,
@@ -58,6 +61,20 @@ export const deviceService = {
       return response.data;
     } catch (error) {
       console.error("진단 리포트 조회 실패:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * 기기 삭제 (Soft Delete)
+   * DELETE /api/devices/{deviceId}
+   */
+  deleteDevice: async (deviceId: string) => {
+    try {
+      // 백엔드는 물리적 삭제가 아닌 'DELETED' 상태값 변경으로 처리합니다.
+      await api.delete(`/devices/${deviceId}`);
+    } catch (error) {
+      console.error("기기 삭제 API 오류:", error);
       throw error;
     }
   },

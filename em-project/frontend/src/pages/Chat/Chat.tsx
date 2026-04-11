@@ -738,8 +738,8 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                 <p className="text-sm p-3 leading-relaxed">{msg.text}</p>
 
 
-                    {/* 피드백 및 매뉴얼 버튼 영역 (강화됨) */}
-                    {msg.senderType === 'AI' && (
+                    {/* 피드백 및 매뉴얼 버튼 영역 (강화됨) - 환영 인사가 아닐 때만 노출 */}
+                    {msg.senderType === 'AI' && msg.id !== '1' && (
                       <div className="mt-4 pt-3 border-t border-slate-100">
                         <div className="flex flex-wrap gap-2 mb-3">
                           {/* 1. 매뉴얼 보기 버튼 (데이터 있을 때) */}
@@ -760,14 +760,16 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                             </button>
                           )}
 
-                          {/* 2. 진단 리포트 열기 버튼 (항상 노출하여 사용자 가이드) */}
-                          <button 
-                            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-800 text-slate-600 hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-slate-200"
-                            onClick={() => setIsReportModalOpen(true)}
-                          >
-                            <ShieldCheck size={14} strokeWidth={2.5} />
-                            AI 진단 리포트
-                          </button>
+                          {/* 2. 진단 리포트 열기 버튼 (환영 인사가 아닐 때만 노출) */}
+                          {msg.id !== '1' && (
+                            <button 
+                              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-800 text-slate-600 hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-slate-200"
+                              onClick={() => setIsReportModalOpen(true)}
+                            >
+                              <ShieldCheck size={14} strokeWidth={2.5} />
+                              AI 진단 리포트
+                            </button>
+                          )}
                         </div>
 
                         {/* 피드백 하단 배치 */}
@@ -951,9 +953,9 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                     {devices && devices.length > 0 ? (
                       devices
                         .filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase()) || d.model.toLowerCase().includes(mentionQuery.toLowerCase()))
-                        .map((device) => (
+                        .map((device, idx) => (
                           <button
-                            key={device.id}
+                            key={device.id || `mention-device-${idx}`}
                             onClick={() => handleSelectMention(device.name)}
                             className="w-full text-left px-3 py-2.5 hover:bg-white rounded-xl hover:shadow-sm transition-all flex items-center gap-3"
                           >
