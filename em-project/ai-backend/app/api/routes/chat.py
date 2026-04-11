@@ -3,6 +3,7 @@ import json
 import re
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
+from typing import Optional
 from langchain_ollama import OllamaEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from neo4j import GraphDatabase
@@ -124,6 +125,8 @@ def ask_manual(request: ChatRequest):
     else:
         ai_answer = str(response.content)
 
+    print(f"\n💡 [AI 생성 답변]\n{ai_answer}\n")
+
     # 🌟 프론트 반환용 (AI는 이미지가 없어도, 사용자는 화면상으로 볼 수 있게 URL 전달)
     manual_image_urls = [
         f"http://localhost:8000/manual_images/{target_manual}/{img_filename}"
@@ -186,6 +189,8 @@ def summarize_chat(request: SummaryRequest):
             raw_answer = "".join([str(item.get("text", "")) for item in response.content if isinstance(item, dict) and "text" in item])
         else:
             raw_answer = str(response.content)
+            
+        print(f"\n💡 [AI 요약 결과 (원본)]\n{raw_answer}\n")
         
         # 안전 장치: 모델이 혹시나 마크다운 블록(```json)을 붙였을 경우를 대비한 클렌징 로직
         cleaned_answer = raw_answer.strip()

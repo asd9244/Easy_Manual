@@ -63,8 +63,8 @@ public class DeviceService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
 
-        // 2. 조회된 User 엔티티를 조건으로, 해당 유저가 등록한 모든 UserDevice 엔티티 목록을 조회합니다.
-        List<UserDevice> devices = userDeviceRepository.findAllByUser(user);
+        // 2. 조회된 User 엔티티를 조건으로, 해당 유저가 등록한 기기 중 삭제되지 않은(ACTIVE) 목록만 조회합니다.
+        List<UserDevice> devices = userDeviceRepository.findAllByUserAndStatus(user, UserDevice.DeviceStatus.ACTIVE);
 
         // 3. 조회된 엔티티 리스트(List<UserDevice>)를 클라이언트 반환용 DTO 리스트(List<DeviceResponse>)로 변환합니다.
         // (Java 8의 Stream API를 사용하여 간결하게 변환합니다.)
@@ -93,5 +93,21 @@ public class DeviceService {
         return manualOpt.stream()
                 .map(manual -> new ManualSearchResponse(manual))
                 .toList();
+    }
+
+    // 새로 추가된 기능: 등록된 기기 삭제 (Soft Delete)
+    @Transactional
+    public void deleteDevice(Long deviceId, String email) {
+        // 1. 디바이스 ID로 기기 조회
+        UserDevice userDevice = userDeviceRepository.findById(deviceId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 기기를 찾을 수 없습니다."));
+
+        // 2. 본인의 기기인지 확인 (보안 검증)
+        if (!userDevice.getUser().getEmail().equals(email)) {
+            throw new IllegalArgumentException("해당 기기를 삭제할 권한이 없습니다.");
+        }
+
+        // 3. 물리적 삭제가 아닌 상태값만 DELETED로 변경 (Soft Delete)
+        userDevice.deleteDevice();
     }
 }

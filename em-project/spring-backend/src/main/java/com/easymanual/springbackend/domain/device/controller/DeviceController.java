@@ -66,4 +66,18 @@ public class DeviceController {
         // 2. 검색된 DTO 리스트를 HTTP 상태 코드 200(OK)과 함께 프론트엔드에 반환합니다.
         return ResponseEntity.ok(responseList);
     }
+
+    // 새로 추가된 기능: 등록된 기기 삭제 API
+    // DELETE 방식으로 "/api/devices/{deviceId}" 주소로 요청이 오면 실행됩니다.
+    @DeleteMapping("/{deviceId}")
+    public ResponseEntity<Void> deleteDevice(
+            Principal principal,
+            @PathVariable("deviceId") Long deviceId) {
+
+        // 1. 인증 객체에서 이메일을 추출하고, 서비스 계층에 삭제 처리를 위임합니다.
+        deviceService.deleteDevice(deviceId, principal.getName());
+
+        // 2. 삭제 성공 시 상태 코드 204(No Content)를 전송합니다. 
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -35,10 +35,22 @@ public class UserDevice extends BaseTimeEntity {
     @Column(nullable = false, length = 100)
     private String alias;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(255) default 'ACTIVE'")
+    private DeviceStatus status;
+
     @Builder
     public UserDevice(User user, Manual manual, String alias) {
         this.user = user;
         this.manual = manual;
         this.alias = alias;
+        this.status = DeviceStatus.ACTIVE;
     }
+
+    // 상태값을 변경하여 데이터를 물리적으로 삭제하지 않고 숨기는 메서드
+    public void deleteDevice() {
+        this.status = DeviceStatus.DELETED;
+    }
+
+    public enum DeviceStatus { ACTIVE, DELETED }
 }
