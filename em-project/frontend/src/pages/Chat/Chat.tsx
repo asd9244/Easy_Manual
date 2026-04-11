@@ -108,8 +108,8 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     }
   };
 
-  // [UX] 전송 버튼 활성화 조건: 기기 멘션 선택 + 텍스트 또는 첨부파일 필요
-  const canSend = (inputText.trim().length > 0 || attachedFiles.length > 0) && !!selectedMentionDevice;
+  // [UX] 전송 버튼 활성화 조건: (텍스트/파일 있음) AND (기기 멘션됨 OR 이미 활성화된 방이 있음)
+  const canSend = (inputText.trim().length > 0 || attachedFiles.length > 0) && (!!selectedMentionDevice || !!activeRoomId);
 
   // 채팅 스크롤 관리 (안정성을 위해 requestAnimationFrame 사용)
   useEffect(() => {
@@ -133,14 +133,24 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     if (roomId) {
       setActiveRoomId(roomId);
       loadRoomMessages(roomId);
-      setActiveDeviceId(null); // 방 ID가 있으면 기기 ID 모드는 해제
+      
+      // 기존 방 진입 시: 해당 방의 기기 정보를 찾아서 Context 이름 세팅
+      // (지금은 roomId와 deviceId 관계를 알 수 없으나, History에서 선택된 기기 정보를 전달하면 더 좋습니다. 
+      //  임시로 activeDeviceId를 초기화하되, 추후 개선을 위해 null로 둡니다.)
+      setActiveDeviceId(null); 
+      setSelectedMentionDevice(null);
     } else if (deviceId) {
-      // 새로운 기기 대화 모드
+      // 홈에서 기기 카드를 눌러서 진입한 경우
       setActiveRoomId(null);
       setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?' }]);
       setActiveDeviceId(deviceId);
+      // 기기가 이미 선택되어 있으므로 @ 어노테이션 자동 세팅 → 전송 버튼 즉시 활성화
+      const preSelectedDevice = devices?.find(d => Number(d.id) === deviceId);
+      if (preSelectedDevice) {
+        setSelectedMentionDevice(preSelectedDevice.name);
+      }
     }
-  }, [roomId, deviceId]);
+  }, [roomId, deviceId, devices]);
 
   const loadRoomMessages = async (id: number) => {
     setIsAnalyzing(true);
@@ -296,7 +306,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
       text: data.message || '답변을 생성할 수 없습니다.',
       type: 'guide',
       referencedPage: (data as any).referencedPage,
-      manualImageUrl: (data as any).manualImageUrl
+      manualImageUrls: (data as any).manualImageUrls || [],
     };
     setMessages(prev => [...prev, fixieMsg]);
   };
@@ -490,6 +500,18 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
     const mentionedDevice = devices?.find(d => d.name === deviceName);
     if (mentionedDevice) {
       setActiveDeviceId(Number(mentionedDevice.id));
+      
+      // 기기를 명시적으로 바꿨으므로 기존 방 ID 초기화 (새 대화 세션 시작)
+      setActiveRoomId(null);
+
+      // 사용자 경험을 위해 채팅창에 안내 메시지 추가
+      const systemMsg: Message = {
+        id: 'system-' + Date.now(),
+        senderType: 'AI',
+        text: `✨ 새로운 [${deviceName}] 가이드 대화를 시작합니다.`,
+        type: 'status' // 상태형 메시지 (필요 시 스타일 구분 가능)
+      };
+      setMessages(prev => [...prev, systemMsg]);
     }
     
     setShowMentionPopover(false);
@@ -509,18 +531,18 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
           <div>
             <h3 className="font-bold text-slate-800 text-xl tracking-tight leading-tight">
               {(() => {
-                if (activeRoomId && devices) {
-                  const device = devices.find(d => Number(d.id) === activeRoomId); // 여기서 activeRoomId가 device.id와 일치하지 않을 수 있음 (수정 필요)
-                  // 백엔드 구조상 ChatRoom 엔티티가 UserDevice를 들고 있으므로, 
-                  // 사실 roomId로 기기명을 바로 찾는 건 devices 목록에 roomId와 일치하는 device.id가 있을 때만 가능함.
-                  // 그래서 activeDeviceId를 우선시하거나, 로드된 메시지/방 정보에서 찾아야 함.
-                  const targetDevice = devices.find(d => Number(d.id) === (activeDeviceId || activeRoomId));
-                  return targetDevice ? `${targetDevice.name} 가이드` : 'Fixie 가이드';
-                }
+                // 1순위: @ 버튼으로 선택 중인 기기
                 if (activeDeviceId && devices) {
                   const targetDevice = devices.find(d => Number(d.id) === activeDeviceId);
-                  return targetDevice ? `${targetDevice.name} 가이드` : 'Fixie 가이드';
+                  if (targetDevice) return `${targetDevice.name} 가이드`;
                 }
+                
+                // 2순위: 현재 표시중인 @ 멘션 텍스트 (아이콘 옆 텍스트)
+                if (selectedMentionDevice) {
+                  return `${selectedMentionDevice} 가이드`;
+                }
+
+                // 3순위: 기본 타이틀
                 return 'Fixie 가이드';
               })()}
             </h3>
@@ -542,20 +564,27 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
             key={msg.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`flex gap-3 ${msg.senderType === 'USER' ? 'justify-end' : 'justify-start'}`}
+            className={`flex gap-3 ${
+              msg.type === 'status' ? 'justify-center w-full' : 
+              msg.senderType === 'USER' ? 'justify-end' : 'justify-start'
+            }`}
           >
 
-            {/* Fixie 봇 프로필 아이콘 */}
-            {msg.senderType === 'AI' && (
+            {/* Fixie 봇 프로필 아이콘 (상태 메시지에는 미표시) */}
+            {msg.senderType === 'AI' && msg.type !== 'status' && (
               <div className="w-8 h-8 rounded-full bg-wing-gradient flex items-center justify-center shrink-0">
                 <span className="text-white font-bold italic text-[10px]">F</span>
               </div>
             )}
             {/* 메시지 컨텐츠 */}
-            <div className={`max-w-[85%] p-1.5 relative ${msg.senderType === 'USER'
-                ? 'bg-fixie-steel text-white rounded-3xl rounded-tr-none shadow-md'
-                : 'bg-white/70 backdrop-blur-md text-slate-700 rounded-3xl rounded-tl-none border border-white/40 shadow-sm'
-              }`}>
+            <div className={`
+              ${msg.type === 'status' 
+                ? 'bg-slate-100/50 backdrop-blur-sm text-slate-400 text-[11px] font-bold border border-slate-100 rounded-full px-4 py-0.5' 
+                : 'max-w-[85%] p-1.5 relative ' + (msg.senderType === 'USER'
+                  ? 'bg-fixie-steel text-white rounded-3xl rounded-tr-none shadow-md'
+                  : 'bg-white/70 backdrop-blur-md text-slate-700 rounded-3xl rounded-tl-none border border-white/40 shadow-sm')
+              }
+            `}>
               <div className="p-3">
 
                 {/* 첨부 이미지 표시 (그리드 레이아웃 적용) */}
@@ -597,16 +626,17 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                   <div className="mt-2 space-y-3">
 
                     {/* 백엔드에서 온 매뉴얼 위치 이미지 */}
-                    {msg.manualImageUrl && (
+                    {msg.manualImageUrls && msg.manualImageUrls.length > 0 && (
                       <div className="mb-2">
                         <p className="text-[11px] font-bold text-theme-primary mb-1.5 flex items-center gap-1">
                           <ImageIcon size={12} /> 매뉴얼 위치 이미지
                         </p>
                         <img
-                          src={msg.manualImageUrl}
+                          src={msg.manualImageUrls[0]}
                           alt="Manual Guide"
-                          className="w-full rounded-2xl border border-white/20 shadow-sm"
+                          className="w-full rounded-2xl border border-white/20 shadow-sm cursor-pointer"
                           referrerPolicy="no-referrer"
+                          onClick={() => { setLightboxImages(msg.manualImageUrls!); setLightboxIndex(0); }}
                         />
                       </div>
                     )}
@@ -647,20 +677,20 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                     )}
                     
                     {/* [NEW] 실제 데이터가 있을 때만 매뉴얼 페이지 미리보기 표시 */}
-                    {msg.senderType === 'AI' && msg.manualImageUrl && (
+                    {msg.senderType === 'AI' && msg.manualImageUrls && msg.manualImageUrls.length > 0 && (
                       <div className="mt-3">
                         <div className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1 uppercase tracking-tight">
                           <FileText size={10} />
-                          Manual Preview
+                          Manual Preview ({msg.manualImageUrls.length}p)
                         </div>
                         <div 
                           className="w-full h-32 rounded-xl overflow-hidden border border-slate-200 cursor-zoom-in relative group"
                           onClick={() => {
-                            setLightboxImages([msg.manualImageUrl!]);
+                            setLightboxImages(msg.manualImageUrls!);
                             setLightboxIndex(0);
                           }}
                         >
-                          <img src={msg.manualImageUrl} alt="Manual" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          <img src={msg.manualImageUrls[0]} alt="Manual" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                              <div className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-slate-700 shadow-lg">
                                <FileText size={14} />
@@ -695,12 +725,12 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
                           </button>
                         </div>
 
-                        {(msg.manualLink || msg.referencedPage || msg.manualImageUrl) && (
+                        {(msg.manualLink || msg.referencedPage || (msg.manualImageUrls && msg.manualImageUrls.length > 0)) && (
                           <button 
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-primary/10 hover:bg-theme-primary text-theme-primary hover:text-white rounded-xl transition-all text-[11px] font-bold border border-theme-primary/10 shadow-sm"
                             onClick={() => {
-                              if (msg.manualImageUrl) {
-                                setLightboxImages([msg.manualImageUrl]);
+                              if (msg.manualImageUrls && msg.manualImageUrls.length > 0) {
+                                setLightboxImages(msg.manualImageUrls);
                                 setLightboxIndex(0);
                               } else if (msg.manualLink) {
                                 window.open(msg.manualLink, '_blank');
@@ -810,7 +840,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
             className="flex-1 bg-transparent h-10 px-1 focus:outline-none text-[13px] md:text-sm text-slate-700 font-medium"
             onKeyDown={(e) => {
               if (e.nativeEvent.isComposing) return;
-              if (e.key === 'Enter' && (inputText || attachedFiles.length > 0)) {
+              if (e.key === 'Enter' && canSend) {
                 onSendMessage();
               }
             }}
