@@ -12,8 +12,7 @@ import java.util.List;
 public interface UserDeviceRepository extends JpaRepository<UserDevice, Long> {
     // 기본적인 CRUD(생성, 조회, 수정, 삭제) 기능은 JpaRepository를 상속받음으로써 자동으로 제공됩니다.
 
-    // 특정 User 엔티티를 조건으로 모든 UserDevice 엔티티를 조회합니다.
-    // (내부적으로 "SELECT * FROM user_devices WHERE user_id = ?" 쿼리가 자동 실행됩니다.)
-    List<UserDevice> findAllByUser(User user);
+    // 특정 User 엔티티를 조건으로, 삭제되지 않은(ACTIVE) 모든 UserDevice 엔티티를 조회합니다.
+    List<UserDevice> findAllByUserAndStatus(User user, UserDevice.DeviceStatus status);
 
 }
