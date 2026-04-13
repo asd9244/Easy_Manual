@@ -1,14 +1,10 @@
 package com.easymanual.springbackend.domain.chat.controller;
 
-import com.easymanual.springbackend.domain.chat.dto.ChatRoomResponse;
+import com.easymanual.springbackend.domain.chat.dto.*;
 import com.easymanual.springbackend.domain.chat.service.ChatService;
-import com.easymanual.springbackend.domain.chat.dto.ChatMessageResponse;
-import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import com.easymanual.springbackend.domain.chat.dto.ChatAskRequest;
-import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateRequest;
-import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateResponse;
+import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
@@ -20,48 +16,50 @@ public class ChatController {
 
     private final ChatService chatService;
 
+    // 내 채팅방 목록 조회
     @GetMapping("/rooms")
     public ResponseEntity<List<ChatRoomResponse>> getMyChatRooms(Principal principal) {
-        String email = principal.getName();
-        List<ChatRoomResponse> responseList = chatService.getMyChatRooms(email);
-        return ResponseEntity.ok(responseList);
+        return ResponseEntity.ok(chatService.getMyChatRooms(principal.getName()));
     }
 
+    // 특정 채팅방 메시지 내역 조회
     @GetMapping("/rooms/{roomId}/messages")
     public ResponseEntity<List<ChatMessageResponse>> getChatMessages(
-            @PathVariable("roomId") Long roomId,
+            @PathVariable Long roomId,
             Principal principal) {
-        String email = principal.getName();
-        List<ChatMessageResponse> responseList = chatService.getChatMessages(roomId, email);
-        return ResponseEntity.ok(responseList);
+        return ResponseEntity.ok(chatService.getChatMessages(roomId, principal.getName()));
     }
 
+    // 질문하기 및 AI 답변 받기
     @PostMapping("/rooms/{roomId}/ask")
     public ResponseEntity<ChatMessageResponse> askQuestion(
-            @PathVariable("roomId") Long roomId,
+            @PathVariable Long roomId,
             @RequestBody ChatAskRequest request,
             Principal principal) {
-        String email = principal.getName();
-        ChatMessageResponse response = chatService.askQuestion(roomId, email, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(chatService.askQuestion(roomId, principal.getName(), request));
     }
 
+    // 새 채팅방 생성
     @PostMapping("/rooms")
     public ResponseEntity<ChatRoomCreateResponse> createChatRoom(
             @RequestBody ChatRoomCreateRequest request,
             Principal principal) {
-        String email = principal.getName();
-        ChatRoomCreateResponse response = chatService.createChatRoom(email, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(chatService.createChatRoom(principal.getName(), request));
     }
 
-    // 채팅방 삭제 API 추가
+    // 채팅방 개별 삭제
     @DeleteMapping("/rooms/{roomId}")
     public ResponseEntity<Void> deleteChatRoom(
-            @PathVariable("roomId") Long roomId,
+            @PathVariable Long roomId,
             Principal principal) {
-        String email = principal.getName();
-        chatService.deleteChatRoom(roomId, email);
+        chatService.deleteChatRoom(roomId, principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    // [추가] 유저의 모든 채팅방 일괄 삭제
+    @DeleteMapping("/rooms")
+    public ResponseEntity<Void> deleteAllChatRooms(Principal principal) {
+        chatService.deleteAllChatRooms(principal.getName());
         return ResponseEntity.noContent().build();
     }
 }

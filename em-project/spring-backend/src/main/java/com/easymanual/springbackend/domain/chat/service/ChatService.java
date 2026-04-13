@@ -127,7 +127,7 @@ public class ChatService {
         return new ChatRoomCreateResponse(savedChatRoom.getId());
     }
 
-    // 채팅방 삭제 비즈니스 로직 추가
+    // 채팅방 삭제 비즈니스 로직
     @Transactional
     public void deleteChatRoom(Long roomId, String email) {
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
@@ -138,5 +138,13 @@ public class ChatService {
         }
 
         chatRoomRepository.delete(chatRoom);
+    }
+
+    // [추가] 유저의 모든 채팅방 일괄 삭제 로직
+    @Transactional
+    public void deleteAllChatRooms(String email) {
+        List<ChatRoom> chatRooms = chatRoomRepository.findAllByUserEmailOrderByCreatedAtDesc(email);
+        // CascadeType.ALL 설정이 엔티티에 되어 있으므로, 리스트를 지우면 관련 메시지도 모두 연쇄 삭제됩니다.
+        chatRoomRepository.deleteAll(chatRooms);
     }
 }

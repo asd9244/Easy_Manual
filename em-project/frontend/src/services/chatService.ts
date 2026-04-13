@@ -88,5 +88,18 @@ export const chatService = {
       console.error("채팅방 삭제 실패:", error);
       throw error;
     }
+  },
+
+  /**
+   * [추가] 모든 채팅방 일괄 삭제
+   */
+  deleteAllChatRooms: async () => {
+    try {
+      const response = await api.delete('/chat/rooms');
+      return response.data;
+    } catch (error) {
+      console.error("전체 채팅방 삭제 실패:", error);
+      throw error;
+    }
   }
 };
