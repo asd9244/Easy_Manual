@@ -67,6 +67,7 @@ export default function App() {
   const [initialChatQuery, setInitialChatQuery] = useState<string>('');
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null); // 추가: 기기 기반 채팅 진입을 위해 기기 ID 관리
+  const [selectedDeviceName, setSelectedDeviceName] = useState<string | null>(null); // 추가: 이력 상세 진입 시 제목 동기화
 
   // 버튼 클릭 시 채팅방 ID 초기화 (홈/가라지 등 이동할 때)
   const handleMenuClick = (id: Screen) => {
@@ -75,12 +76,14 @@ export default function App() {
     if (id !== 'chat') {
       setSelectedRoomId(null);
       setSelectedDeviceId(null); // 다른 탭 이동 시 기기 선택 정보도 초기화
+      setSelectedDeviceName(null);
     }
   };
 
   //  모바일 하단 메뉴용 (App 내부에 정의하여 상태 공유)
   const NavItem = ({ id, icon: Icon, label }: any) => {
-    const isActive = screen === id;
+    // 이력 탭의 경우 상세 보기(history-detail) 모드에서도 활성화 유지
+    const isActive = screen === id || (id === 'history' && screen === 'history-detail');
     return (
       <button 
         onClick={() => handleMenuClick(id)}
@@ -173,7 +176,8 @@ export default function App() {
 
 // 데스크탑 사이드바 메뉴용 
 const SidebarItem = ({ id, icon: Icon, label }: any) => {
-  const isActive = screen === id;
+  // 이력 탭의 경우 상세 보기(history-detail) 모드에서도 활성화 유지
+  const isActive = screen === id || (id === 'history' && screen === 'history-detail');
   return (
     <button 
       onClick={() => handleMenuClick(id)}  
@@ -301,10 +305,35 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                     isLoadingDevices={isLoadingDevices} 
                     roomId={selectedRoomId} 
                     deviceId={selectedDeviceId}
+                    initialDeviceName={selectedDeviceName} // [신규] 초기 타이틀 전달
                     onRoomCreated={setSelectedRoomId} // 새 방 생성 시 App 상태 업데이트
                   />
                 )}
-                {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} onRoomSelect={(id: number) => { setSelectedRoomId(id); setSelectedDeviceId(null); }} />}
+                {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} onRoomSelect={(id: number, name?: string) => { setSelectedRoomId(id); setSelectedDeviceName(name || null); setSelectedDeviceId(null); }} />}
+                {screen === 'history-detail' && (
+                  <Chat 
+                    key="history-detail" 
+                    setScreen={setScreen} 
+                    messages={messages} 
+                    isAnalyzing={isAnalyzing} 
+                    setIsAnalyzing={setIsAnalyzing} 
+                    attachedFiles={attachedFiles} 
+                    setAttachedFiles={setAttachedFiles} 
+                    chatEndRef={chatEndRef} 
+                    handleSendMessage={handleSendMessage} 
+                    handleFileChange={handleFileChange} 
+                    setMessages={setMessages} 
+                    isReadOnly={true} // 항상 읽기 전용
+                    removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} 
+                    initialQuery={initialChatQuery} 
+                    setInitialQuery={setInitialChatQuery} 
+                    devices={devices} 
+                    isLoadingDevices={isLoadingDevices} 
+                    roomId={selectedRoomId} 
+                    deviceId={null}
+                    initialDeviceName={selectedDeviceName}
+                  />
+                )}
 
                 {screen === 'settings' && <Settings key="settings" setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />}
                 {screen === 'scan' && <ScanScreen key="scan" onClose={() => setScreen('home')} onScan={(model?: string) => { 

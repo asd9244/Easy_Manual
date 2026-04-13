@@ -13,41 +13,27 @@ import {
   ThumbsDown,
   Image as ImageIcon,
   WashingMachine,
-  AtSign
+  AtSign,
+  Sparkles,
+  ClipboardCheck,
+  Share2,
+  MessageCircle,
+  MessageSquare,
+  Sparkle
 } from 'lucide-react';
+import { SocialShareModal } from '@/src/components/common/SocialShareModal';
 import { FixieLogo } from '@/src/components/common/FixieLogo';
 import { Message, Screen, Device } from '@/src/types/index';
 import { api } from '@/src/api/apiService';
-import { DiagnosticReport } from '../Report/DiagnosticReport';
+import { chatService } from '@/src/services/chatService';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 
-// 4. 채팅 페이지 JSX 구조
-const SafetyCheck = ({ text }: { text: string }) => {
-  const [isChecked, setIsChecked] = useState(false);
-
-  return (
-    <div
-      onClick={() => setIsChecked(!isChecked)}
-      className={`mt-3 flex items-center gap-3 p-3.5 border rounded-3xl cursor-pointer active:scale-[0.98] transition-all duration-300 ${isChecked
-          ? 'bg-theme-primary/10 border-theme-primary'
-          : 'bg-white/80 backdrop-blur-md border-white/20 hover:bg-white/90'
-        }`}
-    >
-      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${isChecked ? 'bg-theme-primary text-white shadow-sm' : 'bg-theme-primary/10 text-transparent'
-        }`}>
-        {isChecked && <ShieldCheck size={16} strokeWidth={2.5} />}
-      </div>
-      <span className={`text-sm font-bold transition-colors duration-300 ${isChecked ? 'text-slate-800' : 'text-slate-500'
-        }`}>
-        {text}
-      </span>
-    </div>
-  );
-};
-
-// 1. 채팅 페이지에서 필요한 데이터와 함수 정의
+/**
+ * 4. 채팅 페이지 JSX 구조
+ * 1. 채팅 페이지에서 필요한 데이터와 함수 정의
+ */
 interface ChatProps {
   setScreen: (screen: Screen) => void;
   messages: Message[];
@@ -65,17 +51,16 @@ interface ChatProps {
   setInitialQuery?: (query: string) => void;
   devices: Device[];
   isLoadingDevices?: boolean;
-  roomId: number | null;
   deviceId: number | null;
-  onRoomCreated?: (id: number) => void; // 추가: 새 방 생성 시 부모에게 알림
+  initialDeviceName?: string | null; // [신규] 초기 기기 이름 prop 추가
+  onRoomCreated?: (id: number) => void; // 추가: 채팅방 생성 시 부모에게 알림
 }
 
 
 
 // Chat 컴포넌트 정의
-import { chatService } from '@/src/services/chatService';
 
-// AI 답변 대기 시 표시할 스켈레톤 UI
+// AI 응답 대기 시 표시할 스켈레톤 UI
 const ChatSkeleton = () => (
   <motion.div 
     initial={{ opacity: 0, y: 10 }} 
@@ -116,16 +101,16 @@ export const Chat: React.FC<ChatProps> = ({
   isLoadingDevices,
   roomId,
   deviceId,
+  initialDeviceName,
   onRoomCreated
 }) => {
   const [inputText, setInputText] = useState('');
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [activeDeviceId, setActiveDeviceId] = useState<number | null>(deviceId || null); // 현재 대화 중인 기기 ID
-  const [selectedMentionDevice, setSelectedMentionDevice] = useState<string | null>(null); // @ 어노테이션으로 선택된 기기
+  const [selectedMentionDevice, setSelectedMentionDevice] = useState<string | null>(initialDeviceName || null); // @ 멘션으로 선택된 기기
 
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false); // 미등록 기기 모드
   const [currentVideoUrl, setCurrentVideoUrl] = useState('');
   const hasProcessedInitialQuery = useRef(false);
@@ -133,9 +118,15 @@ export const Chat: React.FC<ChatProps> = ({
   const [tempTranscript, setTempTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
 
+  // [신규] 대화 이어하기 UX 관련 상태
+  const [pendingResumeRoom, setPendingResumeRoom] = useState<any | null>(null);
+
   // 라이트박스(이미지 크게 보기) 상태
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [summaryText, setSummaryText] = useState('');
 
   // 멘션(@) 관련 상태
   const [showMentionPopover, setShowMentionPopover] = useState(false);
@@ -149,16 +140,16 @@ export const Chat: React.FC<ChatProps> = ({
         messageId,
         feedback: isLike ? 'LIKE' : 'DISLIKE'
       });
-      alert(isLike ? '좋은 답변 피드백 감사합니다.' : '답변 개선에 참고하겠습니다.');
+      alert(isLike ? '좋은 답변 피드백 감사합니다!' : '답변 개선에 참고하겠습니다.');
     } catch (error) {
       console.error("피드백 전송 실패:", error);
     }
   };
 
-  // [UX] 전송 버튼 활성화 조건: (텍스트/파일 있음) AND (기기 멘션됨 OR 이미 활성화된 방이 있음)
+  // [UX] 전송 버튼 활성화 조건: (텍스트나 파일 있음) AND (기기 멘션됨 OR 이미 활성화된 방이 있음) 원칙
   const canSend = (inputText.trim().length > 0 || attachedFiles.length > 0) && (!!selectedMentionDevice || !!activeRoomId);
 
-  // 채팅 스크롤 관리 (메시지 추가 및 분석 중(SKELETON) 시점 모두 대응)
+  // 채팅 스크롤 관리 (메시지 추가 및 분석 중 SKELETON) 시점 모두 대응
   useEffect(() => {
     const scroll = () => {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -167,7 +158,7 @@ export const Chat: React.FC<ChatProps> = ({
   }, [messages, isAnalyzing]);
 
   useEffect(() => {
-    // initialQuery가 있으면 새 방을 만들고 시작
+    // initialQuery가 있으면 방을 만들고 시작
     if (initialQuery && !hasProcessedInitialQuery.current) {
       startNewChat(initialQuery);
       hasProcessedInitialQuery.current = true;
@@ -181,32 +172,43 @@ export const Chat: React.FC<ChatProps> = ({
       setActiveRoomId(roomId);
       loadRoomMessages(roomId);
       
-      // 기존 방 진입 시: 해당 방의 기기 정보를 찾아서 Context 이름 세팅
-      // (지금은 roomId와 deviceId 관계를 알 수 없으나, History에서 선택된 기기 정보를 전달하면 더 좋습니다. 
-      //  임시로 activeDeviceId를 초기화하되, 추후 개선을 위해 null로 둡니다.)
-      setActiveDeviceId(null); 
-      setSelectedMentionDevice(null);
+      // [개선] 이력에서 진입 시 기기 정보를 대조하여 Context 복구
+      const syncRoomContext = async () => {
+        try {
+          const rooms = await chatService.getChatRooms();
+          const currentRoom = rooms.find((r: any) => Number(r.id) === Number(roomId));
+          if (currentRoom) {
+            const devId = currentRoom.userDeviceId || currentRoom.deviceId;
+            setActiveDeviceId(devId !== undefined ? Number(devId) : null);
+            
+            // [수정] 백엔드에서 준 deviceName이 있으면 우선 사용하고, 없으면 목록에서 찾습니다.
+            const roomDevName = currentRoom.deviceName || currentRoom.device_name;
+            if (roomDevName && roomDevName !== '알 수 없는 기기') {
+              setSelectedMentionDevice(roomDevName);
+            } else {
+              const dev = devices?.find(d => Number(d.id) === Number(devId));
+              if (dev) setSelectedMentionDevice(dev.name);
+            }
+          }
+        } catch (e) {
+          console.error("방 컨텍스트 동기화 실패:", e);
+        }
+      };
+      syncRoomContext();
     } else if (deviceId) {
       // [개선] 기기 선택 진입 시, 해당 기기와의 마지막 대화가 있는지 확인하여 자동으로 이어줍니다.
       const resumeLastSession = async () => {
         setIsAnalyzing(true);
         try {
           const rooms = await chatService.getChatRooms();
-          // 현재 기기(deviceId)와 일치하는 방들 중 가장 최근 것(목록의 앞쪽)을 찾습니다.
           const lastRoom = rooms.find((r: any) => 
-            // 백엔드 엔티티 구조에 따라 userDeviceId를 대조 (보통 DTO에 포함됨)
-            // 여기서는 지난 이력 매핑 로직과 동일하게 기기 정보를 대조하거나 
-            // 백엔드가 방 목록에 deviceId를 포함한다고 가정합니다.
-            // (만약 DTO에 없더라도, 제목이나 생성일자 등을 통해 유추하거나 백엔드에 필드 추가를 요청할 수 있습니다.)
             r.userDeviceId === deviceId || r.deviceId === deviceId
           );
 
           if (lastRoom && lastRoom.id) {
-            setActiveRoomId(lastRoom.id);
-            if (onRoomCreated) onRoomCreated(lastRoom.id); // 부모 상태 동기화
-            await loadRoomMessages(lastRoom.id);
+            // [개선] 즉시 불러오지 않고 사용자에게 묻기 위해 상태만 저장
+            setPendingResumeRoom(lastRoom);
           } else {
-            // 이전 이력이 없는 경우에만 웰컴 메시지 표시
             setActiveRoomId(null);
             setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?', type: 'status' }]);
           }
@@ -222,13 +224,13 @@ export const Chat: React.FC<ChatProps> = ({
 
       resumeLastSession();
 
-      // 기기가 이미 선택되어 있으므로 @ 어노테이션 자동 세팅
+      // 기기가 이미 선택되어 있으므로 @ 멘션 자동 세팅
       const preSelectedDevice = devices?.find(d => Number(d.id) === deviceId);
       if (preSelectedDevice) {
         setSelectedMentionDevice(preSelectedDevice.name);
       }
     }
-  }, [roomId, deviceId, devices]);
+  }, [roomId, deviceId, devices, initialDeviceName]); // initialDeviceName 추가 (연속 기기 변경 대응)
 
   const loadRoomMessages = async (id: number) => {
     setIsAnalyzing(true);
@@ -238,7 +240,7 @@ export const Chat: React.FC<ChatProps> = ({
     } catch (error) {
       console.error("대화 내역 로드 실패:", error);
     } finally {
-      setIsAnalyzing(false);
+      setTimeout(() => setIsAnalyzing(false), 600);
     }
   };
 
@@ -256,20 +258,19 @@ export const Chat: React.FC<ChatProps> = ({
         };
         setMessages(prev => [...prev, welcomeMsg]);
 
-        // 기기가 없더라도 대화방 생성을 시도 (백엔드에서 0이나 Guest ID를 허용한다고 가정)
+        // 기기가 없더라도 대화방 생성 시도
         try {
           setIsGuestMode(true);
-          const guestRoom = await chatService.createChatRoom(0); // 0을 게스트 ID로 규약
+          const guestRoom = await chatService.createChatRoom(0);
           const guestRoomId = guestRoom.roomId;
           setActiveRoomId(guestRoomId);
-          if (onRoomCreated) onRoomCreated(guestRoomId); // 부모 상태 업데이트
+          if (onRoomCreated) onRoomCreated(guestRoomId);
 
           if (query !== 'ocr_image') {
             await onSendMessage(query, guestRoomId);
           }
         } catch (err) {
           console.warn("게스트 대화방 생성 실패, 가상 세션으로 전환:", err);
-          // 서버 실패(500 에러 등) 시에도 가상 룸 ID(-1) 부여하여 대화 지속
           setActiveRoomId(-1);
           if (query !== 'ocr_image') {
             await onSendMessage(query, -1);
@@ -278,20 +279,19 @@ export const Chat: React.FC<ChatProps> = ({
         return;
       }
 
-      // 1. 새 채팅방 생성 (정상 기기 등록자)
-      // activeDeviceId가 있으면 해당 기기로, 없으면 목록 첫 번째로 방 생성
+      // 1. 새 채팅방 생성 (정상 기기 등록됨)
       const deviceId = activeDeviceId ? String(activeDeviceId) : devices[0].id;
       const newRoom = await chatService.createChatRoom(deviceId);
       const newRoomId = newRoom.roomId;
       setActiveRoomId(newRoomId);
-      if (onRoomCreated) onRoomCreated(newRoomId); // 부모 상태 업데이트
+      if (onRoomCreated) onRoomCreated(newRoomId);
 
       // 2. 초기 메시지 전송
       if (query === 'ocr_image') {
         const ocrMsg: Message = {
           id: 'ocr-notice-' + Date.now(),
           senderType: 'AI',
-          text: '📸 스캔하신 이미지를 분석 중입니다. 잠시만 기다려주세요...',
+          text: '방금 스캔하신 이미지를 분석 중입니다. 잠시만 기다려주세요...',
           type: 'status'
         };
         setMessages(prev => [...prev, ocrMsg]);
@@ -299,10 +299,10 @@ export const Chat: React.FC<ChatProps> = ({
         await onSendMessage(query, newRoomId);
       }
     } catch (error) {
-      console.error("새 채팅 시작 실패:", error);
+      console.error('새 채팅 시작 실패:', error);
       handleChatError(error);
     } finally {
-      setIsAnalyzing(false);
+      setTimeout(() => setIsAnalyzing(false), 600);
     }
   };
 
@@ -316,7 +316,6 @@ export const Chat: React.FC<ChatProps> = ({
 
     // 0. 로딩 중 방어
     if (isLoadingDevices) {
-      // 기기 정보가 로드될 때까지는 전송을 잠시 막거나 대기
       return;
     }
 
@@ -327,21 +326,18 @@ export const Chat: React.FC<ChatProps> = ({
     setAttachedFiles([]);
 
     if (!targetRoomId && !activeRoomId) {
-      // 방이 없으면 생성 후 전송
       setIsAnalyzing(true);
       try {
         if (!devices || devices.length === 0 || !activeDeviceId) {
-          // 기기가 아예 없거나 선택되지 않은 경우는 게스트/폴백 모드
           setIsGuestMode(true);
           setActiveRoomId(-1);
           await performAsk(-1, userText, userAttachments[0]);
         } else {
-          // 기기는 선택되어 있으나 아직 방이 안 만들어진 경우 (예: 진입 시 생성 실패 등)
           const newRoom = await chatService.createChatRoom(activeDeviceId);
           if (newRoom && newRoom.roomId) {
             const newId = newRoom.roomId;
             setActiveRoomId(newId);
-            if (onRoomCreated) onRoomCreated(newId); // 부모 상태 업데이트
+            if (onRoomCreated) onRoomCreated(newId);
             await performAsk(newId, userText, userAttachments[0]);
           } else {
             throw new Error("채팅방을 생성할 수 없습니다.");
@@ -356,14 +352,12 @@ export const Chat: React.FC<ChatProps> = ({
         setTimeout(() => setIsAnalyzing(false), 500);
       }
     } else {
-      // 이미 방이 있으면 (통상적인 경우) 바로 전송
       setIsAnalyzing(true);
       try {
         await performAsk(targetRoomId || activeRoomId!, userText, userAttachments[0]);
       } catch (error) {
         handleChatError(error);
       } finally {
-        // AI 답변이 화면에 추가된 후, 사용자 인지를 위해 0.5초 정도 로딩을 더 유지하여 부드러운 전환 제공
         setTimeout(() => setIsAnalyzing(false), 500);
       }
     }
@@ -373,11 +367,10 @@ export const Chat: React.FC<ChatProps> = ({
     let data;
 
     if (roomId === -1) {
-      // 가상 룸(서버 에러 시)일 경우
       await new Promise(resolve => setTimeout(resolve, 800));
       data = {
         id: Date.now(),
-        message: `현재 기기 정보 확인이 어렵습니다. 잠시 후 다시 시도해 주시거나 [가라지]에서 기기 상태를 확인해 주세요.`
+        message: `현재 기기 정보 확인이 어렵습니다. 잠시 후 다시 시도해 주시거나 [가이드]에서 기기 상태를 확인해 주세요.`
       };
     } else {
       data = await chatService.askQuestion(roomId, text, mediaUrl);
@@ -386,7 +379,7 @@ export const Chat: React.FC<ChatProps> = ({
     // [개선] 백엔드 응답(data)으로부터 필드 추출 시 카멜케이스와 스네이크케이스 모두 대응
     const referencedPage = (data as any).referencedPage || (data as any).referenced_page;
     const manualImageUrls = (data as any).manualImageUrls || (data as any).manual_image_urls || [];
-    const aiMessage = (data as any).message || (data as any).ai_answer || data.text || '답변을 생성할 수 없습니다.';
+    const aiMessage = (data as any).message || (data as any).ai_answer || data.text || '대답을 생성할 수 없습니다.';
 
     const fixieMsg: Message = {
       id: String(data.id || Date.now() + 1),
@@ -402,12 +395,12 @@ export const Chat: React.FC<ChatProps> = ({
   };
 
   const handleChatError = (error: any) => {
-    console.error("채팅 오류:", error);
+    console.error('채팅 오류:', error);
     let errorDetail = error.response?.data?.message || error.message;
 
     // 특정 에러 상황에 대한 친절한 안내 (500 에러 등)
     if (error.response?.status === 500) {
-      errorDetail = "서버 엔진에서 기기 정보를 처리하지 못했습니다. 기기 상태를 다시 확인해주세요.";
+      errorDetail = '서버 엔진에서 기기 정보를 처리하지 못했습니다. 기기 상태를 다시 확인해주세요.';
     }
 
     const errorMsg: Message = {
@@ -419,7 +412,7 @@ export const Chat: React.FC<ChatProps> = ({
     setMessages(prev => [...prev, errorMsg]);
   };
 
-  {/* 이미지 리사이징 함수 */ }
+  // 이미지 리사이징 함수
   const resizeImage = (file: File, maxWidth: number = 800): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -512,21 +505,18 @@ export const Chat: React.FC<ChatProps> = ({
     setIsVoiceModalOpen(false);
   };
 
-  // 멘션 팝업 연동을 위한 인풋 핸들러
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInputText(value);
 
-    // 정규표현식으로 '@' 이후의 텍스트 추출 (예: "안녕하세요 @에어" -> "에어")
     const mentionMatch = value.match(/@([^@\s]*)$/);
     
     if (mentionMatch) {
-      const query = mentionMatch[1]; // @ 뒤의 검색어
+      const query = mentionMatch[1];
       setMentionQuery(query);
       
       const rect = inputRef.current?.getBoundingClientRect();
       if (rect) {
-        // 팝업 위치를 입력창 위로 동적으로 계산 (반응형 대응)
         setMentionPosition({ top: rect.top - 10, left: rect.left }); 
         setShowMentionPopover(true);
       }
@@ -536,18 +526,15 @@ export const Chat: React.FC<ChatProps> = ({
     }
   };
 
-    const handleSelectMention = (deviceName: string) => {
+  const handleSelectMention = (deviceName: string) => {
     if (deviceName === '매뉴얼 즉시 보기') {
-      // 현재 기기 정보가 있는 경우 바로 라이트박스 오픈
       if (activeDeviceId && devices) {
-        const currentDevice = devices.find(d => Number(d.id) === activeDeviceId);
-        // 실제로는 기기 정보에 매뉴얼 URL이 있어야 함 (임시로 첫 AI 메시지에서 가져오거나 안내)
         const lastAiMsg = [...messages].reverse().find(m => m.senderType === 'AI' && m.manualImageUrls && m.manualImageUrls.length > 0);
         if (lastAiMsg?.manualImageUrls) {
           setLightboxImages(lastAiMsg.manualImageUrls);
           setLightboxIndex(0);
         } else {
-          alert("현재 대화 중인 기기의 매뉴얼 정보를 찾을 수 없습니다. 분석 내용을 먼저 확인해 주세요.");
+          alert('현재 대화 중인 기기의 매뉴얼 정보를 찾을 수 없습니다. 분석 내용을 먼저 확인해 주세요.');
         }
       }
       setShowMentionPopover(false);
@@ -555,27 +542,15 @@ export const Chat: React.FC<ChatProps> = ({
       return;
     }
 
-    if (deviceName === '진단 리포트 열기') {
-      setIsReportModalOpen(true);
-      setShowMentionPopover(false);
-      setMentionQuery('');
-      return;
-    }
-
-    // 현재 입력된 텍스트에서 마지막 @ 부분을 가전 이름으로 교체
     const newValue = inputText.replace(/@([^@\s]*)$/, `@${deviceName} `);
     setInputText(newValue);
-    setSelectedMentionDevice(deviceName); // 선택된 기기 저장 → 전송 버튼 활성화
+    setSelectedMentionDevice(deviceName);
     
-    // 멘션된 기기로 activeDeviceId 업데이트 → 이 기기로 채팅방 생성됨
     const mentionedDevice = devices?.find(d => d.name === deviceName);
     if (mentionedDevice) {
       setActiveDeviceId(Number(mentionedDevice.id));
-      
-      // 기기를 명시적으로 바꿨으므로 기존 방 ID 초기화 (새 대화 세션 시작)
       setActiveRoomId(null);
 
-      // 사용자 경험을 위해 기존 대화 내용을 비우고 새로운 안내 메시지만 표시 (별도 페이지 효과)
       const systemMsg: Message = {
         id: 'system-' + Date.now(),
         senderType: 'AI',
@@ -590,43 +565,83 @@ export const Chat: React.FC<ChatProps> = ({
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
-  {/* 안전 확인 박스 */ }
+  const handleConfirmResume = async () => {
+    if (pendingResumeRoom) {
+      setActiveRoomId(pendingResumeRoom.id);
+      await loadRoomMessages(pendingResumeRoom.id);
+      setPendingResumeRoom(null);
+    }
+  };
+
+  const handleStartNew = () => {
+    setActiveRoomId(null);
+    setMessages([{ id: 'welcome', senderType: 'AI', text: '✨ 새로운 대화 세션을 시작합니다.', type: 'status' }]);
+    setPendingResumeRoom(null);
+  };
+
+  const handleSummarize = () => {
+    setIsSummaryModalOpen(true);
+    if (messages.length < 2) {
+      setSummaryText('대화가 부족하여 요약할 내용이 없습니다. 궁금한 점을 더 말씀해 주세요!');
+      return;
+    }
+    
+    const userQueries = messages.filter(m => m.senderType === 'USER').map(m => m.text).slice(0, 3);
+    setSummaryText(`이번 대화에서는 주로 **${selectedMentionDevice || '기기'}**의 **${userQueries[0]?.substring(0, 10) || '사용 방법'}** 등에 대해 알아보셨습니다. AI 가이드가 제안한 해결책을 확인하고 이 대화 내역을 공유해 보세요.`);
+  };
+
   return (
-    <div className="flex flex-col h-[100dvh] md:h-[calc(100dvh-40px)] md:my-5 max-w-3xl mx-auto bg-white md:bg-white/90 md:backdrop-blur-xl md:rounded-3xl md:shadow-2xl overflow-hidden relative border border-white/20">
+    <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
       {/* 상단 헤더 */}
       <header className="p-5 md:p-7 bg-white/80 backdrop-blur-md flex items-center justify-between border-b border-white/20 z-10">
         <div className="flex items-center gap-4">
-          <button onClick={() => setScreen('home')} className="w-10 h-10 bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-500 hover:bg-white/80 transition-colors border border-white/20 shadow-sm">
+          <button 
+            onClick={() => {
+              // [수정] 상세 보기 모드인 경우 'history' 메뉴로, 아니면 'home'으로 이동
+              if (selectedMentionDevice && isReadOnly) {
+                setScreen('history');
+              } else {
+                setScreen('home');
+              }
+            }} 
+            className="w-10 h-10 bg-white/50 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-500 hover:bg-white/80 transition-colors border border-white/20 shadow-sm"
+          >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h3 className="font-bold text-slate-800 text-xl tracking-tight leading-tight">
+            <h3 className="font-bold text-fixie-steel text-lg md:text-xl leading-tight">
               {(() => {
-                // 1순위: @ 버튼으로 선택 중인 기기
-                if (activeDeviceId && devices) {
-                  const targetDevice = devices.find(d => Number(d.id) === activeDeviceId);
-                  if (targetDevice) return `${targetDevice.name} 가이드`;
-                }
-                
-                // 2순위: 현재 표시중인 @ 멘션 텍스트 (아이콘 옆 텍스트)
+                // 1. 멘션된 기기명이 있으면 최우선 (이력 동기화 데이터 포함)
                 if (selectedMentionDevice) {
                   return `${selectedMentionDevice} 가이드`;
                 }
-
-                // 3순위: 기본 타이틀
+                // 2. 현재 활성 기기 ID가 있고 목록에 있으면 표시 (ID 0인 게스트 모드 대응)
+                if (activeDeviceId !== null && devices) {
+                  const targetDevice = devices.find(d => Number(d.id) === activeDeviceId);
+                  if (targetDevice) return `${targetDevice.name} 가이드`;
+                }
                 return 'Fixie 가이드';
               })()}
             </h3>
             <span className="text-[11px] text-theme-primary font-bold">온라인 · 도움 준비 완료</span>
           </div>
         </div>
-        <button
-          onClick={() => setIsReportModalOpen(true)}
-          className="w-10 h-10 bg-theme-primary/10 rounded-xl flex items-center justify-center text-theme-primary hover:bg-theme-primary/20 transition-colors"
-          title="진단 리포트"
-        >
-          <FileText size={20} />
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSummarize}
+            className="w-10 h-10 bg-theme-primary/5 border border-theme-primary/10 rounded-xl flex items-center justify-center text-theme-primary hover:bg-theme-primary/10 transition-all active:scale-95"
+            title="대화 요약"
+          >
+            <Sparkles size={18} />
+          </button>
+          <button
+            onClick={() => setIsShareModalOpen(true)}
+            className="w-10 h-10 bg-fixie-steel/5 border border-fixie-steel/10 rounded-xl flex items-center justify-center text-fixie-steel hover:bg-fixie-steel/10 transition-all active:scale-95"
+            title="공유하기"
+          >
+            <Share2 size={18} />
+          </button>
+        </div>
       </header>
 
       {/* 메시지 리스트 영역 */}
@@ -648,7 +663,7 @@ export const Chat: React.FC<ChatProps> = ({
                 <span className="text-white font-bold italic text-[10px]">F</span>
               </div>
             )}
-            {/* 메시지 컨텐츠 */}
+            {/* 메시지 콘텐츠 */}
             <div className={`
               ${msg.type === 'status' 
                 ? 'bg-slate-100/50 backdrop-blur-sm text-slate-400 text-[10px] md:text-[11px] font-bold border border-slate-100 rounded-full px-5 py-1 text-center' 
@@ -693,15 +708,16 @@ export const Chat: React.FC<ChatProps> = ({
                   </div>
                 )}
 
-                {/* 메시지 텍스트 (사용자/AI 공통 노출) */}
+                {/* 메시지 텍스트 (사용자 AI 공통 노출) */}
+                <div className="text-sm leading-relaxed mb-1 px-1 whitespace-pre-wrap markdown-content">
+                  <div className="prose prose-sm prose-slate max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.text}
+                    </ReactMarkdown>
+                  </div>
                 </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-1 py-1 italic">
-                  <span>{msg.text}</span>
-                </div>
-              )}
 
-                {/* 가이드 타입 메시지 (매뉴얼 이미지, 비디오, 페이지 참고 등 포함) */}
+                {/* 가이드 답변 메시지 (매뉴얼 이미지, 비디오, 페이지 참고 정보 포함) */}
                 {msg.senderType === 'AI' && (
                   <div className="mt-2 space-y-3">
 
@@ -723,70 +739,28 @@ export const Chat: React.FC<ChatProps> = ({
 
                     {msg.type === 'guide' && (
                       <>
-                        {/* 나중에 들어갈 동영상 자리 (미리 만들어두기) */}
                         {msg.videoUrl && (
                           <div className="relative overflow-hidden rounded-2xl aspect-video bg-slate-800 shadow-sm group">
-
-                            {/* 실제 동영상이 들어갈 태그 */}
                             <video src={msg.videoUrl} className="w-full h-full object-cover opacity-80" />
-
-                            {/* 예쁜 재생 버튼 오버레이 (가운데 반투명 버튼) */}
                             <div
-                              onClick={() => {
-                                setCurrentVideoUrl(msg.videoUrl!);
-                                setIsVideoModalOpen(true);
-                              }}
+                              onClick={() => { setCurrentVideoUrl(msg.videoUrl!); setIsVideoModalOpen(true); }}
                               className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors cursor-pointer z-10"
                             >
                               <button className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white shadow-lg hover:scale-105 active:scale-95 transition-all">
                                 <Play fill="white" size={20} className="ml-1" />
                               </button>
                             </div>
-
-                            {/* 나중에 "동영상 생성 중" 상태를 보여주고 싶다면 아래 주석을 풀고 활용  */}
-                            {/* <div className="absolute inset-0 flex items-center justify-center bg-slate-800 backdrop-blur-sm">
-                        <span className="text-white/70 text-xs font-bold animate-pulse">AI가 동영상을 생성하고 있습니다...</span>
-                      </div> 
-                      */}
                           </div>
                         )}
-
-                        {/* 안전 확인 박스 */}
-                        <SafetyCheck text="전원을 뽑았나요?" />
                       </>
                     )}
-                    
-                    {/* [NEW] 실제 데이터가 있을 때만 매뉴얼 페이지 미리보기 표시 */}
-                    {msg.senderType === 'AI' && msg.manualImageUrls && msg.manualImageUrls.length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1 uppercase tracking-tight">
-                          <FileText size={10} />
-                          Manual Preview ({msg.manualImageUrls.length}p)
-                        </div>
-                        <div 
-                          className="w-full h-32 rounded-xl overflow-hidden border border-slate-200 cursor-zoom-in relative group"
-                          onClick={() => {
-                            setLightboxImages(msg.manualImageUrls!);
-                            setLightboxIndex(0);
-                          }}
-                        >
-                          <img src={msg.manualImageUrls[0]} alt="Manual" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                             <div className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-slate-700 shadow-lg">
-                               <FileText size={14} />
-                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
-                    {/* 피드백 및 매뉴얼 버튼 영역 (강화됨) - 환영 인사가 아니며 status 타입이 아닐 때만 노출 */}
-                    {msg.senderType === 'AI' && msg.id !== '1' && msg.id !== 'welcome' && msg.type !== 'status' && (
+                    {/* 피드백 및 매뉴얼 버튼 영역 - status 타입이 아닐 때만 노출 */}
+                    {msg.id !== '1' && msg.id !== 'welcome' && (msg.type as string) !== 'status' && (
                       <div className="mt-4 pt-3 border-t border-slate-100">
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {/* 1. 매뉴얼 보기 버튼 (데이터 있을 때) */}
                           {(msg.manualLink || msg.referencedPage || (msg.manualImageUrls && msg.manualImageUrls.length > 0)) && (
-                            <button 
+                            <button
                               className="flex items-center gap-2 px-4 py-3 bg-theme-primary/10 hover:bg-theme-primary text-theme-primary hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-theme-primary/10"
                               onClick={() => {
                                 if (msg.manualImageUrls && msg.manualImageUrls.length > 0) {
@@ -801,40 +775,28 @@ export const Chat: React.FC<ChatProps> = ({
                               {msg.referencedPage ? `매뉴얼 P.${msg.referencedPage} 열기` : '상세 매뉴얼 보기'}
                             </button>
                           )}
-
-                          {/* 2. 진단 리포트 열기 버튼 (환영 인사가 아닐 때만 노출) */}
-                          {msg.id !== '1' && (
-                            <button 
-                              className="flex items-center gap-2 px-4 py-3 bg-slate-100 hover:bg-slate-800 text-slate-600 hover:text-white rounded-2xl transition-all text-xs font-black shadow-sm border border-slate-200"
-                              onClick={() => setIsReportModalOpen(true)}
-                            >
-                              <ShieldCheck size={14} strokeWidth={2.5} />
-                              AI 진단 리포트
-                            </button>
-                          )}
                         </div>
-
-                        {/* 피드백 하단 배치 */}
                         <div className="flex items-center gap-3 px-1">
                           <span className="text-[10px] font-bold text-slate-300 uppercase tracking-tighter">Helpful?</span>
-                          <button
-                            onClick={() => handleFeedback(msg.id, true)}
-                            className="text-slate-300 hover:text-theme-primary transition-colors"
-                          >
-                            <ThumbsUp size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleFeedback(msg.id, false)}
-                            className="text-slate-300 hover:text-red-400 transition-colors"
-                          >
-                            <ThumbsDown size={14} />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => handleFeedback(msg.id, true)} className="p-1.5 text-slate-300 hover:text-theme-primary transition-colors">
+                              <ThumbsUp size={14} />
+                            </button>
+                            <button onClick={() => handleFeedback(msg.id, false)} className="p-1.5 text-slate-300 hover:text-red-400 transition-colors">
+                              <ThumbsDown size={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
                 )}
               </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-4 py-1 italic">
+                  <span>{msg.text}</span>
+                </div>
+              )}
             </div>
           </motion.div>
         ))}
@@ -858,9 +820,7 @@ export const Chat: React.FC<ChatProps> = ({
       {/* 하단 입력창 영역 */}
       <div className={`
         absolute left-0 right-0 transition-all duration-300
-        /* 📱 모바일: 바닥에 딱 붙고 그림자 없는 플랫 스타일 */
         bottom-0 p-3 bg-white border-t border-slate-50
-        /* 💻 데스크탑: 공중에 떠 있고 화려한 스타일 (여백 강화) */
         md:bottom-8 md:left-10 md:right-10 md:p-0 md:bg-transparent md:border-none
       `}>
 
@@ -885,7 +845,7 @@ export const Chat: React.FC<ChatProps> = ({
           )}
         </AnimatePresence>
 
-        {/* 메인 입력 알약(Pill) */}
+        {/* 메인 입력 필드(Pill) */}
         <div className={`
           flex items-center gap-2 transition-all duration-300 relative
           bg-white/40 backdrop-blur-xl rounded-full p-1 pl-4 shadow-none border border-white/20
@@ -905,7 +865,7 @@ export const Chat: React.FC<ChatProps> = ({
             <Paperclip size={18} className="md:w-5 md:h-5" />
           </label>
 
-          {/* @ 어노테이션 버튼 (모바일 친화적) */}
+          {/* @ 멘션 버튼 */}
           <button
             id="mention-btn"
             onClick={() => {
@@ -917,9 +877,8 @@ export const Chat: React.FC<ChatProps> = ({
                 ? 'text-white bg-theme-primary shadow-md shadow-theme-primary/30'
                 : 'text-slate-400 bg-slate-100 hover:bg-theme-primary/10 hover:text-theme-primary'
             }`}
-            title="기기 멘션하기"
           >
-            @
+            <AtSign size={18} />
           </button>
 
           <input
@@ -927,7 +886,7 @@ export const Chat: React.FC<ChatProps> = ({
             type="text"
             value={inputText}
             onChange={handleInputChange}
-            placeholder="질문을 입력하세요..."
+            placeholder="질문을 입력하세요.."
             className="flex-1 bg-transparent h-10 px-1 focus:outline-none text-[13px] md:text-sm text-slate-700 font-medium"
             onKeyDown={(e) => {
               if (e.nativeEvent.isComposing) return;
@@ -937,7 +896,6 @@ export const Chat: React.FC<ChatProps> = ({
             }}
           />
 
-          {/* 전송 버튼: 기기 멘션(@)이 선택되어야 활성화 */}
           <button
             id="send-btn"
             disabled={!canSend}
@@ -949,14 +907,14 @@ export const Chat: React.FC<ChatProps> = ({
             onClick={() => {
               if (canSend) {
                 onSendMessage();
-                setSelectedMentionDevice(null); // 전송 후 멘션 초기화
+                setSelectedMentionDevice(null);
               }
             }}
           >
             <Send className="w-4 h-4 md:w-4.5 md:h-4.5 -ml-0.5" />
           </button>
 
-          {/* 멘션(@) 기기 선택 팝업 (입력창 바로 위로 배치) */}
+          {/* 멘션(@) 기기 선택 팝업 */}
           <AnimatePresence>
             {showMentionPopover && (
               <motion.div
@@ -966,10 +924,9 @@ export const Chat: React.FC<ChatProps> = ({
                 className="absolute bottom-full left-0 mb-2 z-[100] bg-white/95 backdrop-blur-2xl border border-slate-200/60 rounded-2xl overflow-hidden w-64"
               >
                 <div className="p-3 border-b border-slate-100 bg-slate-50/50">
-                  <p className="text-[10px] font-black text-theme-primary uppercase tracking-wider">가전 참조하기</p>
+                  <p className="text-[10px] font-black text-theme-primary uppercase tracking-wider">가이드 참조하기</p>
                 </div>
                 <div className="max-h-56 overflow-y-auto no-scrollbar">
-                  {/* 카테고리 1: 기능 호출 */}
                   <div className="p-2 border-b border-slate-50">
                     <button
                       onClick={() => handleSelectMention('매뉴얼 즉시 보기')}
@@ -980,20 +937,10 @@ export const Chat: React.FC<ChatProps> = ({
                       </div>
                       <span className="text-[13px] font-black text-slate-700">매뉴얼 즉시 보기</span>
                     </button>
-                    <button
-                      onClick={() => handleSelectMention('진단 리포트 열기')}
-                      className="w-full text-left px-3 py-2.5 hover:bg-theme-primary/5 rounded-xl transition-colors flex items-center gap-3"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-theme-secondary/10 flex items-center justify-center text-theme-secondary">
-                        <ShieldCheck size={16} />
-                      </div>
-                      <span className="text-[13px] font-black text-slate-700">진단 리포트 열기</span>
-                    </button>
                   </div>
 
-                  {/* 카테고리 2: 기기 목록 */}
                   <div className="p-2 bg-slate-50/30">
-                    <p className="px-3 py-1 text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">나의 가전 목록</p>
+                    <p className="px-3 py-1 text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">나의 가이드 목록</p>
                     {devices && devices.length > 0 ? (
                       devices
                         .filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase()) || d.model.toLowerCase().includes(mentionQuery.toLowerCase()))
@@ -1018,10 +965,6 @@ export const Chat: React.FC<ChatProps> = ({
                       </div>
                     )}
                   </div>
-                  
-                  {devices && devices.length > 0 && devices.filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase())).length === 0 && mentionQuery && (
-                    <div className="p-4 text-center text-[11px] text-slate-400">검색 결과가 없습니다</div>
-                  )}
                 </div>
               </motion.div>
             )}
@@ -1029,15 +972,14 @@ export const Chat: React.FC<ChatProps> = ({
         </div>
       </div>
 
-
-      {/* 비디오 모달 팝업 */}
+      {/* 비디오 재생 모달 */}
       <AnimatePresence>
         {isVideoModalOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[160] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
           >
             <div className="relative w-full max-w-4xl max-h-screen">
               <button
@@ -1083,12 +1025,11 @@ export const Chat: React.FC<ChatProps> = ({
 
               <div className="text-center space-y-2 mt-4">
                 <h3 className="text-xl font-bold text-slate-800">
-                  {isListening ? "듣고 있어요..." : "말씀하시려면 버튼을 누르세요"}
+                  {isListening ? "듣고 있어요.." : "말씀하시려면 버튼을 누르세요"}
                 </h3>
-                <p className="text-sm text-slate-500">궁금한 점을 자유롭게 말씀해주세요.</p>
+                <p className="text-sm text-slate-500">궁금한 점을 자유롭게 말씀해 주세요.</p>
               </div>
 
-              {/* 마이크 파동 애니메이션 효과 */}
               <div
                 className="relative w-32 h-32 flex items-center justify-center my-6 cursor-pointer"
                 onClick={toggleListening}
@@ -1107,7 +1048,7 @@ export const Chat: React.FC<ChatProps> = ({
               <div className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 min-h-[100px] flex items-center justify-center text-center">
                 {isListening || tempTranscript ? (
                   <span className="text-slate-700 text-sm font-bold animate-in fade-in">
-                    {tempTranscript || "언어 분석 중..."}
+                    {tempTranscript || "언어 분석 중.."}
                   </span>
                 ) : (
                   <span className="text-slate-400 text-sm font-medium italic">마이크를 눌러 음성 입력을 시작하세요.</span>
@@ -1121,25 +1062,6 @@ export const Chat: React.FC<ChatProps> = ({
                 입력 완료
               </button>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 진단 리포트 오버레이 모달 */}
-      <AnimatePresence>
-        {isReportModalOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed inset-0 z-[150] bg-slate-50 overflow-y-auto"
-          >
-            <DiagnosticReport
-              setScreen={setScreen}
-              roomId={activeRoomId ? String(activeRoomId) : undefined}
-              onClose={() => setIsReportModalOpen(false)}
-              shareUrl={activeRoomId ? `https://fixie.app/share/${activeRoomId}` : undefined}
-            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -1193,6 +1115,118 @@ export const Chat: React.FC<ChatProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 대화 이어하기 확인 바텀 시트 */}
+      <AnimatePresence>
+        {pendingResumeRoom && (
+          <div className="fixed inset-0 z-[250] bg-black/40 backdrop-blur-sm flex items-end">
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="w-full bg-white rounded-t-[40px] p-8 md:max-w-3xl md:mx-auto md:rounded-3xl md:mb-10 shadow-2xl"
+            >
+              <div className="flex flex-col items-center text-center gap-6">
+                <div className="w-16 h-16 bg-theme-primary/10 rounded-full flex items-center justify-center text-theme-primary">
+                  <MessageCircle size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-slate-800">이전 대화가 있습니다.</h3>
+                  <p className="text-sm text-slate-500 font-medium">
+                    마지막 대화 <span className="text-theme-primary font-bold">"{pendingResumeRoom.title}"</span>를 이어하시겠습니까?<br/>새로 시작하면 기존 대화가 정리됩니다.
+                  </p>
+                </div>
+                <div className="w-full grid grid-cols-2 gap-4 mt-2">
+                  <button
+                    onClick={handleStartNew}
+                    className="py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all active:scale-[0.98]"
+                  >
+                    새로 시작
+                  </button>
+                  <button
+                    onClick={handleConfirmResume}
+                    className="py-4 bg-theme-primary text-white font-bold rounded-2xl hover:bg-theme-primary/90 transition-all shadow-lg shadow-theme-primary/20 active:scale-[0.98]"
+                  >
+                    대화 이어하기
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 대화 요약 모달 */}
+      <AnimatePresence>
+        {isSummaryModalOpen && (
+          <div className="fixed inset-0 z-[300] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-lg bg-white rounded-[32px] overflow-hidden shadow-2xl"
+            >
+              <div className="bg-wing-gradient p-8 text-white relative">
+                <button 
+                  onClick={() => setIsSummaryModalOpen(false)}
+                  className="absolute top-6 right-6 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                    <Sparkle size={18} />
+                  </div>
+                  <span className="text-sm font-bold opacity-80 uppercase tracking-tighter">AI Conversation Summary</span>
+                </div>
+                <h3 className="text-2xl font-black">오늘의 대화 브리핑</h3>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                  <div className="prose prose-slate max-w-none">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                    >
+                      {summaryText}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => {
+                       navigator.clipboard.writeText(summaryText);
+                       alert('요약 내용이 복사되었습니다.');
+                    }}
+                    className="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                  >
+                    <ClipboardCheck size={18} /> 클립보드 복사
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsSummaryModalOpen(false);
+                      setIsShareModalOpen(true);
+                    }}
+                    className="flex-1 py-4 bg-theme-primary text-white font-bold rounded-2xl hover:bg-theme-primary/90 transition-all shadow-lg shadow-theme-primary/20 flex items-center justify-center gap-2"
+                  >
+                    <Share2 size={18} /> 친구에게 공유
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 공유 모달 */}
+      <SocialShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        title={selectedMentionDevice ? `${selectedMentionDevice} 상담 내역` : "Fixie 대화 공유"}
+        shareUrl={activeRoomId ? `${window.location.origin}/share/${activeRoomId}` : window.location.href}
+      />
 
     </div>
   );

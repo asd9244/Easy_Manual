@@ -101,5 +101,18 @@ export const chatService = {
       console.error("전체 채팅방 삭제 실패:", error);
       throw error;
     }
+  },
+
+  /**
+   * [신규] 채팅방 제목 수정
+   */
+  updateChatRoomTitle: async (roomId: number, title: string) => {
+    try {
+      const response = await api.patch(`/chat/rooms/${roomId}`, { title });
+      return response.data;
+    } catch (error) {
+      console.error("채팅방 제목 수정 실패:", error);
+      throw error;
+    }
   }
 };

@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import { Screen } from '@/src/types';
 import { FixieLogo } from '@/src/components/common/FixieLogo';
 import { SocialShareModal } from '@/src/components/common/SocialShareModal';
+import { deviceService } from '@/src/services/deviceService';
 
 interface DiagnosticReportProps {
   setScreen: (screen: Screen) => void;

@@ -16,11 +16,33 @@ export const SocialShareModal: React.FC<SocialShareModalProps> = ({
   shareUrl = window.location.href 
 }) => {
   
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: title,
+          text: `Fixie와 함께한 대화 내용입니다: ${title}`,
+          url: shareUrl,
+        });
+        onClose();
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.error('공유 실패:', error);
+          handleCopyLink(); // 시스템 공유 실패 시 클립보드 복사로 대체
+        }
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);
     alert('링크가 복사되었습니다!');
     onClose();
   };
+   
+  const isNativeShareSupported = typeof navigator !== 'undefined' && !!navigator.share;
 
   const shareLinks = [
     {

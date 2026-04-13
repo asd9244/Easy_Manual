@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { chatService } from '@/src/services/chatService';
-import { DiagnosticReport } from '../Report/DiagnosticReport';
+import { Search, Edit2 } from 'lucide-react';
 import { SocialShareModal } from '../../components/common/SocialShareModal';
 import { Screen } from '@/src/types/index';
 
@@ -20,15 +20,19 @@ interface HistoryProps {
   setHistoryFilter: (filter: 'all' | 'completed' | 'visit') => void;
   setScreen: (screen: Screen) => void;
   setIsChatReadOnly: (readOnly: boolean) => void;
-  onRoomSelect?: (id: number) => void; // 추가
+  onRoomSelect?: (id: number, deviceName?: string) => void; // 수정: 기기 이름 전달 추가
 }
 
 export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilter, setScreen, setIsChatReadOnly, onRoomSelect }: HistoryProps) => {
   const [historyItems, setHistoryItems] = useState<any[]>([]);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedShareUrl, setSelectedShareUrl] = useState('');
-  const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(undefined);
+  
+  // [신규] 검색 및 제목 수정 상태
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [editingRoomId, setEditingRoomId] = useState<number | null>(null);
+  const [newTitle, setNewTitle] = useState('');
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -50,22 +54,18 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
     fetchRooms();
   }, []);
 
-  // 필터링 로직
-  const filteredItems = historyFilter === 'all' 
-    ? historyItems 
-    : historyItems.filter(item => item.status === historyFilter);
+  // 필터링 및 검색 로직 결합
+  const filteredItems = historyItems
+    .filter(item => historyFilter === 'all' || item.status === historyFilter)
+    .filter(item => 
+      item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      item.device.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   const handleShare = (e: React.MouseEvent, id: string | number) => {
     e.stopPropagation(); 
     setSelectedShareUrl(`https://fixie.app/share/${id}`);
     setIsShareModalOpen(true);
-  };
-
-  const handleGoToReport = (e: React.MouseEvent, id: string | number) => {
-    e.stopPropagation(); 
-    setSelectedRoomId(String(id));
-    setSelectedShareUrl(`https://fixie.app/share/${id}`);
-    setIsReportModalOpen(true);
   };
 
   const handleDeleteRoom = async (e: React.MouseEvent, id: number) => {
@@ -95,6 +95,28 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
     }
   };
 
+  // [신규] 제목 수정 핸들러
+  const openRenameModal = (e: React.MouseEvent, id: number, currentTitle: string) => {
+    e.stopPropagation();
+    setEditingRoomId(id);
+    setNewTitle(currentTitle);
+    setIsRenameModalOpen(true);
+  };
+
+  const handleRename = async () => {
+    if (!editingRoomId || !newTitle.trim()) return;
+    try {
+      await chatService.updateChatRoomTitle(editingRoomId, newTitle);
+      setHistoryItems(prev => prev.map(item => 
+        item.id === editingRoomId ? { ...item, title: newTitle } : item
+      ));
+      setIsRenameModalOpen(false);
+    } catch (error) {
+      console.error("제목 수정 실패:", error);
+      alert("제목 수정 중 오류가 발생했습니다.");
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-8 no-scrollbar pb-20 px-4 md:px-8">
       <header className="flex justify-between items-center">
@@ -116,13 +138,25 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
           )}
           {/* 상단 공통 공유 버튼 */}
           <button 
-            onClick={(e) => handleShare(e, 'latest')}
             className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-slate-300 hover:text-theme-primary transition-all border border-slate-50"
+            title="공유하기"
           >
             <Share2 size={20} />
           </button>
         </div>
       </header>
+
+      {/* [신규] 검색 바 */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <input 
+          type="text"
+          placeholder="대화 제목 또는 기기 이름으로 검색..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full h-14 bg-white/80 backdrop-blur-md rounded-2xl pl-12 pr-4 border border-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-theme-primary/20 transition-all text-sm font-medium"
+        />
+      </div>
 
       {/* 필터 카테고리 탭 */}
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
@@ -155,9 +189,9 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
               onClick={() => {
-                if (onRoomSelect) onRoomSelect(item.id);
+                if (onRoomSelect) onRoomSelect(item.id, item.device);
                 setIsChatReadOnly(true); 
-                setScreen('chat');
+                setScreen('history-detail'); // chat에서 history-detail로 변경
               }}
               className="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow cursor-pointer group"
             >
@@ -179,22 +213,30 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
                   </button>
                 </div>
               </div>
-              <h4 className="font-bold text-fixie-steel text-xl mb-1 group-hover:text-theme-primary transition-colors">{item.title}</h4>
+              <div className="flex items-start justify-between mb-1 group/title">
+                <h4 className="font-bold text-fixie-steel text-xl group-hover:text-theme-primary transition-colors truncate">{item.title}</h4>
+                <button 
+                  onClick={(e) => openRenameModal(e, item.id, item.title)}
+                  className="p-1 text-slate-300 hover:text-theme-primary opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <Edit2 size={13} />
+                </button>
+              </div>
               <p className="text-[13px] text-slate-400 mb-8">{item.device} ({item.model})</p>
               
               {/* 하단 액션 버튼 (디자인 최적화: 폰트 크기 하향 및 배치 조정) */}
               <div className="flex gap-2 mt-auto">
                 <button 
-                  onClick={(e) => handleGoToReport(e, item.id || i)}
+                  onClick={(e) => { e.stopPropagation(); alert('AI 요약 기능을 준비 중입니다.'); }}
                   className="flex-1 h-10 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-1.5 text-[11px] font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
                 >
-                  <FileText size={14} className="text-slate-400" /> PDF 저장
+                  <FileText size={14} className="text-slate-400" /> 대화 요약
                 </button>
                 <button 
                   onClick={(e) => handleShare(e, item.id || i)}
-                  className="flex-1 h-10 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-1.5 text-[11px] font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
+                  className="flex-1 h-10 bg-wing-gradient/5 border border-theme-primary/10 rounded-2xl flex items-center justify-center gap-1.5 text-[11px] font-bold text-theme-primary hover:bg-theme-primary/10 transition-all shadow-sm"
                 >
-                  <Share2 size={14} className="text-slate-400" /> 링크 공유
+                  <Share2 size={14} /> 링크 공유
                 </button>
               </div>
             </motion.div>
@@ -209,21 +251,43 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
         )}
       </div>
 
-      {/* 진단 리포트 오버레이 모달 (Chat.tsx와 동일한 방식) */}
+      {/* 제목 수정 모달 */}
       <AnimatePresence>
-        {isReportModalOpen && (
+        {isRenameModalOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed inset-0 z-[150] bg-slate-50 overflow-y-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
           >
-            <DiagnosticReport 
-              setScreen={setScreen} 
-              roomId={selectedRoomId}
-              onClose={() => setIsReportModalOpen(false)} 
-              shareUrl={selectedShareUrl} 
-            />
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl"
+            >
+              <h3 className="text-lg font-bold text-slate-800 mb-4">대화 제목 수정</h3>
+              <input 
+                type="text"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                className="w-full h-12 bg-slate-50 rounded-xl px-4 border border-slate-100 focus:outline-none focus:ring-2 focus:ring-theme-primary/20 mb-6 font-bold"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setIsRenameModalOpen(false)}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  취소
+                </button>
+                <button 
+                  onClick={handleRename}
+                  className="flex-1 py-3 bg-theme-primary text-white font-bold rounded-xl hover:bg-theme-primary/90 transition-colors shadow-lg shadow-theme-primary/20"
+                >
+                  저장하기
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
