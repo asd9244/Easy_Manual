@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { 
   Home as HomeIcon, 
-  MessageCircle, 
   History as HistoryIcon, 
   Settings as SettingsIcon, 
   Plus, 
@@ -88,18 +87,29 @@ export default function App() {
     }
     return null;
   });
-  const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null); // 추가: 기기 기반 채팅 진입을 위해 기기 ID 관리
-  const [selectedDeviceName, setSelectedDeviceName] = useState<string | null>(null); // 추가: 이력 상세 진입 시 제목 동기화
+  const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
+  const [selectedDeviceName, setSelectedDeviceName] = useState<string | null>(null);
+  const [isChatOverlayOpen, setIsChatOverlayOpen] = useState(false);
 
-  // 버튼 클릭 시 채팅방 ID 초기화 (홈/가라지 등 이동할 때)
+  const openChatOverlay = (deviceId?: number | null, query?: string) => {
+    setSelectedRoomId(null);
+    setSelectedDeviceId(deviceId ?? null);
+    setInitialChatQuery(query || '');
+    setIsChatOverlayOpen(true);
+  };
+
+  const closeChatOverlay = () => {
+    setIsChatOverlayOpen(false);
+    setSelectedRoomId(null);
+    setSelectedDeviceId(null);
+    setSelectedDeviceName(null);
+    setInitialChatQuery('');
+  };
+
   const handleMenuClick = (id: Screen) => {
     setScreen(id);
     setIsChatReadOnly(false);
-    if (id !== 'chat') {
-      setSelectedRoomId(null);
-      setSelectedDeviceId(null); // 다른 탭 이동 시 기기 선택 정보도 초기화
-      setSelectedDeviceName(null);
-    }
+    closeChatOverlay();
   };
 
   //  모바일 하단 메뉴용 (App 내부에 정의하여 상태 공유)
@@ -142,7 +152,7 @@ export default function App() {
   // --- 유저 정보 및 기기 목록 가져오기 ---
   useEffect(() => {
     const fetchData = async () => {
-      if (!['home', 'garage', 'chat', 'profile'].includes(screen)) return;
+      if (!['home', 'garage', 'profile'].includes(screen)) return;
 
       // 1. 유저 정보
       try {
@@ -280,7 +290,6 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
               {/*내비게이션*/}
              <nav className="flex-1 space-y-2 relative pr-2">
               <SidebarItem id="home" icon={HomeIcon} label="홈" />
-              <SidebarItem id="chat" icon={MessageCircle} label="Fixie 가이드" />
               <SidebarItem id="scan" icon={Camera} label="기기 스캔" />
               <SidebarItem id="history" icon={HistoryIcon} label="이력" />
               <SidebarItem id="settings" icon={SettingsIcon} label="설정" />
@@ -302,35 +311,10 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
           </aside>
 
             {/* 메인 콘텐츠 영역 */}
-            <main className={`flex-1 ${showNav ? 'md:ml-64' : ''} ${screen === 'chat' ? 'p-0 pb-20 md:p-6' : 'p-6 pb-32'}`}>              
+            <main className={`flex-1 ${showNav ? 'md:ml-64' : ''} p-6 pb-32`}>              
               <AnimatePresence mode="wait">
-                {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} isLoading={isLoadingDevices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} onGuideClick={(title: string) => { setInitialChatQuery(title); setIsAnalyzing(true); setScreen('chat'); }} setSelectedRoomId={setSelectedRoomId} setSelectedDeviceId={setSelectedDeviceId} />}
-                {screen === 'garage' && <Garage key="garage" setScreen={setScreen} devices={devices} setDevices={setDevices} showGarageOptions={showGarageOptions} setShowGarageOptions={setShowGarageOptions} scannedModel={scannedModel} setScannedModel={setScannedModel} />}
-                {screen === 'chat' && (
-                  <Chat 
-                    key="chat" 
-                    setScreen={setScreen} 
-                    messages={messages} 
-                    isAnalyzing={isAnalyzing} 
-                    setIsAnalyzing={setIsAnalyzing} 
-                    attachedFiles={attachedFiles} 
-                    setAttachedFiles={setAttachedFiles} 
-                    chatEndRef={chatEndRef} 
-                    handleSendMessage={handleSendMessage} 
-                    handleFileChange={handleFileChange} 
-                    setMessages={setMessages} 
-                    isReadOnly={isChatReadOnly} 
-                    removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} 
-                    initialQuery={initialChatQuery} 
-                    setInitialQuery={setInitialChatQuery} 
-                    devices={devices} 
-                    isLoadingDevices={isLoadingDevices} 
-                    roomId={selectedRoomId} 
-                    deviceId={selectedDeviceId}
-                    initialDeviceName={selectedDeviceName} // [신규] 초기 타이틀 전달
-                    onRoomCreated={setSelectedRoomId} // 새 방 생성 시 App 상태 업데이트
-                  />
-                )}
+                {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} isLoading={isLoadingDevices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} onGuideClick={(title: string) => openChatOverlay(null, title)} onOpenChat={(deviceId: number) => openChatOverlay(deviceId)} />}
+                {screen === 'garage' && <Garage key="garage" setScreen={setScreen} devices={devices} setDevices={setDevices} showGarageOptions={showGarageOptions} setShowGarageOptions={setShowGarageOptions} scannedModel={scannedModel} setScannedModel={setScannedModel} onOpenChat={(deviceId: number) => openChatOverlay(deviceId)} />}
                 {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} onRoomSelect={(id: number, name?: string) => { setSelectedRoomId(id); setSelectedDeviceName(name || null); setSelectedDeviceId(null); }} />}
                 {screen === 'history-detail' && (
                   <Chat 
@@ -362,14 +346,9 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                   if (model) { 
                     const existingDevice = devices.find(d => d.model === model || d.name === model);
                     if (existingDevice) {
-                      // 스마트 스캔: 이미 등록된 기기면 즉시 해당 기기의 채팅창으로 이동!
-                      setSelectedDeviceId(Number(existingDevice.id));
-                      setSelectedRoomId(null); // 방 ID는 초기화하여 Chat 내에서 생성하도록 유도
-                      setInitialChatQuery(''); // 별도 자동 질문 없이 채팅창 진입
-                      setIsAnalyzing(true); // 멋진 진입 애니메이션 효과 실행
-                      setScreen('chat');
+                      setScreen('home');
+                      openChatOverlay(Number(existingDevice.id));
                     } else {
-                      // 미등록 기기면 기기 추가(Garage) 창으로 자동 이동하여 등록 유도
                       setScannedModel(model); 
                       setScreen('garage'); 
                     }
@@ -386,10 +365,57 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
               </AnimatePresence>
             </main>
 
+            {/* 채팅 오버레이 패널 */}
+            <AnimatePresence>
+              {isChatOverlayOpen && (
+                <motion.div
+                  key="chat-overlay-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm"
+                  onClick={closeChatOverlay}
+                >
+                  <motion.div
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0 }}
+                    exit={{ y: '100%' }}
+                    transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                    className="absolute bottom-0 left-0 right-0 h-[95vh] md:h-[90vh] md:top-[5vh] md:left-auto md:right-4 md:w-[480px] md:rounded-2xl bg-white rounded-t-3xl shadow-2xl overflow-hidden flex flex-col"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Chat
+                      key="chat-overlay"
+                      setScreen={setScreen}
+                      messages={messages}
+                      isAnalyzing={isAnalyzing}
+                      setIsAnalyzing={setIsAnalyzing}
+                      attachedFiles={attachedFiles}
+                      setAttachedFiles={setAttachedFiles}
+                      chatEndRef={chatEndRef}
+                      handleSendMessage={handleSendMessage}
+                      handleFileChange={handleFileChange}
+                      setMessages={setMessages}
+                      isReadOnly={false}
+                      removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))}
+                      initialQuery={initialChatQuery}
+                      setInitialQuery={setInitialChatQuery}
+                      devices={devices}
+                      isLoadingDevices={isLoadingDevices}
+                      roomId={selectedRoomId}
+                      deviceId={selectedDeviceId}
+                      initialDeviceName={selectedDeviceName}
+                      onRoomCreated={setSelectedRoomId}
+                      onClose={closeChatOverlay}
+                    />
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* 하단 탭바 (모바일 전용) */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-2 grid grid-cols-5 items-center justify-items-center z-50">              
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-2 grid grid-cols-4 items-center justify-items-center z-50">              
               <NavItem id="home" icon={HomeIcon} label="홈" />
-              <NavItem id="chat" icon={MessageCircle} label="픽시 가이드" />
               <div className="relative -top-6">
                 <button onClick={() => setScreen('scan')} className="w-14 h-14 rounded-full bg-wing-gradient flex items-center justify-center text-white shadow-lg shadow-theme-primary/30 active:scale-95 transition-transform">
                   <Camera size={24} />

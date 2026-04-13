@@ -13,6 +13,25 @@ import { Search, Edit2 } from 'lucide-react';
 import { SocialShareModal } from '../../components/common/SocialShareModal';
 import { Screen } from '@/src/types/index';
 
+/** 나의 가전(기기 관리)에서 저장한 기기 별명 — local_devices와 userDeviceId로 매칭 */
+function resolveDeviceAlias(
+  userDeviceId: number | null | undefined,
+  serverDeviceName: string,
+): string {
+  if (userDeviceId == null) return serverDeviceName;
+  try {
+    const raw = localStorage.getItem('local_devices');
+    if (!raw) return serverDeviceName;
+    const localDevices = JSON.parse(raw) as { id: string | number; name?: string }[];
+    const local = localDevices.find((ld) => String(ld.id) === String(userDeviceId));
+    if (local?.name && String(local.name).trim() !== '') {
+      return String(local.name).trim();
+    }
+  } catch {
+    /* ignore */
+  }
+  return serverDeviceName;
+}
 
 // 1. 필요한 프롭스 타입 정의
 interface HistoryProps {
@@ -38,14 +57,18 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
     const fetchRooms = async () => {
       try {
         const res = await api.get('/chat/rooms');
-        const items = res.data.map((room: any) => ({
-          id: room.id,
-          title: room.title || '알 수 없는 대화',
-          date: new Date(room.createdAt).toLocaleDateString(),
-          status: 'completed',
-          device: room.deviceName || '알 수 없는 기기',
-          model: room.modelName || '-'
-        }));
+        const items = res.data.map((room: any) => {
+          const serverName = room.deviceName || '알 수 없는 기기';
+          return {
+            id: room.id,
+            title: room.title || '알 수 없는 대화',
+            date: new Date(room.createdAt).toLocaleDateString(),
+            status: 'completed',
+            device: resolveDeviceAlias(room.userDeviceId, serverName),
+            model: room.modelName || '-',
+            userDeviceId: room.userDeviceId,
+          };
+        });
         setHistoryItems(items);
       } catch (error) {
         console.error("채팅 목록 조회 실패:", error);
@@ -59,7 +82,8 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
     .filter(item => historyFilter === 'all' || item.status === historyFilter)
     .filter(item => 
       item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      item.device.toLowerCase().includes(searchTerm.toLowerCase())
+      item.device.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(item.model || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
   const handleShare = (e: React.MouseEvent, id: string | number) => {
@@ -118,7 +142,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 no-scrollbar pb-20 px-4 md:px-8">
+    <div className="w-full max-w-3xl mx-auto space-y-8 no-scrollbar pb-20 px-4 md:px-8">
       <header className="flex justify-between items-center">
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-bold text-fixie-steel">질문 이력</h1>
@@ -179,31 +203,50 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
         ))}
       </div>
 
-      {/* 이력 카드 리스트 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* 이력 카드 리스트 — 한 줄에 카드 하나, 가로 전체 너비 */}
+      <div className="flex flex-col gap-4 w-full">
         {filteredItems.length > 0 ? (
           filteredItems.map((item, i) => (
             <motion.div 
-              key={i} 
+              key={item.id ?? i} 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: Math.min(i * 0.05, 0.4) }}
               onClick={() => {
                 if (onRoomSelect) onRoomSelect(item.id, item.device);
                 setIsChatReadOnly(true); 
                 setScreen('history-detail'); // chat에서 history-detail로 변경
               }}
-              className="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow cursor-pointer group"
+              className="w-full bg-white/80 backdrop-blur-md p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow cursor-pointer group min-w-0"
             >
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-bold text-slate-300 tracking-tight">{item.date}</span>
-                <div className="flex items-center gap-2">
+              <div className="flex justify-between items-start gap-3 mb-3">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 flex-1 text-xs leading-snug">
+                  <span className="font-bold text-slate-300 tracking-tight shrink-0">{item.date}</span>
+                  <span className="text-slate-200 select-none shrink-0" aria-hidden>·</span>
+                  <span
+                    className="font-semibold text-slate-600 min-w-0 break-words [overflow-wrap:anywhere]"
+                    title={item.device}
+                  >
+                    {item.device}
+                  </span>
+                  {item.model && item.model !== '-' ? (
+                    <>
+                      <span className="text-slate-200 select-none shrink-0" aria-hidden>·</span>
+                      <span
+                        className="font-semibold text-slate-500 min-w-0 break-words [overflow-wrap:anywhere]"
+                        title={item.model}
+                      >
+                        {item.model}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
                   <div className={`px-2.5 py-0.5 rounded-lg text-[9px] font-bold ${
                     item.status === 'completed' ? 'bg-theme-primary/10 text-theme-primary' : 'bg-theme-secondary/10 text-theme-secondary'
                   }`}>
                     {item.status === 'completed' ? '가이드 완료' : '방문 권장'}
                   </div>
-                  {/* 삭제 버튼 */}
                   <button 
                     onClick={(e) => handleDeleteRoom(e, item.id)}
                     className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all"
@@ -213,16 +256,19 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
                   </button>
                 </div>
               </div>
-              <div className="flex items-start justify-between mb-1 group/title">
-                <h4 className="font-bold text-fixie-steel text-xl group-hover:text-theme-primary transition-colors truncate">{item.title}</h4>
+              <div className="flex items-start gap-2 mb-4 group/title min-w-0">
+                <h4 className="min-w-0 flex-1 font-bold text-fixie-steel text-lg sm:text-xl group-hover:text-theme-primary transition-colors break-words [overflow-wrap:anywhere] leading-snug">
+                  {item.title}
+                </h4>
                 <button 
+                  type="button"
                   onClick={(e) => openRenameModal(e, item.id, item.title)}
-                  className="p-1 text-slate-300 hover:text-theme-primary opacity-0 group-hover:opacity-100 transition-all"
+                  className="shrink-0 p-1.5 text-slate-300 hover:text-theme-primary opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-slate-50"
+                  aria-label="제목 수정"
                 >
-                  <Edit2 size={13} />
+                  <Edit2 size={15} />
                 </button>
               </div>
-              <p className="text-[13px] text-slate-400 mb-8">{item.device} ({item.model})</p>
               
               {/* 하단 액션 버튼 (디자인 최적화: 폰트 크기 하향 및 배치 조정) */}
               <div className="flex gap-2 mt-auto">
@@ -242,7 +288,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
             </motion.div>
           ))
         ) : (
-          <div className="col-span-full py-12 text-center space-y-3">
+          <div className="w-full py-12 text-center space-y-3">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FileText size={24} className="text-slate-300" />
             </div>

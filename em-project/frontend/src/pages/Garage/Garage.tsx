@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { 
   ChevronRight, 
-  Settings, 
   X, 
   Plus, 
   Type, 
   QrCode, 
   Trash2,
   Search,
-  Camera
+  Camera,
+  WashingMachine
 } from 'lucide-react';
 import { Device, Screen } from '@/src/types/index';
 import { deviceService } from '@/src/services/deviceService';
+import { DeviceStatusCard } from '@/src/components/common/DeviceStatusCard';
 
 interface GarageProps {
   setScreen: (screen: Screen) => void;
@@ -22,6 +23,7 @@ interface GarageProps {
   setShowGarageOptions: (show: boolean) => void;
   scannedModel?: string;
   setScannedModel?: (model: string) => void;
+  onOpenChat?: (deviceId: number) => void;
 }
 
 export const Garage: React.FC<GarageProps> = ({ 
@@ -31,7 +33,8 @@ export const Garage: React.FC<GarageProps> = ({
   showGarageOptions, 
   setShowGarageOptions,
   scannedModel,
-  setScannedModel
+  setScannedModel,
+  onOpenChat,
 }: GarageProps) => {
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -99,50 +102,47 @@ export const Garage: React.FC<GarageProps> = ({
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 no-scrollbar px-4 md:px-8">
-      <header className="flex items-center gap-4">
-        {/* 모바일에서만 보이는 뒤로가기 버튼 */}
-        <button 
-          onClick={() => setScreen('home')} 
-          className="p-2 bg-white rounded-xl shadow-sm md:hidden"
+      <header className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setScreen('home')}
+          className="p-2.5 rounded-xl bg-white/90 shadow-sm border border-slate-100 text-slate-600 hover:bg-white hover:text-slate-800 shrink-0 transition-colors"
+          aria-label="뒤로 가기"
         >
-          <ChevronRight className="rotate-180" />
+          <ChevronRight className="rotate-180" size={22} strokeWidth={2.25} />
         </button>
-        <h1 className="text-xl font-bold">나의 가전</h1>
+        <h1 className="text-xl font-bold text-slate-800">나의 가전</h1>
       </header>
 
-      {/* 기기 목록 (드래그로 순서 변경 가능) */}
-      <Reorder.Group 
-        axis="y" 
-        values={devices} 
+      {/* 기기 목록: 홈「기기 상태 대시보드」와 동일한 DeviceStatusCard 폭(1열 전체 너비) */}
+      <Reorder.Group
+        axis="y"
+        values={devices}
         onReorder={setDevices}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        className="flex flex-col gap-4 w-full"
       >
         {devices.map((device, idx) => (
-          <Reorder.Item 
-            key={`device-item-${device.id}-${idx}`} 
+          <Reorder.Item
+            key={`device-item-${device.id}-${idx}`}
             value={device}
-            className="bg-white/80 backdrop-blur-md p-4 rounded-3xl flex items-center gap-4 shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
+            className="w-full list-none cursor-grab active:cursor-grabbing"
           >
-            <div className="w-20 h-20 rounded-2xl bg-slate-50/50 flex items-center justify-center text-theme-primary pointer-events-none">
-              {device.icon ? (
-                <device.icon size={40} />
-              ) : (
-                <img src={device.image} className="w-full h-full rounded-xl object-cover" alt={device.name} />
-              )}
-            </div>
-            <div className="flex-1 pointer-events-none">
-              <h4 className="font-bold">{device.name}</h4>
-              <p className="text-sm text-slate-500">{device.model}</p>
-            </div>
-            <button 
-              onClick={() => {
+            <DeviceStatusCard
+              title={device.name}
+              model={device.model}
+              icon={device.icon || WashingMachine}
+              status="정상"
+              lastCheck="오늘"
+              filterStatus="양호"
+              repairCount="0회"
+              onSettingsClick={() => {
                 setEditingDevice(device);
-                setNewNickname(device.name); // 모달 열 때 현재 이름으로 초기화
-              }} 
-              className="p-2 text-slate-300 hover:text-theme-primary transition-colors relative z-10"
-            >
-              <Settings size={20} />
-            </button>
+                setNewNickname(device.name);
+              }}
+              onChatClick={() => {
+                onOpenChat?.(Number(device.id));
+              }}
+            />
           </Reorder.Item>
         ))}
       </Reorder.Group>

@@ -4,8 +4,7 @@ import re
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional
-from langchain_ollama import OllamaEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import OllamaEmbeddings, ChatOllama
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
@@ -13,12 +12,17 @@ load_dotenv()
 URI = os.getenv("NEO4J_URI")
 USER = os.getenv("NEO4J_USER")
 PASSWORD = os.getenv("NEO4J_PASSWORD")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-
 router = APIRouter()
 
-embeddings_model = OllamaEmbeddings(model="bge-m3", base_url="http://127.0.0.1:11434")
-llm = ChatGoogleGenerativeAI(model="gemini-3.1-pro-preview", google_api_key=GOOGLE_API_KEY, temperature=0.1)
+OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+
+embeddings_model = OllamaEmbeddings(model="bge-m3", base_url=OLLAMA_BASE)
+llm = ChatOllama(
+    model="qwen2.5:7b",
+    base_url=OLLAMA_BASE,
+    temperature=0.1,
+)
+
 
 
 class ChatRequest(BaseModel):
