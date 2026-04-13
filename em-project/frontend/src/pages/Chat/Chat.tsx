@@ -80,6 +80,8 @@ const ChatSkeleton = () => (
   <motion.div 
     initial={{ opacity: 0, y: 10 }} 
     animate={{ opacity: 1, y: 0 }} 
+    exit={{ opacity: 0, scale: 0.95 }}
+    transition={{ duration: 0.3 }}
     className="flex items-start gap-4 mb-4"
   >
     <div className="w-10 h-10 rounded-full bg-slate-200 animate-pulse shrink-0" />
@@ -349,7 +351,7 @@ export const Chat: React.FC<ChatProps> = ({
         setActiveRoomId(-1);
         await performAsk(-1, userText, userAttachments[0]);
       } finally {
-        setIsAnalyzing(false);
+        setTimeout(() => setIsAnalyzing(false), 500);
       }
     } else {
       // 이미 방이 있으면 (통상적인 경우) 바로 전송
@@ -359,7 +361,8 @@ export const Chat: React.FC<ChatProps> = ({
       } catch (error) {
         handleChatError(error);
       } finally {
-        setIsAnalyzing(false);
+        // AI 답변이 화면에 추가된 후, 사용자 인지를 위해 0.5초 정도 로딩을 더 유지하여 부드러운 전환 제공
+        setTimeout(() => setIsAnalyzing(false), 500);
       }
     }
   };
@@ -832,11 +835,18 @@ export const Chat: React.FC<ChatProps> = ({
         ))}
 
         {/* 분석 중 스켈레톤 UI */}
-        {isAnalyzing && (
-          <div className="pb-10">
-            <ChatSkeleton />
-          </div>
-        )}
+        <AnimatePresence>
+          {isAnalyzing && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="pb-10"
+            >
+              <ChatSkeleton />
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div ref={chatEndRef} />
       </div>
 
