@@ -158,13 +158,13 @@ export const Chat: React.FC<ChatProps> = ({
   // [UX] 전송 버튼 활성화 조건: (텍스트/파일 있음) AND (기기 멘션됨 OR 이미 활성화된 방이 있음)
   const canSend = (inputText.trim().length > 0 || attachedFiles.length > 0) && (!!selectedMentionDevice || !!activeRoomId);
 
-  // 채팅 스크롤 관리 (안정성을 위해 requestAnimationFrame 사용)
+  // 채팅 스크롤 관리 (메시지 추가 및 분석 중(SKELETON) 시점 모두 대응)
   useEffect(() => {
     const scroll = () => {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
     requestAnimationFrame(scroll);
-  }, [messages]);
+  }, [messages, isAnalyzing]);
 
   useEffect(() => {
     // initialQuery가 있으면 새 방을 만들고 시작
