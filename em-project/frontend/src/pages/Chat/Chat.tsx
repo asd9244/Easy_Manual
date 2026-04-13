@@ -251,7 +251,8 @@ export const Chat: React.FC<ChatProps> = ({
         const welcomeMsg: Message = {
           id: 'guest-notice-' + Date.now(),
           senderType: 'AI',
-          text: '등록된 기기 정보가 없지만, 보내주신 이미지를 기반으로 분석을 시작할 수 있습니다. 어떤 도움이 필요하신가요?'
+          text: '등록된 기기 정보가 없지만, 보내주신 이미지를 기반으로 분석을 시작할 수 있습니다. 어떤 도움이 필요하신가요?',
+          type: 'status'
         };
         setMessages(prev => [...prev, welcomeMsg]);
 
@@ -290,7 +291,8 @@ export const Chat: React.FC<ChatProps> = ({
         const ocrMsg: Message = {
           id: 'ocr-notice-' + Date.now(),
           senderType: 'AI',
-          text: '스캔하신 이미지를 분석 중입니다. 잠시만 기다려주세요...'
+          text: '📸 스캔하신 이미지를 분석 중입니다. 잠시만 기다려주세요...',
+          type: 'status'
         };
         setMessages(prev => [...prev, ocrMsg]);
       } else {
@@ -411,7 +413,8 @@ export const Chat: React.FC<ChatProps> = ({
     const errorMsg: Message = {
       id: String(Date.now() + 1),
       senderType: 'AI',
-      text: `⚠️ 오류가 발생했습니다: ${errorDetail}`
+      text: `⚠️ 오류가 발생했습니다: ${errorDetail}`,
+      type: 'status'
     };
     setMessages(prev => [...prev, errorMsg]);
   };
@@ -648,13 +651,14 @@ export const Chat: React.FC<ChatProps> = ({
             {/* 메시지 컨텐츠 */}
             <div className={`
               ${msg.type === 'status' 
-                ? 'bg-slate-100/50 backdrop-blur-sm text-slate-400 text-[11px] font-bold border border-slate-100 rounded-full px-4 py-0.5' 
+                ? 'bg-slate-100/50 backdrop-blur-sm text-slate-400 text-[10px] md:text-[11px] font-bold border border-slate-100 rounded-full px-5 py-1 text-center' 
                 : 'max-w-[85%] p-1.5 relative ' + (msg.senderType === 'USER'
                   ? 'bg-fixie-steel text-white rounded-3xl rounded-tr-none shadow-md'
                   : 'bg-white/70 backdrop-blur-md text-slate-700 rounded-3xl rounded-tl-none border border-white/40 shadow-sm')
               }
             `}>
-              <div className="p-3">
+              {msg.type !== 'status' ? (
+                <div className="p-3">
 
                 {/* 첨부 이미지 표시 (그리드 레이아웃 적용) */}
                 {msg.attachments && msg.attachments.length > 0 && (
@@ -690,11 +694,12 @@ export const Chat: React.FC<ChatProps> = ({
                 )}
 
                 {/* 메시지 텍스트 (사용자/AI 공통 노출) */}
-                <div className="text-sm leading-relaxed mb-1 px-1 whitespace-pre-wrap markdown-content">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {msg.text}
-                  </ReactMarkdown>
                 </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-1 py-1 italic">
+                  <span>{msg.text}</span>
+                </div>
+              )}
 
                 {/* 가이드 타입 메시지 (매뉴얼 이미지, 비디오, 페이지 참고 등 포함) */}
                 {msg.senderType === 'AI' && (
@@ -775,8 +780,8 @@ export const Chat: React.FC<ChatProps> = ({
                       </div>
                     )}
 
-                    {/* 피드백 및 매뉴얼 버튼 영역 (강화됨) - 환영 인사가 아닐 때만 노출 */}
-                    {msg.senderType === 'AI' && msg.id !== '1' && msg.id !== 'welcome' && (
+                    {/* 피드백 및 매뉴얼 버튼 영역 (강화됨) - 환영 인사가 아니며 status 타입이 아닐 때만 노출 */}
+                    {msg.senderType === 'AI' && msg.id !== '1' && msg.id !== 'welcome' && msg.type !== 'status' && (
                       <div className="mt-4 pt-3 border-t border-slate-100">
                         <div className="flex flex-wrap gap-2 mb-3">
                           {/* 1. 매뉴얼 보기 버튼 (데이터 있을 때) */}
