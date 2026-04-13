@@ -164,6 +164,24 @@ export const Chat: React.FC<ChatProps> = ({
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [summaryText, setSummaryText] = useState('');
+  
+  // [신규] 로딩 최적화: 레퍼런스 카운팅 시스템
+  const MIN_LOADING_TIME = 2500;
+  const loadingOpsCount = useRef(0);
+
+  const startLoading = () => {
+    loadingOpsCount.current += 1;
+    if (loadingOpsCount.current === 1) {
+      setIsAnalyzing(true);
+    }
+  };
+
+  const stopLoading = () => {
+    loadingOpsCount.current = Math.max(0, loadingOpsCount.current - 1);
+    if (loadingOpsCount.current === 0) {
+      setIsAnalyzing(false);
+    }
+  };
 
   // 멘션(@) 관련 상태
   const [showMentionPopover, setShowMentionPopover] = useState(false);
@@ -254,11 +272,15 @@ export const Chat: React.FC<ChatProps> = ({
           setActiveRoomId(null);
           setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?', type: 'status' }]);
         } finally {
-          setTimeout(() => setIsAnalyzing(false), 1200);
-          setActiveDeviceId(deviceId);
+          // 세션 체크는 사용자 경험을 위해 약간 짧은 딜레이 후 해제
+          setTimeout(() => {
+            stopLoading();
+            setActiveDeviceId(deviceId);
+          }, 800);
         }
       };
 
+      startLoading();
       resumeLastSession();
 
       // 기기가 이미 선택되어 있으므로 @ 멘션 자동 세팅
@@ -270,14 +292,17 @@ export const Chat: React.FC<ChatProps> = ({
   }, [roomId, deviceId, devices, initialDeviceName]); // initialDeviceName 추가 (연속 기기 변경 대응)
 
   const loadRoomMessages = async (id: number) => {
-    setIsAnalyzing(true);
+    startLoading();
+    const minDelay = new Promise(resolve => setTimeout(resolve, MIN_LOADING_TIME));
     try {
       const history = await chatService.getMessages(id);
+      await minDelay;
       setMessages(history);
     } catch (error) {
+      await minDelay;
       console.error("대화 내역 로드 실패:", error);
     } finally {
-      setTimeout(() => setIsAnalyzing(false), 1500);
+      stopLoading();
     }
   };
 
@@ -339,7 +364,8 @@ export const Chat: React.FC<ChatProps> = ({
       console.error('새 채팅 시작 실패:', error);
       handleChatError(error);
     } finally {
-      setTimeout(() => setIsAnalyzing(false), 1500);
+      // 2.5초 보장 후 해제
+      setTimeout(() => stopLoading(), MIN_LOADING_TIME);
     }
   };
 
@@ -363,7 +389,7 @@ export const Chat: React.FC<ChatProps> = ({
     setAttachedFiles([]);
 
     if (!targetRoomId && !activeRoomId) {
-      setIsAnalyzing(true);
+      startLoading();
       try {
         if (!devices || devices.length === 0 || !activeDeviceId) {
           setIsGuestMode(true);
@@ -386,49 +412,58 @@ export const Chat: React.FC<ChatProps> = ({
         setActiveRoomId(-1);
         await performAsk(-1, userText, userAttachments[0]);
       } finally {
-        setTimeout(() => setIsAnalyzing(false), 1500);
+        stopLoading();
       }
     } else {
-      setIsAnalyzing(true);
+      startLoading();
       try {
         await performAsk(targetRoomId || activeRoomId!, userText, userAttachments[0]);
       } catch (error) {
         handleChatError(error);
       } finally {
-        setTimeout(() => setIsAnalyzing(false), 1500);
+        stopLoading();
       }
     }
   };
 
   const performAsk = async (roomId: number, text: string, mediaUrl?: string) => {
+    const minDelay = new Promise(resolve => setTimeout(resolve, MIN_LOADING_TIME));
     let data;
 
-    if (roomId === -1) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      data = {
-        id: Date.now(),
-        message: `현재 기기 정보 확인이 어렵습니다. 잠시 후 다시 시도해 주시거나 [가이드]에서 기기 상태를 확인해 주세요.`
+    try {
+      const responsePromise = roomId === -1 
+        ? (new Promise(resolve => setTimeout(resolve, 800)).then(() => ({
+            id: Date.now(),
+            message: `현재 기기 정보 확인이 어렵습니다. 잠시 후 다시 시도해 주시거나 [가이드]에서 기기 상태를 확인해 주세요.`
+          })))
+        : chatService.askQuestion(roomId, text, mediaUrl);
+
+      // API 결과와 관계없이 최소 지연 시간을 await
+      const response = await responsePromise;
+      await minDelay;
+      
+      data = response;
+
+      // [개선] 백엔드 응답(data)으로부터 필드 추출 시 카멜케이스와 스네이크케이스 모두 대응
+      const referencedPage = (data as any).referencedPage || (data as any).referenced_page;
+      const manualImageUrls = (data as any).manualImageUrls || (data as any).manual_image_urls || [];
+      const aiMessage = (data as any).message || (data as any).ai_answer || (data as any).text || '대답을 생성할 수 없습니다.';
+
+      const fixieMsg: Message = {
+        id: String(data.id || Date.now() + 1),
+        senderType: 'AI',
+        text: aiMessage,
+        type: 'guide',
+        referencedPage: referencedPage,
+        manualImageUrls: manualImageUrls,
+        mediaUrl: (data as any).mediaUrl || (data as any).media_url
       };
-    } else {
-      data = await chatService.askQuestion(roomId, text, mediaUrl);
+      
+      setMessages(prev => [...prev, fixieMsg]);
+    } catch (error) {
+      await minDelay; // 에러 발생 시에도 최소 대기 시간 보장
+      throw error;
     }
-
-    // [개선] 백엔드 응답(data)으로부터 필드 추출 시 카멜케이스와 스네이크케이스 모두 대응
-    const referencedPage = (data as any).referencedPage || (data as any).referenced_page;
-    const manualImageUrls = (data as any).manualImageUrls || (data as any).manual_image_urls || [];
-    const aiMessage = (data as any).message || (data as any).ai_answer || data.text || '대답을 생성할 수 없습니다.';
-
-    const fixieMsg: Message = {
-      id: String(data.id || Date.now() + 1),
-      senderType: 'AI',
-      text: aiMessage,
-      type: 'guide',
-      referencedPage: referencedPage,
-      manualImageUrls: manualImageUrls,
-      mediaUrl: (data as any).mediaUrl || (data as any).media_url
-    };
-    
-    setMessages(prev => [...prev, fixieMsg]);
   };
 
   const handleChatError = (error: any) => {
@@ -684,10 +719,12 @@ export const Chat: React.FC<ChatProps> = ({
       {/* 메시지 리스트 영역 */}
       <div className="flex-1 overflow-y-auto p-5 md:p-8 space-y-6 no-scrollbar pb-36">
         {messages.map(msg => (
-          <motion.div
+          <motion.div 
             key={msg.id}
+            layout
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
             className={`flex gap-3 ${
               msg.type === 'status' ? 'justify-center w-full' : 
               msg.senderType === 'USER' ? 'justify-end' : 'justify-start'
@@ -839,12 +876,13 @@ export const Chat: React.FC<ChatProps> = ({
         ))}
 
         {/* 분석 중 스켈레톤 UI */}
-        <AnimatePresence>
+        <AnimatePresence mode="popLayout">
           {isAnalyzing && (
             <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              layout
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.2 } }}
               className="pb-10"
             >
               <ChatSkeleton />

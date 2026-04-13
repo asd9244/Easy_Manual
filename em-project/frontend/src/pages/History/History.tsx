@@ -64,7 +64,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
 
   const handleShare = (e: React.MouseEvent, id: string | number) => {
     e.stopPropagation(); 
-    setSelectedShareUrl(`https://fixie.app/share/${id}`);
+    setSelectedShareUrl(`${window.location.origin}/?share=${id}`);
     setIsShareModalOpen(true);
   };
 
