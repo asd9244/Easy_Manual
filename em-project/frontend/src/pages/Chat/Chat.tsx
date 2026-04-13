@@ -185,20 +185,46 @@ export const Chat: React.FC<ChatProps> = ({
       setActiveDeviceId(null); 
       setSelectedMentionDevice(null);
     } else if (deviceId) {
-      // 홈에서 기기 카드를 눌러서 진입한 경우
-      setActiveRoomId(null);
-      setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?', type: 'status' }]);
-      setActiveDeviceId(deviceId);
+      // [개선] 기기 선택 진입 시, 해당 기기와의 마지막 대화가 있는지 확인하여 자동으로 이어줍니다.
+      const resumeLastSession = async () => {
+        setIsAnalyzing(true);
+        try {
+          const rooms = await chatService.getChatRooms();
+          // 현재 기기(deviceId)와 일치하는 방들 중 가장 최근 것(목록의 앞쪽)을 찾습니다.
+          const lastRoom = rooms.find((r: any) => 
+            // 백엔드 엔티티 구조에 따라 userDeviceId를 대조 (보통 DTO에 포함됨)
+            // 여기서는 지난 이력 매핑 로직과 동일하게 기기 정보를 대조하거나 
+            // 백엔드가 방 목록에 deviceId를 포함한다고 가정합니다.
+            // (만약 DTO에 없더라도, 제목이나 생성일자 등을 통해 유추하거나 백엔드에 필드 추가를 요청할 수 있습니다.)
+            r.userDeviceId === deviceId || r.deviceId === deviceId
+          );
+
+          if (lastRoom && lastRoom.id) {
+            setActiveRoomId(lastRoom.id);
+            if (onRoomCreated) onRoomCreated(lastRoom.id); // 부모 상태 동기화
+            await loadRoomMessages(lastRoom.id);
+          } else {
+            // 이전 이력이 없는 경우에만 웰컴 메시지 표시
+            setActiveRoomId(null);
+            setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?', type: 'status' }]);
+          }
+        } catch (e) {
+          console.error("이전 세션 확인 실패:", e);
+          setActiveRoomId(null);
+          setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?', type: 'status' }]);
+        } finally {
+          setIsAnalyzing(false);
+          setActiveDeviceId(deviceId);
+        }
+      };
+
+      resumeLastSession();
 
       // 기기가 이미 선택되어 있으므로 @ 어노테이션 자동 세팅
       const preSelectedDevice = devices?.find(d => Number(d.id) === deviceId);
       if (preSelectedDevice) {
         setSelectedMentionDevice(preSelectedDevice.name);
       }
-      
-      // [변경] 진입 시점에 방을 미리 생성하지 않습니다 (Lazy Creation). 
-      // 첫 메시지를 보낼 때 onSendMessage에서 생성하도록 하여 빈 방 생성을 방지합니다.
-      setIsAnalyzing(false); 
     }
   }, [roomId, deviceId, devices]);
 

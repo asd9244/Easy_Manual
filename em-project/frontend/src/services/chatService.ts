@@ -75,5 +75,18 @@ export const chatService = {
       console.error("AI 질문 실패:", error);
       throw error;
     }
+  },
+
+  /**
+   * 채팅방 삭제
+   */
+  deleteChatRoom: async (roomId: number) => {
+    try {
+      const response = await api.delete(`/chat/rooms/${roomId}`);
+      return response.data;
+    } catch (error) {
+      console.error("채팅방 삭제 실패:", error);
+      throw error;
+    }
   }
 };

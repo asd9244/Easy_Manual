@@ -4,9 +4,11 @@ import { motion } from 'motion/react';
 import { 
   Share2, 
   FileText,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
+import { chatService } from '@/src/services/chatService';
 import { DiagnosticReport } from '../Report/DiagnosticReport';
 import { SocialShareModal } from '../../components/common/SocialShareModal';
 import { Screen } from '@/src/types/index';
@@ -66,6 +68,19 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
     setIsReportModalOpen(true);
   };
 
+  const handleDeleteRoom = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    if (window.confirm('정말로 이 대화 내역을 삭제하시겠습니까?')) {
+      try {
+        await chatService.deleteChatRoom(id);
+        setHistoryItems(prev => prev.filter(item => item.id !== id));
+      } catch (error) {
+        console.error("채팅방 삭제 실패:", error);
+        alert("삭제에 실패했습니다. 다시 시도해 주세요.");
+      }
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-8 no-scrollbar pb-20 px-4 md:px-8">
       <header className="flex justify-between items-center">
@@ -117,10 +132,20 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
           >
             <div className="flex justify-between items-start mb-4">
               <span className="text-xs font-bold text-slate-300 tracking-tight">{item.date}</span>
-              <div className={`px-3 py-1 rounded-lg text-[10px] font-bold ${
-                item.status === 'completed' ? 'bg-theme-primary/10 text-theme-primary' : 'bg-theme-secondary/10 text-theme-secondary'
-              }`}>
-                {item.status === 'completed' ? '가이드 완료' : '방문 권장'}
+              <div className="flex items-center gap-2">
+                <div className={`px-3 py-1 rounded-lg text-[10px] font-bold ${
+                  item.status === 'completed' ? 'bg-theme-primary/10 text-theme-primary' : 'bg-theme-secondary/10 text-theme-secondary'
+                }`}>
+                  {item.status === 'completed' ? '가이드 완료' : '방문 권장'}
+                </div>
+                {/* 삭제 버튼 추가 */}
+                <button 
+                  onClick={(e) => handleDeleteRoom(e, item.id)}
+                  className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all"
+                  title="삭제"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             </div>
             <h4 className="font-bold text-fixie-steel text-xl mb-1">{item.title}</h4>
