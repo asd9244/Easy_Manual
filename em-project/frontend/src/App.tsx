@@ -47,7 +47,10 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [screen, setScreen] = useState<Screen>(() => {
-    if (window.location.pathname === '/oauth2/redirect') return 'splash';
+    const path = window.location.pathname;
+    if (path === '/oauth2/redirect') return 'splash';
+    if (path.startsWith('/share/')) return 'share';
+    
     const token = localStorage.getItem('accessToken');
     if (token && token !== 'undefined' && token !== 'null') return 'home';
     return 'splash';
@@ -65,7 +68,16 @@ export default function App() {
   // 파이프라인 제어용 상태
   const [scannedModel, setScannedModel] = useState<string>('');
   const [initialChatQuery, setInitialChatQuery] = useState<string>('');
-  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(() => {
+    // 초기 URL이 /share/123 형태인 경우 방 번호 추출
+    const path = window.location.pathname;
+    if (path.startsWith('/share/')) {
+      const parts = path.split('/');
+      const id = parseInt(parts[parts.length - 1]);
+      return isNaN(id) ? null : id;
+    }
+    return null;
+  });
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null); // 추가: 기기 기반 채팅 진입을 위해 기기 ID 관리
   const [selectedDeviceName, setSelectedDeviceName] = useState<string | null>(null); // 추가: 이력 상세 진입 시 제목 동기화
 
@@ -356,7 +368,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                 {screen === 'theme-select' && (<ThemeSelect key="theme-select"setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />)}
                 {screen === 'profile' && (<Profile key="profile" setScreen={setScreen} />)}  
                 {screen === 'report' && (<DiagnosticReport key="report" setScreen={setScreen} />)}
-                {screen === 'share' && (<ShareView key="share" setScreen={setScreen} />)}
+                {screen === 'share' && (<ShareView key="share" setScreen={setScreen} roomId={selectedRoomId} />)}
                 {screen === 'settings-notifications' && <SettingsSubpage key="s-notif" title="알림 설정" setScreen={setScreen} />}
                 {screen === 'settings-language' && <SettingsSubpage key="s-lang" title="언어 설정" setScreen={setScreen} />}
                 {screen === 'settings-privacy' && <SettingsSubpage key="s-priv" title="개인정보 처리방침" setScreen={setScreen} />}
