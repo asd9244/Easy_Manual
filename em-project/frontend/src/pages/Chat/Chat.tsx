@@ -16,7 +16,7 @@ import {
   AtSign
 } from 'lucide-react';
 import { FixieLogo } from '@/src/components/common/FixieLogo';
-import { Message, Screen } from '@/src/types/index';
+import { Message, Screen, Device } from '@/src/types/index';
 import { api } from '@/src/api/apiService';
 import { DiagnosticReport } from '../Report/DiagnosticReport';
 import ReactMarkdown from 'react-markdown';
