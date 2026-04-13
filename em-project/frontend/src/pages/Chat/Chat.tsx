@@ -454,52 +454,7 @@ export const Chat: React.FC<ChatProps> = ({
     });
   };
 
-  {/* 파일 변경 핸들러_ 파일을 선택하면 서버로 바로 업로드 후 URL을 받아와 담기 */ }
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    // 전체 화면 분석 로딩 대신 백그라운드에서 처리하도록 개선 (UX 향상)
-    // setIsAnalyzing(true); 
-
-    try {
-      const fileArray = Array.from(files);
-      const uploadedUrls: string[] = [];
-
-      // 순차적으로 혹은 Promise.all로 업로드 (여기서는 S3 업로드 API 가정)
-      for (const file of fileArray) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        // 백엔드 이미지 업로드 API (FileController: POST /api/files/upload)
-        const response = await api.post('/files/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-
-        // 백엔드에서 내려주는 URL을 추출한다고 가정
-        if (response.data && response.data.url) {
-          uploadedUrls.push(response.data.url);
-        } else {
-          // 서버 연결 안될 시 로컬 리사이즈로 폴백 (테스트 목적)
-          const localUrl = await resizeImage(file, 1000);
-          uploadedUrls.push(localUrl);
-        }
-      }
-
-      setAttachedFiles(prev => [...prev, ...uploadedUrls]);
-    } catch (error) {
-      console.error("이미지 업로드 중 오류 발생:", error);
-      // Fallback for local testing if API fails
-      const fallbackUrls = await Promise.all(Array.from(files).map(f => resizeImage(f, 1000)));
-      setAttachedFiles(prev => [...prev, ...fallbackUrls]);
-    } finally {
-      // setIsAnalyzing(false);
-    }
-  };
-
-
-
-  // --- STT (음성 인식) 로직 구현 ---
+  // STT (음성 인식) 로직 구현
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {

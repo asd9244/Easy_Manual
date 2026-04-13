@@ -8,6 +8,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "chat_rooms")
 @Getter
@@ -27,6 +30,10 @@ public class ChatRoom extends BaseTimeEntity {
     @Column(nullable = false, length = 200)
     private String title;
 
+    // 🌟 추가: 채팅방 삭제 시 소속된 메시지들도 함께 삭제되도록 연쇄 삭제(Cascade) 설정
+    @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ChatMessage> messages = new ArrayList<>();
+
     @Builder
     public ChatRoom(UserDevice userDevice, String title) {
         this.userDevice = userDevice;
@@ -34,7 +41,6 @@ public class ChatRoom extends BaseTimeEntity {
     }
 
     // 채팅방 제목 변경 스위치
-    // 외부에서 무분별한 수정을 막고, 객체 지향적인 상태 변경을 위해 엔티티 내부에 메서드를 정의합니다.
     public void updateTitle(String newTitle) {
         this.title = newTitle;
     }
