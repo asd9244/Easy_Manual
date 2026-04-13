@@ -48,8 +48,10 @@ export default function App() {
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [screen, setScreen] = useState<Screen>(() => {
     const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    
     if (path === '/oauth2/redirect') return 'splash';
-    if (path.startsWith('/share/')) return 'share';
+    if (path.startsWith('/share/') || searchParams.has('share')) return 'share';
     
     const token = localStorage.getItem('accessToken');
     if (token && token !== 'undefined' && token !== 'null') return 'home';
@@ -69,7 +71,15 @@ export default function App() {
   const [scannedModel, setScannedModel] = useState<string>('');
   const [initialChatQuery, setInitialChatQuery] = useState<string>('');
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(() => {
-    // 초기 URL이 /share/123 형태인 경우 방 번호 추출
+    // 1. 쿼리 파라미터 우선 확인 (안정성 높음)
+    const searchParams = new URLSearchParams(window.location.search);
+    const shareId = searchParams.get('share');
+    if (shareId) {
+      const id = parseInt(shareId);
+      return isNaN(id) ? null : id;
+    }
+
+    // 2. 기존 경로 방식 확인 (하위 호환성)
     const path = window.location.pathname;
     if (path.startsWith('/share/')) {
       const parts = path.split('/');

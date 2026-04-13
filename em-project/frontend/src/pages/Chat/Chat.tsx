@@ -51,6 +51,7 @@ interface ChatProps {
   setInitialQuery?: (query: string) => void;
   devices: Device[];
   isLoadingDevices?: boolean;
+  roomId: number | null;
   deviceId: number | null;
   initialDeviceName?: string | null; // [신규] 초기 기기 이름 prop 추가
   onRoomCreated?: (id: number) => void; // 추가: 채팅방 생성 시 부모에게 알림
@@ -66,17 +67,53 @@ const ChatSkeleton = () => (
     initial={{ opacity: 0, y: 10 }} 
     animate={{ opacity: 1, y: 0 }} 
     exit={{ opacity: 0, scale: 0.95 }}
-    transition={{ duration: 0.3 }}
-    className="flex items-start gap-4 mb-4"
+    transition={{ duration: 0.4, ease: "easeOut" }}
+    className="flex items-start gap-4 mb-6"
   >
-    <div className="w-10 h-10 rounded-full bg-slate-200 animate-pulse shrink-0" />
+    <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0 relative overflow-hidden">
+      <motion.div 
+        animate={{ x: ['-100%', '100%'] }} 
+        transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+      />
+    </div>
     <div className="space-y-3 w-full max-w-[80%]">
-      <div className="h-4 bg-slate-200 rounded-full animate-pulse w-3/4" />
-      <div className="h-4 bg-slate-200 rounded-full animate-pulse w-1/2" />
-      <div className="h-32 bg-slate-100/50 rounded-3xl animate-pulse mt-4 w-full border border-slate-50" />
+      <div className="h-4 bg-slate-200 rounded-full w-3/4 relative overflow-hidden">
+        <motion.div 
+          animate={{ x: ['-100%', '100%'] }} 
+          transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+        />
+      </div>
+      <div className="h-4 bg-slate-200 rounded-full w-1/2 relative overflow-hidden">
+        <motion.div 
+          animate={{ x: ['-100%', '100%'] }} 
+          transition={{ repeat: Infinity, duration: 1.5, ease: "linear", delay: 0.2 }}
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+        />
+      </div>
+      <div className="h-32 bg-slate-100/50 rounded-3xl mt-4 w-full border border-slate-50 relative overflow-hidden">
+        <motion.div 
+          animate={{ x: ['-100%', '100%'] }} 
+          transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+        />
+      </div>
       <div className="flex gap-2">
-        <div className="h-8 w-24 bg-slate-200 rounded-full animate-pulse" />
-        <div className="h-8 w-24 bg-slate-200 rounded-full animate-pulse" />
+        <div className="h-8 w-24 bg-slate-200 rounded-full relative overflow-hidden">
+          <motion.div 
+            animate={{ x: ['-100%', '100%'] }} 
+            transition={{ repeat: Infinity, duration: 1.5, ease: "linear", delay: 0.4 }}
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+          />
+        </div>
+        <div className="h-8 w-24 bg-slate-200 rounded-full relative overflow-hidden">
+          <motion.div 
+            animate={{ x: ['-100%', '100%'] }} 
+            transition={{ repeat: Infinity, duration: 1.5, ease: "linear", delay: 0.5 }}
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+          />
+        </div>
       </div>
     </div>
   </motion.div>
@@ -217,7 +254,7 @@ export const Chat: React.FC<ChatProps> = ({
           setActiveRoomId(null);
           setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?', type: 'status' }]);
         } finally {
-          setIsAnalyzing(false);
+          setTimeout(() => setIsAnalyzing(false), 1200);
           setActiveDeviceId(deviceId);
         }
       };
@@ -240,7 +277,7 @@ export const Chat: React.FC<ChatProps> = ({
     } catch (error) {
       console.error("대화 내역 로드 실패:", error);
     } finally {
-      setTimeout(() => setIsAnalyzing(false), 600);
+      setTimeout(() => setIsAnalyzing(false), 1500);
     }
   };
 
@@ -302,7 +339,7 @@ export const Chat: React.FC<ChatProps> = ({
       console.error('새 채팅 시작 실패:', error);
       handleChatError(error);
     } finally {
-      setTimeout(() => setIsAnalyzing(false), 600);
+      setTimeout(() => setIsAnalyzing(false), 1500);
     }
   };
 
@@ -349,7 +386,7 @@ export const Chat: React.FC<ChatProps> = ({
         setActiveRoomId(-1);
         await performAsk(-1, userText, userAttachments[0]);
       } finally {
-        setTimeout(() => setIsAnalyzing(false), 500);
+        setTimeout(() => setIsAnalyzing(false), 1500);
       }
     } else {
       setIsAnalyzing(true);
@@ -358,7 +395,7 @@ export const Chat: React.FC<ChatProps> = ({
       } catch (error) {
         handleChatError(error);
       } finally {
-        setTimeout(() => setIsAnalyzing(false), 500);
+        setTimeout(() => setIsAnalyzing(false), 1500);
       }
     }
   };
@@ -1225,7 +1262,7 @@ export const Chat: React.FC<ChatProps> = ({
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         title={selectedMentionDevice ? `${selectedMentionDevice} 상담 내역` : "Fixie 대화 공유"}
-        shareUrl={activeRoomId ? `${window.location.origin}/share/${activeRoomId}` : window.location.href}
+        shareUrl={activeRoomId ? `${window.location.origin}/?share=${activeRoomId}` : window.location.href}
       />
 
     </div>
