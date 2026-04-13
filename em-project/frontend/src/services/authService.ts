@@ -42,5 +42,19 @@ export const authService = {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.clear(); // 모든 저장 데이터 삭제
+  },
+
+  /**
+   * 내 정보 수정 (닉네임 등)
+   * PUT /api/users/me
+   */
+  updateProfile: async (nickname: string) => {
+    try {
+      const response = await api.put('/users/me', { nickname });
+      return response.data;
+    } catch (error) {
+      console.error("프로필 업데이트 실패:", error);
+      throw error;
+    }
   }
 };

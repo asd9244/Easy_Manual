@@ -82,15 +82,12 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
     
     setIsSaving(true);
     try {
-      const response = await api.put('/users/me', { nickname });
+      const data = await authService.updateProfile(nickname);
       // 서버에서 반환된 최신 데이터로 상태 갱신
-      if (response.data && response.data.nickname) {
-        setNickname(response.data.nickname);
+      if (data && data.nickname) {
+        setNickname(data.nickname);
       }
       showToast('프로필이 성공적으로 업데이트 되었습니다! 🎉', 'success');
-      
-      // 세션이나 다른 컴포넌트 동기화를 위해 페이지 리프레시 혹은 상태 트리거 (권장)
-      // window.location.reload(); // 가장 확실한 동기화 방법 중 하나
     } catch (error: any) {
       console.error("프로필 업데이트 실패:", error);
       const msg = error.response?.data?.message || '업데이트에 실패했습니다.';

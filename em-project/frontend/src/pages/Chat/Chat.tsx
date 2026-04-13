@@ -62,11 +62,12 @@ interface ChatProps {
   attachedFiles: string[];
   setAttachedFiles: React.Dispatch<React.SetStateAction<string[]>>;
   initialQuery?: string;
-  setInitialQuery?: React.Dispatch<React.SetStateAction<string>>;
-  devices: any[];
-  isLoadingDevices: boolean;
-  roomId?: number | null;
-  deviceId?: number | null;
+  setInitialQuery?: (query: string) => void;
+  devices: Device[];
+  isLoadingDevices?: boolean;
+  roomId: number | null;
+  deviceId: number | null;
+  onRoomCreated?: (id: number) => void; // 추가: 새 방 생성 시 부모에게 알림
 }
 
 
@@ -74,7 +75,47 @@ interface ChatProps {
 // Chat 컴포넌트 정의
 import { chatService } from '@/src/services/chatService';
 
-export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, chatEndRef, removeAttachment, isAnalyzing, setIsAnalyzing, attachedFiles, setAttachedFiles, initialQuery, setInitialQuery, devices, isLoadingDevices, roomId, deviceId }) => {
+// AI 답변 대기 시 표시할 스켈레톤 UI
+const ChatSkeleton = () => (
+  <motion.div 
+    initial={{ opacity: 0, y: 10 }} 
+    animate={{ opacity: 1, y: 0 }} 
+    className="flex items-start gap-4 mb-4"
+  >
+    <div className="w-10 h-10 rounded-full bg-slate-200 animate-pulse shrink-0" />
+    <div className="space-y-3 w-full max-w-[80%]">
+      <div className="h-4 bg-slate-200 rounded-full animate-pulse w-3/4" />
+      <div className="h-4 bg-slate-200 rounded-full animate-pulse w-1/2" />
+      <div className="h-32 bg-slate-100/50 rounded-3xl animate-pulse mt-4 w-full border border-slate-50" />
+      <div className="flex gap-2">
+        <div className="h-8 w-24 bg-slate-200 rounded-full animate-pulse" />
+        <div className="h-8 w-24 bg-slate-200 rounded-full animate-pulse" />
+      </div>
+    </div>
+  </motion.div>
+);
+
+export const Chat: React.FC<ChatProps> = ({ 
+  setScreen, 
+  messages, 
+  isAnalyzing, 
+  setIsAnalyzing, 
+  attachedFiles, 
+  setAttachedFiles, 
+  chatEndRef, 
+  handleSendMessage, 
+  handleFileChange, 
+  setMessages, 
+  isReadOnly, 
+  removeAttachment,
+  initialQuery,
+  setInitialQuery,
+  devices,
+  isLoadingDevices,
+  roomId,
+  deviceId,
+  onRoomCreated
+}) => {
   const [inputText, setInputText] = useState('');
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [activeDeviceId, setActiveDeviceId] = useState<number | null>(deviceId || null); // 현재 대화 중인 기기 ID
@@ -147,7 +188,6 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
       // 홈에서 기기 카드를 눌러서 진입한 경우
       setActiveRoomId(null);
       setMessages([{ id: 'welcome', senderType: 'AI', text: '안녕하세요! 선택하신 기기에 대해 무엇을 도와드릴까요?', type: 'status' }]);
-      setIsAnalyzing(true); // 방 생성 중에는 분석 모드로 진입 (전송 버튼 비활성화 유도)
       setActiveDeviceId(deviceId);
 
       // 기기가 이미 선택되어 있으므로 @ 어노테이션 자동 세팅
@@ -155,22 +195,10 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
       if (preSelectedDevice) {
         setSelectedMentionDevice(preSelectedDevice.name);
       }
-
-      // [추가] 진입 시점에 방을 미리 생성하여 ID를 고정함
-      const initRoom = async () => {
-        try {
-          const resp = await chatService.createChatRoom(deviceId);
-          if (resp && resp.roomId) {
-            setActiveRoomId(resp.roomId);
-          }
-        } catch (e) {
-          console.error("방 미리 생성 실패:", e);
-          // 실패하더라도 나중에 전송 시점에 다시 시도할 수 있도록 에러만 기록
-        } finally {
-          setIsAnalyzing(false);
-        }
-      };
-      initRoom();
+      
+      // [변경] 진입 시점에 방을 미리 생성하지 않습니다 (Lazy Creation). 
+      // 첫 메시지를 보낼 때 onSendMessage에서 생성하도록 하여 빈 방 생성을 방지합니다.
+      setIsAnalyzing(false); 
     }
   }, [roomId, deviceId, devices]);
 
@@ -205,6 +233,8 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
           const guestRoom = await chatService.createChatRoom(0); // 0을 게스트 ID로 규약
           const guestRoomId = guestRoom.roomId;
           setActiveRoomId(guestRoomId);
+          if (onRoomCreated) onRoomCreated(guestRoomId); // 부모 상태 업데이트
+
           if (query !== 'ocr_image') {
             await onSendMessage(query, guestRoomId);
           }
@@ -225,6 +255,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
       const newRoom = await chatService.createChatRoom(deviceId);
       const newRoomId = newRoom.roomId;
       setActiveRoomId(newRoomId);
+      if (onRoomCreated) onRoomCreated(newRoomId); // 부모 상태 업데이트
 
       // 2. 초기 메시지 전송
       if (query === 'ocr_image') {
@@ -280,6 +311,7 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
           if (newRoom && newRoom.roomId) {
             const newId = newRoom.roomId;
             setActiveRoomId(newId);
+            if (onRoomCreated) onRoomCreated(newId); // 부모 상태 업데이트
             await performAsk(newId, userText, userAttachments[0]);
           } else {
             throw new Error("채팅방을 생성할 수 없습니다.");
@@ -818,18 +850,11 @@ export const Chat: React.FC<ChatProps> = ({ setScreen, messages, setMessages, ch
           </motion.div>
         ))}
 
-        {/* 분석 중 애니메이션 (FastAPI 연동 시 활용) */}
+        {/* 분석 중 스켈레톤 UI */}
         {isAnalyzing && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative flex flex-col items-center justify-center py-20 overflow-hidden rounded-3xl">
-            <div className="absolute inset-0 z-0">
-              <div className="absolute top-0 -left-4 w-72 h-72 bg-theme-primary rounded-full mix-blend-screen filter blur-3xl opacity-50 animate-blob" />
-              <div className="absolute top-0 -right-4 w-72 h-72 bg-theme-secondary rounded-full mix-blend-screen filter blur-3xl opacity-50 animate-blob animation-delay-2000" />
-            </div>
-            <div className="relative z-10 bg-white/40 backdrop-blur-xl border border-white/20 p-8 rounded-3xl flex flex-col items-center gap-4 shadow-xl">
-              <FixieLogo size={60} rainbow={true} />
-              <p className="text-sm font-bold text-fixie-steel/70 tracking-tight animate-pulse">FIXIE TIME: 분석 중...</p>
-            </div>
-          </motion.div>
+          <div className="pb-10">
+            <ChatSkeleton />
+          </div>
         )}
         <div ref={chatEndRef} />
       </div>

@@ -36,8 +36,9 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
           id: room.id,
           title: room.title || '알 수 없는 대화',
           date: new Date(room.createdAt).toLocaleDateString(),
-          status: 'completed', // 백엔드에 상태가 없으므로 임시값
-          device: '스마트 가전' // 백엔드 ChatRoomResponse에 기기명이 없으므로 임시값
+          status: 'completed',
+          device: room.deviceName || '알 수 없는 기기',
+          model: room.modelName || '-'
         }));
         setHistoryItems(items);
       } catch (error) {
@@ -123,7 +124,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
               </div>
             </div>
             <h4 className="font-bold text-fixie-steel text-xl mb-1">{item.title}</h4>
-            <p className="text-sm text-slate-400 mb-8">{item.device}</p>
+            <p className="text-sm text-slate-400 mb-8">{item.device} ({item.model})</p>
             
             {/* 하단 액션 버튼 */}
             <div className="flex gap-3 mt-auto">

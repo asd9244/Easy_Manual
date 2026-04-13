@@ -52,5 +52,18 @@ public class UserDevice extends BaseTimeEntity {
         this.status = DeviceStatus.DELETED;
     }
 
-    public enum DeviceStatus { ACTIVE, DELETED }
+    public enum DeviceStatus {
+        ACTIVE, DELETED
+    }
+
+    // 기기 종류 가져오기
+    public String getDeviceName() {
+        // manual이 있으면 productType을 반환하고, 없으면 "알 수 없는 기기"를 반환
+        return (this.manual != null) ? this.manual.getProductType() : "알 수 없는 기기";
+    }
+
+    // 대표 모델명 (예: 휘센 벽걸이 에어컨 )가져오기
+    public String getModelName() {
+        return (this.manual != null) ? this.manual.getRepresentativeModelName() : "-";
+    }
 }
