@@ -19,6 +19,10 @@ public class Model {
     @Column(nullable = false, length = 100)
     private String name;
 
+    /** 매뉴얼의 product_type과 동일 — 조회·필터 시 조인 없이 구분용 */
+    @Column(name = "product_type", nullable = false, length = 50)
+    private String productType;
+
     @Column(length = 1000)
     private String qrCodeUrl;
 
@@ -27,8 +31,9 @@ public class Model {
     private Manual manual;
 
     @Builder
-    public Model(String name, String qrCodeUrl, Manual manual) {
+    public Model(String name, String productType, String qrCodeUrl, Manual manual) {
         this.name = name;
+        this.productType = productType;
         this.qrCodeUrl = qrCodeUrl;
         this.manual = manual;
     }

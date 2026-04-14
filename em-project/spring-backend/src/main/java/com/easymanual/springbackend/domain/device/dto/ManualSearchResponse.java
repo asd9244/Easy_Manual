@@ -18,11 +18,13 @@ public class ManualSearchResponse {
     public static class ModelDto {
         private Long id;
         private String name;
+        private String productType;
         private String qrCodeUrl;
 
         public ModelDto(Model model) {
             this.id = model.getId();
             this.name = model.getName();
+            this.productType = model.getProductType();
             this.qrCodeUrl = model.getQrCodeUrl();
         }
     }

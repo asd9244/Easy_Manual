@@ -62,6 +62,8 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/error" // 추가: 내부 에러 발생 시 403으로 마스킹되는 현상 방지
                         ).permitAll()
+                        // QR·업로드 정적 파일: <img src="/uploads/..."> 는 Authorization 헤더를 붙이지 않음
+                        .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/oauth2/**",       // 추가: 소셜 로그인 요청 진입점 허용
