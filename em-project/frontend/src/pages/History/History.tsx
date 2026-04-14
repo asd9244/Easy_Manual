@@ -215,7 +215,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
               onClick={() => {
                 if (onRoomSelect) onRoomSelect(item.id, item.device);
                 setIsChatReadOnly(true); 
-                setScreen('history-detail'); // chat에서 history-detail로 변경
+                setScreen('history-detail');
               }}
               className="w-full bg-white/80 backdrop-blur-md p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow cursor-pointer group min-w-0"
             >
@@ -270,23 +270,29 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
                 </button>
               </div>
               
-              {/* 하단 액션 버튼 (디자인 최적화: 폰트 크기 하향 및 배치 조정) */}
+              <div className="flex items-center gap-2 mb-8">
+                <p className="text-[13px] font-bold text-theme-primary">{item.device}</p>
+                <div className="w-1 h-1 bg-slate-200 rounded-full" />
+                <p className="text-[13px] text-slate-400">{item.model}</p>
+              </div>
+              
               <div className="flex gap-2 mt-auto">
                 <button 
                   onClick={(e) => { e.stopPropagation(); alert('AI 요약 기능을 준비 중입니다.'); }}
-                  className="flex-1 h-10 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-1.5 text-[11px] font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
+                  className="flex-1 h-11 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-[12px] font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
                 >
-                  <FileText size={14} className="text-slate-400" /> 대화 요약
+                  <FileText size={16} className="text-slate-400" /> 대화 요약
                 </button>
                 <button 
                   onClick={(e) => handleShare(e, item.id || i)}
-                  className="flex-1 h-10 bg-wing-gradient/5 border border-theme-primary/10 rounded-2xl flex items-center justify-center gap-1.5 text-[11px] font-bold text-theme-primary hover:bg-theme-primary/10 transition-all shadow-sm"
+                  className="flex-1 h-11 bg-wing-gradient/5 border border-theme-primary/10 rounded-2xl flex items-center justify-center gap-2 text-[12px] font-bold text-theme-primary hover:bg-theme-primary/10 transition-all shadow-sm"
                 >
-                  <Share2 size={14} /> 링크 공유
+                  <Share2 size={16} /> 링크 공유
                 </button>
               </div>
             </motion.div>
           ))
+
         ) : (
           <div className="w-full py-12 text-center space-y-3">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">

@@ -220,7 +220,7 @@ export const Chat: React.FC<ChatProps> = ({
       />
 
       {/* 메시지 리스트 영역 */}
-      <div className="flex-1 overflow-y-auto p-5 md:p-8 space-y-6 no-scrollbar pb-36">
+      <div className="flex-1 overflow-y-auto p-5 md:p-8 space-y-6 no-scrollbar pb-56">
         {messages.map(msg => (
           <MessageBubble
             key={msg.id}

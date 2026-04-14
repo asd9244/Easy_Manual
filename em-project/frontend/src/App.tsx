@@ -56,7 +56,9 @@ export default function App() {
     if (token && token !== 'undefined' && token !== 'null') return 'home';
     return 'splash';
   });
-  const [currentTheme, setCurrentTheme] = useState<ThemeType>('magician');
+  const [currentTheme, setCurrentTheme] = useState<ThemeType>(() => {
+    return (localStorage.getItem('theme') as ThemeType) || 'magician';
+  });
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -123,14 +125,17 @@ export default function App() {
           isActive ? 'text-theme-primary' : 'text-slate-400 hover:text-slate-600'
         }`}
       >
-        <Icon size={24} />
+        <div className="relative">
+          <Icon size={24} />
+          {isActive && (
+            <motion.div
+              layoutId="mobile-active-dot"
+              className="absolute -right-2 top-0 w-1.5 h-1.5 bg-theme-primary rounded-full"
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            />
+          )}
+        </div>
         <span className="text-[10px] font-bold">{label}</span>
-        {isActive && (
-          <motion.div
-            layoutId="mobile-active-dot"
-            className="absolute -bottom-3 w-1.5 h-1.5 bg-theme-primary rounded-full"
-          />
-        )}
       </button>
     );
   };
@@ -147,6 +152,7 @@ export default function App() {
     const theme = THEMES.find(t => t.id === currentTheme) || THEMES[0];
     document.documentElement.style.setProperty('--theme-primary', theme.primary);
     document.documentElement.style.setProperty('--theme-secondary', theme.secondary);
+    localStorage.setItem('theme', currentTheme);
   }, [currentTheme]);
 
   // --- 유저 정보 및 기기 목록 가져오기 ---
@@ -416,11 +422,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
             {/* 하단 탭바 (모바일 전용) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-2 grid grid-cols-4 items-center justify-items-center z-50">              
               <NavItem id="home" icon={HomeIcon} label="홈" />
-              <div className="relative -top-6">
-                <button onClick={() => setScreen('scan')} className="w-14 h-14 rounded-full bg-wing-gradient flex items-center justify-center text-white shadow-lg shadow-theme-primary/30 active:scale-95 transition-transform">
-                  <Camera size={24} />
-                </button>
-              </div>
+              <NavItem id="scan" icon={Camera} label="스캔" />
               <NavItem id="history" icon={HistoryIcon} label="이력" />
               <NavItem id="settings" icon={SettingsIcon} label="설정" />
             </nav>

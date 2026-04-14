@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Check, HelpCircle as HelpIcon } from 'lucide-react';
 import { Screen } from '@/src/types/index';
+import { useToastStore } from '@/src/store/useToastStore';
 
 interface SettingsSubpageProps {
   title: string;
@@ -20,6 +21,17 @@ export const SettingsSubpage: React.FC<SettingsSubpageProps> = ({ title, setScre
   const [notif1, setNotif1] = useState(true);
   const [notif2, setNotif2] = useState(false);
   const [lang, setLang] = useState('ko');
+  const showToast = useToastStore((state) => state.showToast);
+
+  const toggleNotif1 = () => {
+    setNotif1(!notif1);
+    showToast(`푸시 알림이 ${!notif1 ? '켜졌습니다' : '꺼졌습니다'}.`, 'success');
+  };
+
+  const toggleNotif2 = () => {
+    setNotif2(!notif2);
+    showToast(`마케팅 수신이 ${!notif2 ? '동의되었습니다' : '해제되었습니다'}.`, 'success');
+  };
 
   const renderContent = () => {
     switch (title) {
@@ -32,14 +44,14 @@ export const SettingsSubpage: React.FC<SettingsSubpageProps> = ({ title, setScre
                   <h4 className="font-bold text-slate-700">푸시 알림</h4>
                   <p className="text-xs text-slate-400">기기 상태 및 주요 업데이트 알림을 받습니다.</p>
                 </div>
-                <ToggleSwitch enabled={notif1} onClick={() => setNotif1(!notif1)} />
+                <ToggleSwitch enabled={notif1} onClick={toggleNotif1} />
               </div>
               <div className="flex justify-between items-center">
                 <div>
                   <h4 className="font-bold text-slate-700">마케팅 정보 수신</h4>
                   <p className="text-xs text-slate-400">이벤트 및 혜택 정보를 받습니다.</p>
                 </div>
-                <ToggleSwitch enabled={notif2} onClick={() => setNotif2(!notif2)} />
+                <ToggleSwitch enabled={notif2} onClick={toggleNotif2} />
               </div>
             </div>
           </div>
@@ -69,15 +81,37 @@ export const SettingsSubpage: React.FC<SettingsSubpageProps> = ({ title, setScre
       case '개인정보 처리방침':
         return (
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-50 h-[500px] overflow-y-auto no-scrollbar prose prose-slate">
-            <h4 className="font-bold mb-4">제1조 (개인정보의 처리 목적)</h4>
+            <h4 className="font-bold mb-4">제1조 (목적)</h4>
             <p className="text-xs leading-relaxed text-slate-600 mb-6 text-left">
-              'Fixie'는 다음의 목적을 위하여 개인정보를 처리합니다. 처리하고 있는 개인정보는 다음의 목적 이외의 용도로는 이용되지 않으며 이용 목적이 변경되는 경우에는 「개인정보 보호법」 제18조에 따라 별도의 동의를 받는 등 필요한 조치를 이행할 예정입니다.
-              <br/><br/>
-              1. 홈페이지 회원가입 및 관리: 회원 가입의사 확인, 회원제 서비스 제공에 따른 본인 식별·인증, 회원자격 유지·관리, 서비스 부정이용 방지...
+              본 방침은 이지매뉴얼(Fixie) 서비스(이하 '서비스') 이용과 관련하여 회원님의 소중한 개인정보를 보호하고, 관련 법령을 준수하고자 작성되었습니다. 회사는 회원의 개인정보를 보호하기 위해 최선을 다하고 있습니다.
             </p>
-            <h4 className="font-bold mb-4">제2조 (개인정보의 처리 및 보유 기간)</h4>
+            <h4 className="font-bold mb-4">제2조 (개인정보 수집 항목 및 방법)</h4>
+            <p className="text-xs leading-relaxed text-slate-600 mb-6 text-left">
+              1. 수집항목(필수): 소셜 로그인 계정 정보(이메일, 닉네임), 프로필 이미지<br/>
+              2. 수집항목(선택): 기기 등록 정보(제품명, 모델명), 서비스 이용 기록(검색어, 채팅 기반 진단 내용, 첨부 이미지 등)<br/>
+              3. 수집방법: 회원가입 및 서비스 이용 중 자동 수집 또는 사용자 직접 입력
+            </p>
+            <h4 className="font-bold mb-4">제3조 (개인정보의 처리 목적)</h4>
+            <p className="text-xs leading-relaxed text-slate-600 mb-6 text-left">
+              회사는 다음의 목적을 위해 수집된 정보를 활용합니다.<br/>
+              1. 회원 식별 및 가입 의사 확인, 계정 관리<br/>
+              2. 맞춤형 AI 진단 가이드, 모델 매뉴얼 정보 제공 등 본질적 서비스 제공<br/>
+              3. 신규 서비스 개발, 기능 개선 및 고객 문의(불만) 대응
+            </p>
+            <h4 className="font-bold mb-4">제4조 (개인정보의 보유 및 이용기간)</h4>
+            <p className="text-xs leading-relaxed text-slate-600 mb-6 text-left">
+              원칙적으로 개인정보 수집 및 처리 목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다. 단, 관계법령의 규정에 의하여 보존할 필요가 있는 경우 다음과 같이 일정한 기간 동안 회원정보를 보관합니다.<br/>
+              • 소비자의 불만 또는 분쟁처리에 관한 기록: 3년<br/>
+              • 서비스 방문 기록: 3개월
+            </p>
+            <h4 className="font-bold mb-4">제5조 (개인정보의 제3자 제공 및 파기절차)</h4>
+            <p className="text-xs leading-relaxed text-slate-600 mb-6 text-left">
+              ① 회사는 원칙적으로 이용자의 개인정보를 제3자에게 제공하지 않습니다. 단, 회원의 사전 동의가 있거나 법령에 규정된 경우에 한합니다.<br/>
+              ② 파기절차: 회원 탈퇴 혹은 목적 달성 시 복구 불가능한 기술적 방법으로 즉시 삭제됩니다.
+            </p>            
+            <h4 className="font-bold mb-4">제6조 (이용자의 권리와 행사방법)</h4>
             <p className="text-xs leading-relaxed text-slate-600 text-left">
-              ① 'Fixie'는 법령에 따른 개인정보 보유·이용기간 또는 정보주체로부터 개인정보를 수집 시에 동의받은 개인정보 보유·이용기간 내에서 개인정보를 처리·보유합니다.
+              이용자는 언제든지 등록되어 있는 자신의 개인정보를 열람, 정정, 삭제(회원탈퇴)를 요청할 수 있습니다. 앱 내 설정 또는 고객센터를 통해 요청 시 지체 없이 조치하겠습니다.
             </p>
           </div>
         );
@@ -95,13 +129,17 @@ export const SettingsSubpage: React.FC<SettingsSubpageProps> = ({ title, setScre
             </div>
             <div className="bg-white rounded-3xl shadow-sm border border-slate-50 overflow-hidden">
                {[
-                 '기기 등록은 어떻게 하나요?',
-                 'AI 진단 리포트를 공유하고 싶어요',
-                 '회원 탈퇴는 어디서 하나요?',
-                 '구독 플랜을 변경하고 싶습니다'
-               ].map((q, i) => (
-                 <button key={i} className="w-full p-5 text-left text-sm font-bold text-slate-600 border-b border-slate-50 last:border-0 hover:bg-slate-50 flex justify-between items-center group">
-                   {q}
+                 { q: '기기 등록은 어떻게 하나요?', a: '나의 가전 탭의 [+] 버튼을 눌러 모델을 스캔하거나 검색할 수 있습니다.' },
+                 { q: 'AI 진단 내용 공유 방법', a: '대화창 상단의 [공유] 아이콘을 누르면 내역을 링크로 공유할 수 있습니다.' },
+                 { q: '지원하는 스마트 기기 브랜드', a: '현재 삼성, LG 등 주요 제조사 브랜드를 우선적으로 지원 중입니다.' },
+                 { q: '결제 및 구독 플랜 문의', a: '마이 프로필 페이지에서 현재 플랜 정보를 확인 및 변경할 수 있습니다.' }
+               ].map((item, i) => (
+                 <button 
+                   key={i} 
+                   onClick={() => showToast(item.a, 'info')}
+                   className="w-full p-5 text-left text-sm font-bold text-slate-600 border-b border-slate-50 last:border-0 hover:bg-slate-50 flex justify-between items-center group"
+                 >
+                   {item.q}
                    <ChevronLeft size={16} className="rotate-180 text-slate-300 group-hover:text-theme-primary" />
                  </button>
                ))}
