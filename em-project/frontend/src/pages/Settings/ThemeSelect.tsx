@@ -3,6 +3,7 @@ import { ArrowLeft, Check } from 'lucide-react';
 import { THEMES } from '@/src/constants/data';
 import { Screen, ThemeType } from '@/src/types/index';
 import { motion } from 'motion/react';
+import { authService } from '@/src/services/authService';
 
 interface ThemeSelectProps {
   setScreen: (screen: Screen) => void;
@@ -26,7 +27,14 @@ export const ThemeSelect: React.FC<ThemeSelectProps> = ({ setScreen, currentThem
             key={theme.id}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => setCurrentTheme(theme.id)}
+            onClick={async () => {
+              setCurrentTheme(theme.id);
+              try {
+                await authService.updateTheme(theme.id);
+              } catch (err) {
+                console.error("테마 백엔드 연동 실패:", err);
+              }
+            }}
             className={`relative p-6 rounded-3xl border-2 transition-all text-left overflow-hidden ${
               currentTheme === theme.id 
                 ? 'border-theme-primary bg-white shadow-lg' 

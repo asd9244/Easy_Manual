@@ -56,5 +56,19 @@ export const authService = {
       console.error("프로필 업데이트 실패:", error);
       throw error;
     }
+  },
+
+  /**
+   * 내 테마 업데이트
+   * PATCH /api/users/me/theme
+   */
+  updateTheme: async (theme: string) => {
+    try {
+      const response = await api.patch('/users/me/theme', { theme });
+      return response.data;
+    } catch (error) {
+      console.error("테마 업데이트에 실패했습니다:", error);
+      throw error;
+    }
   }
 };

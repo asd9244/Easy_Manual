@@ -79,28 +79,19 @@ public class UserController {
         // 3. 삭제처리가 성공적으로 완료되었음을 알리기 위해,
         // 응답 본문(body)없이 HTTP 상태 코드 200(OK)만 클라이언트에게 반환합니다.
 
+        return ResponseEntity.noContent().build();
+    }
+
+    // [새로 추가] 토큰을 제시하면 내 테마를 업데이트해 주는 창구
+    @PatchMapping("/users/me/theme")
+    public ResponseEntity<Void> updateTheme(@RequestBody ThemeUpdateRequest request, Principal principal) {
+        // 1. 요청 띠지(Token)에서 알아낸 '현재 방문자의 이름표(이메일)'를 확인합니다.
+        String email = principal.getName();
+
+        // 2. 창고 관리자(Service)에게 이메일과 변경할 테마를 넘겨줍니다. 
+        userService.updateTheme(email, request.getTheme());
+        
+        // 3. 200 OK
         return ResponseEntity.ok().build();
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

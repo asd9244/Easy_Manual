@@ -166,6 +166,9 @@ export default function App() {
         if (userRes.data && userRes.data.nickname) {
           setNickname(userRes.data.nickname);
         }
+        if (userRes.data && userRes.data.theme) {
+          setCurrentTheme(userRes.data.theme as ThemeType);
+        }
       } catch (err) { console.error("유저 정보 로드 실패:", err); }
 
       // 2. 기기 목록

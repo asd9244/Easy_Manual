@@ -113,4 +113,13 @@ public class UserService {
         // 객체의 값만 변경해도 트랜잭션이 종료될 때 자동으로 UPDATE SQL 쿼리가 DB로 전송됩니다. (Dirty Checking)
         user.withdraw();
     }
+
+    // 테마 변경 로직 추가
+    @Transactional
+    public void updateTheme(String email, String theme) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
+
+        user.updateTheme(theme);
+    }
 }

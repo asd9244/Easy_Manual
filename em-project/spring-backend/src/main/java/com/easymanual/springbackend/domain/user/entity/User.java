@@ -23,6 +23,11 @@ public class User extends BaseTimeEntity {
         this.status = UserStatus.DELETED;
     }
 
+    // 테마 설정 변경 로직
+    public void updateTheme(String newTheme) {
+        this.theme = newTheme;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -40,6 +45,10 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private Role role;
 
+    // 🌟 추가됨: 테마 (light, dark, modern, sepia 등)
+    @Column(nullable = false, columnDefinition = "varchar(50) default 'light'")
+    private String theme;
+
     // 🌟 추가됨: 회원 탈퇴 여부 관리 (Soft Delete)
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -52,6 +61,7 @@ public class User extends BaseTimeEntity {
         this.nickname = nickname;
         this.role = role;
         this.status = UserStatus.ACTIVE; // 가입 시 기본값은 '활성'
+        this.theme = "light"; // 가입 시 기본 테마는 'light'
     }
 
     public enum Role { USER, ADMIN }
