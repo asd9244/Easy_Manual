@@ -179,42 +179,43 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
         ))}
       </div>
 
-      {/* 이력 카드 리스트 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* 이력 카드 리스트 (260413 수정사항 반영: 한 줄에 하나씩) */}
+      <div className="flex flex-col gap-5">
         {filteredItems.length > 0 ? (
           filteredItems.map((item, i) => (
             <motion.div 
               key={i} 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.05 }}
               onClick={() => {
                 if (onRoomSelect) onRoomSelect(item.id, item.device);
                 setIsChatReadOnly(true); 
-                setScreen('history-detail'); // chat에서 history-detail로 변경
+                setScreen('history-detail');
               }}
-              className="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow cursor-pointer group"
+              className="bg-white/80 backdrop-blur-md p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow cursor-pointer group w-full"
             >
               <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-bold text-slate-300 tracking-tight">{item.date}</span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-300 tracking-tight">{item.date}</span>
                   <div className={`px-2.5 py-0.5 rounded-lg text-[9px] font-bold ${
                     item.status === 'completed' ? 'bg-theme-primary/10 text-theme-primary' : 'bg-theme-secondary/10 text-theme-secondary'
                   }`}>
                     {item.status === 'completed' ? '가이드 완료' : '방문 권장'}
                   </div>
-                  {/* 삭제 버튼 */}
-                  <button 
-                    onClick={(e) => handleDeleteRoom(e, item.id)}
-                    className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all"
-                    title="삭제"
-                  >
-                    <Trash2 size={13} />
-                  </button>
                 </div>
+                {/* 삭제 버튼 */}
+                <button 
+                  onClick={(e) => handleDeleteRoom(e, item.id)}
+                  className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all"
+                  title="삭제"
+                >
+                  <Trash2 size={13} />
+                </button>
               </div>
+
               <div className="flex items-start justify-between mb-1 group/title">
-                <h4 className="font-bold text-fixie-steel text-xl group-hover:text-theme-primary transition-colors truncate">{item.title}</h4>
+                <h4 className="font-bold text-fixie-steel text-xl group-hover:text-theme-primary transition-colors">{item.title}</h4>
                 <button 
                   onClick={(e) => openRenameModal(e, item.id, item.title)}
                   className="p-1 text-slate-300 hover:text-theme-primary opacity-0 group-hover:opacity-100 transition-all"
@@ -222,25 +223,30 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
                   <Edit2 size={13} />
                 </button>
               </div>
-              <p className="text-[13px] text-slate-400 mb-8">{item.device} ({item.model})</p>
               
-              {/* 하단 액션 버튼 (디자인 최적화: 폰트 크기 하향 및 배치 조정) */}
+              <div className="flex items-center gap-2 mb-8">
+                <p className="text-[13px] font-bold text-theme-primary">{item.device}</p>
+                <div className="w-1 h-1 bg-slate-200 rounded-full" />
+                <p className="text-[13px] text-slate-400">{item.model}</p>
+              </div>
+              
               <div className="flex gap-2 mt-auto">
                 <button 
                   onClick={(e) => { e.stopPropagation(); alert('AI 요약 기능을 준비 중입니다.'); }}
-                  className="flex-1 h-10 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-1.5 text-[11px] font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
+                  className="flex-1 h-11 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-[12px] font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
                 >
-                  <FileText size={14} className="text-slate-400" /> 대화 요약
+                  <FileText size={16} className="text-slate-400" /> 대화 요약
                 </button>
                 <button 
                   onClick={(e) => handleShare(e, item.id || i)}
-                  className="flex-1 h-10 bg-wing-gradient/5 border border-theme-primary/10 rounded-2xl flex items-center justify-center gap-1.5 text-[11px] font-bold text-theme-primary hover:bg-theme-primary/10 transition-all shadow-sm"
+                  className="flex-1 h-11 bg-wing-gradient/5 border border-theme-primary/10 rounded-2xl flex items-center justify-center gap-2 text-[12px] font-bold text-theme-primary hover:bg-theme-primary/10 transition-all shadow-sm"
                 >
-                  <Share2 size={14} /> 링크 공유
+                  <Share2 size={16} /> 링크 공유
                 </button>
               </div>
             </motion.div>
           ))
+
         ) : (
           <div className="col-span-full py-12 text-center space-y-3">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">

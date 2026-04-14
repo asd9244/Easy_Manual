@@ -110,36 +110,36 @@ export const Garage: React.FC<GarageProps> = ({
         <h1 className="text-xl font-bold">나의 가전</h1>
       </header>
 
-      {/* 기기 목록 (드래그로 순서 변경 가능) */}
+      {/* 기기 목록 (260413 수정사항 반영: 가로 길이 확장 및 한 줄에 1~2개씩) */}
       <Reorder.Group 
         axis="y" 
         values={devices} 
         onReorder={setDevices}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
       >
         {devices.map((device, idx) => (
           <Reorder.Item 
             key={`device-item-${device.id}-${idx}`} 
             value={device}
-            className="bg-white/80 backdrop-blur-md p-4 rounded-3xl flex items-center gap-4 shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
+            className="bg-white/80 backdrop-blur-md p-6 rounded-[32px] flex items-center gap-6 shadow-sm border border-slate-100 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow w-full"
           >
-            <div className="w-20 h-20 rounded-2xl bg-slate-50/50 flex items-center justify-center text-theme-primary pointer-events-none">
+            <div className="w-24 h-24 rounded-3xl bg-slate-50/50 flex items-center justify-center text-theme-primary pointer-events-none shrink-0">
               {device.icon ? (
-                <device.icon size={40} />
+                <device.icon size={48} />
               ) : (
-                <img src={device.image} className="w-full h-full rounded-xl object-cover" alt={device.name} />
+                <img src={device.image} className="w-full h-full rounded-2xl object-cover" alt={device.name} />
               )}
             </div>
-            <div className="flex-1 pointer-events-none">
-              <h4 className="font-bold">{device.name}</h4>
-              <p className="text-sm text-slate-500">{device.model}</p>
+            <div className="flex-1 pointer-events-none min-w-0">
+              <h4 className="font-bold text-lg text-fixie-steel truncate">{device.name}</h4>
+              <p className="text-sm text-slate-400 truncate">{device.model}</p>
             </div>
             <button 
               onClick={() => {
                 setEditingDevice(device);
-                setNewNickname(device.name); // 모달 열 때 현재 이름으로 초기화
+                setNewNickname(device.name); 
               }} 
-              className="p-2 text-slate-300 hover:text-theme-primary transition-colors relative z-10"
+              className="p-3 bg-slate-50 rounded-2xl text-slate-300 hover:text-theme-primary transition-all relative z-10 hover:bg-theme-primary/5"
             >
               <Settings size={20} />
             </button>
