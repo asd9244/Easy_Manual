@@ -24,6 +24,8 @@ export interface Device {
 export interface DeviceModel {
   id: number;
   name: string;
+  /** manuals.product_type과 동일 (모델 행 단위 구분) */
+  productType: string;
   qrCodeUrl: string;
 }
 

@@ -65,6 +65,7 @@ public class DataMigrationRunner implements CommandLineRunner {
                     // 5. 생성된 모델을 DB(models 테이블)에 저장
                     Model model = Model.builder()
                             .name(cleanName)
+                            .productType(manual.getProductType())
                             .qrCodeUrl(qrUrl)
                             .manual(manual)
                             .build();

@@ -48,36 +48,37 @@ public class SecurityConfig {
                 return source;
         }
 
-        @Bean
-        public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-                http
-                                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                                .csrf(csrf -> csrf.disable())
-                                .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers(
-                                                                "/swagger-ui/**",
-                                                                "/v3/api-docs/**",
-                                                                "/swagger-ui.html",
-                                                                "/swagger-resources/**",
-                                                                "/webjars/**",
-                                                                "/error" // 추가: 내부 에러 발생 시 403으로 마스킹되는 현상 방지
-                                                ).permitAll()
-                                                .requestMatchers(
-                                                                "/api/auth/**",
-                                                                "/oauth2/**", // 추가: 소셜 로그인 요청 진입점 허용
-                                                                "/login/oauth2/**" // 추가: 소셜 로그인 인증 코드 반환점 허용
-                                                ).permitAll()
-                                                // 공유 링크로 비로그인 사용자도 대화 내용·방 제목을 읽을 수 있도록 허용
-                                                .requestMatchers(HttpMethod.GET, "/api/chat/rooms/*/messages")
-                                                .permitAll()
-                                                .requestMatchers(HttpMethod.GET, "/api/chat/rooms/*/share-summary")
-                                                .permitAll()
-                                                .anyRequest().authenticated())
-                                .oauth2Login(oauth2 -> oauth2
-                                                .userInfoEndpoint(userInfo -> userInfo
-                                                                .userService(customOAuth2UserService))
-                                                .successHandler(oAuth2SuccessHandler))
-                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html",
+                                "/swagger-resources/**",
+                                "/webjars/**",
+                                "/error" // 추가: 내부 에러 발생 시 403으로 마스킹되는 현상 방지
+                        ).permitAll()
+                        // QR·업로드 정적 파일: <img src="/uploads/..."> 는 Authorization 헤더를 붙이지 않음
+                        .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/oauth2/**",       // 추가: 소셜 로그인 요청 진입점 허용
+                                "/login/oauth2/**"  // 추가: 소셜 로그인 인증 코드 반환점 허용
+                        ).permitAll()
+                        // 공유 링크로 비로그인 사용자도 대화 내용·방 제목을 읽을 수 있도록 허용
+                        .requestMatchers(HttpMethod.GET, "/api/chat/rooms/*/messages").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/chat/rooms/*/share-summary").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+                        .successHandler(oAuth2SuccessHandler)
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
                 return http.build();
         }

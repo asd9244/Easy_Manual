@@ -37,6 +37,7 @@ public class ManualService {
                 com.easymanual.springbackend.domain.manual.entity.Model newModel = 
                     com.easymanual.springbackend.domain.manual.entity.Model.builder()
                         .name(cleanName)
+                        .productType(productType)
                         .qrCodeUrl(generatedQrUrl)
                         .manual(newManual)
                         .build();

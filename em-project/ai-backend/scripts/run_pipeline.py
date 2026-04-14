@@ -56,7 +56,7 @@ def run_total_pipeline(pdf_filename, model_name):
 
 if __name__ == "__main__":
     # 🌟 앞으로 매뉴얼이 추가되면 여기 두 줄만 바꾸고 이 파일만 실행하면 끝!
-    TARGET_PDF = "REF_KOR_MFL71401523_00_250731_00_OM_WEB.pdf"
-    TARGET_MODEL = "REF_KOR_MFL71401523_00_250731_00_OM_WEB"
+    TARGET_PDF = "WM_KOR_MFL71792815_11_251204_00_OM_WEB.pdf"
+    TARGET_MODEL = "WM_KOR_MFL71792815_11_251204_00_OM_WEB"
 
     run_total_pipeline(TARGET_PDF, TARGET_MODEL)

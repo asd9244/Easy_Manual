@@ -3,7 +3,7 @@ import json
 import re
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Dict
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
@@ -31,6 +31,31 @@ class ChatRequest(BaseModel):
     media_url: Optional[str] = None  # 프론트엔드에서 전달받을 이미지 URL (선택 사항)
 
 
+def _merge_images_ordered_by_page(records: list) -> List[str]:
+    """
+    섹션별로 넘어온 (page_num, image_filename) 쌍을 합치고,
+    페이지 번호 오름차순 → 동일 페이지 내 파일명 순으로 정렬해 파일명 리스트만 반환.
+    """
+    # filename -> 대표 page_num (여러 섹션에 겹치면 더 작은 페이지 번호 유지)
+    filename_to_page: Dict[str, int] = {}
+
+    for record in records:
+        page_nums = record["page_nums"] or []
+        image_filenames = record["image_filenames"] or []
+        for pn, fn in zip(page_nums, image_filenames):
+            if not fn:
+                continue
+            try:
+                pni = int(pn) if pn is not None else 0
+            except (TypeError, ValueError):
+                pni = 0
+            if fn not in filename_to_page or pni < filename_to_page[fn]:
+                filename_to_page[fn] = pni
+
+    ordered = sorted(filename_to_page.items(), key=lambda kv: (kv[1], kv[0]))
+    return [fn for fn, _ in ordered]
+
+
 @router.post("/ask")
 def ask_manual(request: ChatRequest):
     user_question = request.question
@@ -48,12 +73,18 @@ def ask_manual(request: ChatRequest):
                 WHERE section.product_name = $manual_id
                 
                 MATCH (section)-[:COVERS_PAGE]->(page:Page)
+                WHERE page.image_filename IS NOT NULL AND trim(page.image_filename) <> ''
+                WITH section, score, page
+                ORDER BY page.page_num
+                WITH section, score,
+                     collect(page.page_num) AS page_nums,
+                     collect(page.image_filename) AS image_filenames
                 RETURN section.title AS section_title,
                        section.hierarchy AS hierarchy,
                        section.combined_text AS combined_text,
                        score,
-                       collect(DISTINCT page.page_num) AS page_nums,
-                       collect(DISTINCT page.image_filename) AS image_filenames
+                       page_nums,
+                       image_filenames
                 ORDER BY score DESC
                 LIMIT 3
             """, question_vector=question_vector, manual_id=target_manual)
@@ -72,7 +103,6 @@ def ask_manual(request: ChatRequest):
     # 🌟 2단계: 검색된 Section들의 텍스트, 목차, 연결된 이미지 통합
     toc_entries = []
     combined_texts = []
-    all_image_filenames = []
     all_page_nums = []
 
     for idx, record in enumerate(records):
@@ -80,22 +110,27 @@ def ask_manual(request: ChatRequest):
         hierarchy = record["hierarchy"]
         text = record["combined_text"]
         
-        # page_nums 빈 예외 처리 + 정렬
-        page_nums = sorted(record["page_nums"]) if record["page_nums"] else []
-        image_filenames = sorted(record["image_filenames"]) if record["image_filenames"] else []
+        # Neo4j에서 page.page_num 순으로 collect됨 → 참고 범위는 수집된 번호 기준
+        page_nums = list(record["page_nums"]) if record["page_nums"] else []
+        numeric_pages = []
+        for p in page_nums:
+            try:
+                numeric_pages.append(int(p))
+            except (TypeError, ValueError):
+                continue
         
-        if page_nums:
-            toc_entries.append(f"[{idx+1}] {hierarchy} (참고 페이지: {min(page_nums)}~{max(page_nums)}p)")
+        if numeric_pages:
+            toc_entries.append(f"[{idx+1}] {hierarchy} (참고 페이지: {min(numeric_pages)}~{max(numeric_pages)}p)")
         else:
             toc_entries.append(f"[{idx+1}] {hierarchy}")
             
         combined_texts.append(f"--- [섹션 {idx+1}: {title}] ---\n{text}")
         
-        all_page_nums.extend(page_nums)
-        for img in image_filenames:
-            if img not in all_image_filenames:
-                all_image_filenames.append(img)
-                
+        all_page_nums.extend(numeric_pages)
+
+    # 응답용 이미지 파일명: 전체 섹션 합친 뒤 페이지 번호 오름차순
+    all_image_filenames = _merge_images_ordered_by_page(records)
+
     # 순서 유지를 보장하면서 페이지 번호 중복제거, 가장 작은 페이지를 대표 found_page로 설정
     unique_page_nums = sorted(list(set(all_page_nums)))
     start_page = unique_page_nums[0] if unique_page_nums else None
