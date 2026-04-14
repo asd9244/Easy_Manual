@@ -56,6 +56,16 @@ export const Garage: React.FC<GarageProps> = ({
     }
   }, [scannedModel, isSearching]);
 
+  // 대시보드(Home)에서 '모델명 직접 입력' 버튼을 눌렀을 때의 초기 세팅
+  useEffect(() => {
+    const initialMode = localStorage.getItem('garageInitialMode');
+    if (initialMode === 'search') {
+      setIsSearching(true);
+      setShowGarageOptions(false);
+      localStorage.removeItem('garageInitialMode'); // 1회성 사용 후 삭제
+    }
+  }, []);
+
   // 검색 API 연동
   const handleSearch = async (query: string) => {
     setSearchQuery(query);

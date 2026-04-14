@@ -1,5 +1,5 @@
-import React from "react";
-import {motion} from "motion/react";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Search,
   Send,
@@ -9,6 +9,9 @@ import {
   Play,
   Wind,
   Tv,
+  Type,
+  Camera,
+  QrCode,
 } from "lucide-react";
 
 //쪼개놓은 파일들에서 불러오기
@@ -28,7 +31,6 @@ interface HomeProps {
   onOpenChat?: (deviceId: number) => void;
 }
 
-// 2. renderHome 대신 'Home'이라는 이름의 컴포넌트로 만들기.
 export const Home: React.FC<HomeProps> = ({
   setScreen,
   devices,
@@ -36,6 +38,7 @@ export const Home: React.FC<HomeProps> = ({
   onGuideClick,
   onOpenChat,
 }) => {
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   return (
     <div className="max-w-3xl mx-auto space-y-10 text-left px-4 md:px-8">
       {/* 1. 상단 헤더 & 프로필 */}
@@ -100,11 +103,64 @@ export const Home: React.FC<HomeProps> = ({
           )}
 
           <button
-            onClick={() => setScreen("scan")}
-            className="w-full py-4 mt-2 border-2 border-dashed border-white/30 rounded-3xl flex items-center justify-center gap-2 text-slate-400 font-bold hover:bg-white/20 hover:border-theme-primary hover:text-theme-primary transition-all duration-300 backdrop-blur-sm"
+            onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+            className={`w-full py-4 mt-2 border-2 border-dashed rounded-3xl flex items-center justify-center gap-2 font-bold transition-all duration-300 backdrop-blur-sm ${
+              isAddMenuOpen 
+                ? 'border-theme-primary text-theme-primary bg-white/20' 
+                : 'border-white/30 text-slate-400 hover:bg-white/20 hover:border-theme-primary hover:text-theme-primary'
+            }`}
           >
-            <Plus size={20} />새 기기 추가
+            <Plus size={20} className={`transition-transform duration-300 ${isAddMenuOpen ? 'rotate-45' : ''}`} />새 기기 추가
           </button>
+          
+          {/* 새 기기 추가 확장 메뉴 */}
+          <AnimatePresence>
+            {isAddMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginTop: 8 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-2 sm:p-3 border border-white/20 shadow-sm flex flex-col sm:flex-row gap-1 sm:gap-3">
+                  {[
+                    { icon: Type, label: "직접 입력", action: 'search' },
+                    { icon: Camera, label: "라벨 스캔", action: 'ocr' },
+                    { icon: QrCode, label: "QR 코드 스캔", action: 'qr' }
+                  ].map((opt, i) => (
+                    <motion.button 
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      onClick={() => {
+                          if (opt.action === 'qr') {
+                            localStorage.setItem('scanInitialMode', 'qr');
+                            setScreen('scan');
+                          } else if (opt.action === 'ocr') {
+                            localStorage.setItem('scanInitialMode', 'ocr');
+                            setScreen('scan');
+                          } else if (opt.action === 'search') {
+                            localStorage.setItem('garageInitialMode', 'search');
+                            setScreen("garage");
+                          }
+                          setIsAddMenuOpen(false);
+                      }}
+                      className="w-full sm:flex-1 px-4 py-3 sm:py-5 flex sm:flex-col items-center justify-between sm:justify-center hover:bg-white/30 rounded-xl transition-all text-left hover:shadow-sm group relative overflow-hidden sm:gap-3"
+                    >
+                      <div className="flex sm:flex-col items-center gap-3">
+                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center bg-theme-primary/10 text-theme-primary shadow-sm transition-transform group-hover:scale-110`}>
+                          <opt.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </div>
+                        <span className="font-bold text-slate-700 text-sm sm:text-center whitespace-nowrap">{opt.label}</span>
+                      </div>
+                      <ChevronRight size={16} className="text-slate-400 sm:hidden group-hover:text-theme-primary transition-colors" />
+                    </motion.button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </section>
 
