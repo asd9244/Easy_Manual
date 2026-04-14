@@ -13,6 +13,7 @@ public class ChatRoomResponse {
     private String title; // 채팅방 요약 제목 (예: "에어컨 필터 청소 문의")
     private Long userDeviceId; // [추가] 연결된 기기 ID (대화 이어하기 및 필터링용)
     private String deviceName; // 기기 이름 (예: 세탁기, 냉장고)
+    private String deviceAlias; // 별명 (예: 거실 에어컨)
     private String modelName; // 모델명 (예: WD-1004)
     private LocalDateTime createdAt; // 질문을 처음 등록한 날짜와 시간
 
@@ -26,11 +27,13 @@ public class ChatRoomResponse {
         if (chatRoom.getUserDevice() != null) {
             this.userDeviceId = chatRoom.getUserDevice().getId();
             this.deviceName = chatRoom.getUserDevice().getDeviceName();
+            this.deviceAlias = chatRoom.getUserDevice().getAlias();
             this.modelName = chatRoom.getUserDevice().getModelName();
         } else {
             // 혹시라도 기기 정보가 없는 경우를 대비한 기본값
             this.userDeviceId = null;
             this.deviceName = "알 수 없는 기기";
+            this.deviceAlias = "알 수 없는 기기";
             this.modelName = "-";
         }
     }

@@ -80,6 +80,19 @@ export const deviceService = {
   },
 
   /**
+   * 기기 별명 수정
+   * PATCH /api/devices/{deviceId}/alias
+   */
+  updateDeviceAlias: async (deviceId: string, alias: string) => {
+    try {
+      await api.patch(`/devices/${deviceId}/alias`, { alias });
+    } catch (error) {
+      console.error("기기 별명 수정 API 오류:", error);
+      throw error;
+    }
+  },
+
+  /**
    * 모델명 검색
    * GET /api/devices/search?query=...
    */

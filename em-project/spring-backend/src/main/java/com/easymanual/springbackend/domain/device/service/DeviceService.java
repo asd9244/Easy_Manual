@@ -110,4 +110,20 @@ public class DeviceService {
         // 3. 물리적 삭제가 아닌 상태값만 DELETED로 변경 (Soft Delete)
         userDevice.deleteDevice();
     }
+
+    // 새로 추가된 기능: 기기 별명 수정
+    @Transactional
+    public void updateDeviceAlias(Long deviceId, String email, String newAlias) {
+        // 1. 디바이스 ID로 기기 조회
+        UserDevice userDevice = userDeviceRepository.findById(deviceId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 기기를 찾을 수 없습니다."));
+
+        // 2. 본인의 기기인지 확인
+        if (!userDevice.getUser().getEmail().equals(email)) {
+            throw new IllegalArgumentException("해당 기기의 이름을 수정할 권한이 없습니다.");
+        }
+
+        // 3. 엔티티 상태 변경 (별명 업데이트)
+        userDevice.updateAlias(newAlias);
+    }
 }

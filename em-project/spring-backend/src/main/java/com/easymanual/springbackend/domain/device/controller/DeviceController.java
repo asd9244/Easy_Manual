@@ -2,6 +2,7 @@ package com.easymanual.springbackend.domain.device.controller;
 
 import com.easymanual.springbackend.domain.device.dto.DeviceRegisterRequest;
 import com.easymanual.springbackend.domain.device.dto.DeviceResponse;
+import com.easymanual.springbackend.domain.device.dto.DeviceAliasUpdateRequest;
 import com.easymanual.springbackend.domain.device.service.DeviceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -79,5 +80,20 @@ public class DeviceController {
 
         // 2. 삭제 성공 시 상태 코드 204(No Content)를 전송합니다. 
         return ResponseEntity.noContent().build();
+    }
+
+    // 새로 추가된 기능: 등록된 기기 별명 수정 API
+    // PATCH 방식으로 "/api/devices/{deviceId}/alias" 주소로 요청이 오면 실행됩니다.
+    @PatchMapping("/{deviceId}/alias")
+    public ResponseEntity<Void> updateDeviceAlias(
+            Principal principal,
+            @PathVariable("deviceId") Long deviceId,
+            @RequestBody DeviceAliasUpdateRequest request) {
+
+        // 1. 인증 객체에서 이메일을 추출하고, 서비스 계층에 수정을 위임합니다.
+        deviceService.updateDeviceAlias(deviceId, principal.getName(), request.getAlias());
+
+        // 2. 성공 시 기본 상태 코드(200 OK) 리턴 
+        return ResponseEntity.ok().build();
     }
 }

@@ -42,16 +42,16 @@ export const DeviceStatusCard = ({
     <GlassCard className="active:scale-[0.98] group cursor-pointer">
       {/* 1. 카드 헤더 (아이콘, 이름, 상태 뱃지) */}
       <div
-        className="flex justify-between items-start mb-6"
+        className="flex justify-between items-center mb-3"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-white/30 backdrop-blur-md rounded-2xl flex items-center justify-center text-slate-500">
-            <Icon size={24} />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-white/30 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-500">
+            <Icon size={20} />
           </div>
           <div>
-            <h4 className="font-bold text-slate-800 text-lg">{title}</h4>
-            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+            <h4 className="font-bold text-slate-800 text-[15px]">{title}</h4>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
               {model}
             </p>
           </div>
@@ -66,10 +66,10 @@ export const DeviceStatusCard = ({
                 e.stopPropagation();
                 onSettingsClick();
               }}
-              className="w-10 h-10 bg-slate-100/80 text-slate-500 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-700 transition-all shadow-sm"
+              className="w-9 h-9 bg-slate-100/80 text-slate-500 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-700 transition-all shadow-sm"
               aria-label="기기 설정"
             >
-              <Settings size={20} />
+              <Settings size={18} />
             </button>
           )}
           {/* 채팅 버튼 추가 */}
@@ -79,12 +79,12 @@ export const DeviceStatusCard = ({
               e.stopPropagation(); // 카드 확장 방지
               onChatClick && onChatClick();
             }}
-            className="w-10 h-10 bg-theme-primary/10 text-theme-primary rounded-xl flex items-center justify-center hover:bg-theme-primary hover:text-white transition-all shadow-sm group/btn"
+            className="w-9 h-9 bg-theme-primary/10 text-theme-primary rounded-xl flex items-center justify-center hover:bg-theme-primary hover:text-white transition-all shadow-sm group/btn"
           >
             <motion.div whileHover={{scale: 1.1}} whileTap={{scale: 0.9}}>
               <svg
-                width="20"
-                height="20"
+                width="18"
+                height="18"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -121,12 +121,12 @@ export const DeviceStatusCard = ({
         {isExpanded && (
           <motion.div
             initial={{height: 0, opacity: 0, marginTop: 0}}
-            animate={{height: "auto", opacity: 1, marginTop: 24}}
+            animate={{height: "auto", opacity: 1, marginTop: 16}}
             exit={{height: 0, opacity: 0, marginTop: 0}}
             className="overflow-hidden"
           >
             {/* 2. 핵심 정보 요약 */}
-            <div className="grid grid-cols-3 gap-4 mb-6 text-left">
+            <div className="grid grid-cols-3 gap-3 mb-4 text-left">
               <div>
                 <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
                   <span className="text-slate-300">🕒</span> 마지막 점검

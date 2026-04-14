@@ -242,18 +242,23 @@ export const Garage: React.FC<GarageProps> = ({
               {/* 2. 액션 버튼들 (저장, 취소, 삭제) */}
               <div className="flex flex-col gap-2">
                 <button 
-                  onClick={() => {
-                    // [변경 사항 저장] 기기 목록 업데이트
-                    const updatedDevices = devices.map(d => 
-                      d.id === editingDevice?.id ? { ...d, name: newNickname } : d
-                    );
-                    setDevices(updatedDevices);
-                    
-                    // 로컬스토리지에 임시 저장 (백엔드 수정 불가 제약사항 대응)
-                    localStorage.setItem('local_devices', JSON.stringify(updatedDevices));
-                    
-                    setEditingDevice(null);
-                    alert('기기 정보가 업데이트되었습니다.');
+                  onClick={async () => {
+                    if (!editingDevice) return;
+                    try {
+                      // [변경 사항 저장] 백엔드 API 호츨
+                      await deviceService.updateDeviceAlias(String(editingDevice.id), newNickname);
+
+                      // 기기 목록 업데이트 (UI 즉시 반영)
+                      const updatedDevices = devices.map(d => 
+                        d.id === editingDevice.id ? { ...d, name: newNickname } : d
+                      );
+                      setDevices(updatedDevices);
+                      
+                      setEditingDevice(null);
+                      alert('기기 별명이 서버에 정상적으로 업데이트되었습니다.');
+                    } catch (error) {
+                      alert('기기 정보 변경 중 오류가 발생했습니다.');
+                    }
                   }} 
                   className="w-full py-3 bg-wing-gradient text-white rounded-xl font-bold shadow-md hover:scale-[0.98] transition-transform"
                 >

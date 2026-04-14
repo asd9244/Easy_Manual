@@ -13,25 +13,7 @@ import { Search, Edit2 } from 'lucide-react';
 import { SocialShareModal } from '../../components/common/SocialShareModal';
 import { Screen } from '@/src/types/index';
 
-/** 나의 가전(기기 관리)에서 저장한 기기 별명 — local_devices와 userDeviceId로 매칭 */
-function resolveDeviceAlias(
-  userDeviceId: number | null | undefined,
-  serverDeviceName: string,
-): string {
-  if (userDeviceId == null) return serverDeviceName;
-  try {
-    const raw = localStorage.getItem('local_devices');
-    if (!raw) return serverDeviceName;
-    const localDevices = JSON.parse(raw) as { id: string | number; name?: string }[];
-    const local = localDevices.find((ld) => String(ld.id) === String(userDeviceId));
-    if (local?.name && String(local.name).trim() !== '') {
-      return String(local.name).trim();
-    }
-  } catch {
-    /* ignore */
-  }
-  return serverDeviceName;
-}
+// 로컬 스토리지에 기기 별명을 저장하던 로직을 백엔드로 이관하여 삭제하였습니다.
 
 // 1. 필요한 프롭스 타입 정의
 interface HistoryProps {
@@ -64,7 +46,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
             title: room.title || '알 수 없는 대화',
             date: new Date(room.createdAt).toLocaleDateString(),
             status: 'completed',
-            device: resolveDeviceAlias(room.userDeviceId, serverName),
+            device: room.deviceAlias || room.deviceName || '알 수 없는 기기',
             model: room.modelName || '-',
             userDeviceId: room.userDeviceId,
           };
@@ -154,19 +136,12 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
           {historyItems.length > 0 && (
             <button 
               onClick={handleDeleteAll}
-              className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-slate-300 hover:text-red-400 transition-all border border-slate-50 group"
+              className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center text-slate-300 hover:text-red-400 transition-all border border-slate-50 group"
               title="전체 삭제"
             >
-              <Trash2 size={20} className="group-hover:scale-110 transition-transform" />
+              <Trash2 size={18} className="group-hover:scale-110 transition-transform" />
             </button>
           )}
-          {/* 상단 공통 공유 버튼 */}
-          <button 
-            className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-slate-300 hover:text-theme-primary transition-all border border-slate-50"
-            title="공유하기"
-          >
-            <Share2 size={20} />
-          </button>
         </div>
       </header>
 

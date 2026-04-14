@@ -94,7 +94,6 @@ export const Settings: React.FC<SettingsProps> = ({ setScreen }) => {
       <div className="space-y-3">
         <h3 className="text-xs font-bold text-slate-400 px-4">계정</h3>
         <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100">
-          <SettingsItem icon={User} title="프로필" subtitle="이름, 이메일, 사진" onClick={() => setScreen('profile')} />
           <SettingsItem icon={Bell} title="알림" subtitle="푸시 및 이메일 알림" onClick={() => setScreen('settings-notifications')} />
         </div>
       </div>

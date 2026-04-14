@@ -52,6 +52,11 @@ public class UserDevice extends BaseTimeEntity {
         this.status = DeviceStatus.DELETED;
     }
 
+    // 사용자가 기기 별명을 변경할 때 사용하는 메서드
+    public void updateAlias(String newAlias) {
+        this.alias = newAlias;
+    }
+
     public enum DeviceStatus {
         ACTIVE, DELETED
     }
