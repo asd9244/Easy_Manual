@@ -1,5 +1,13 @@
 import axios from "axios";
 
+/** 공유 링크(?share= 또는 /share/…)로 열린 화면에서는 인증 실패 시 스플래시로 튕기지 않음 */
+function isShareViewContext(): boolean {
+  if (typeof window === "undefined") return false;
+  const path = window.location.pathname;
+  const q = new URLSearchParams(window.location.search);
+  return path.startsWith("/share/") || q.has("share");
+}
+
 /**
  * 전역 API 서비스 (axios 인스턴스)
  * 모든 요청에 자동으로 JWT 토큰을 주입하고, 401/403 에러를 처리합니다.
@@ -42,6 +50,10 @@ api.interceptors.response.use(
       (error.response?.status === 403 || error.response?.status === 401) &&
       !originalRequest._retry
     ) {
+      if (isShareViewContext()) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       // [주의] 현재 백엔드에 리프레시 토큰 로직이 없거나 불확실하므로,

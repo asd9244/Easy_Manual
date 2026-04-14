@@ -8,6 +8,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -66,6 +67,9 @@ public class SecurityConfig {
                                 "/oauth2/**",       // 추가: 소셜 로그인 요청 진입점 허용
                                 "/login/oauth2/**"  // 추가: 소셜 로그인 인증 코드 반환점 허용
                         ).permitAll()
+                        // 공유 링크로 비로그인 사용자도 대화 내용·방 제목을 읽을 수 있도록 허용
+                        .requestMatchers(HttpMethod.GET, "/api/chat/rooms/*/messages").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/chat/rooms/*/share-summary").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2

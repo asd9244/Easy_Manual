@@ -22,12 +22,16 @@ public class ChatController {
         return ResponseEntity.ok(chatService.getMyChatRooms(principal.getName()));
     }
 
-    // 특정 채팅방 메시지 내역 조회
+    // 특정 채팅방 메시지 내역 조회 (공유 링크용 비로그인 읽기 허용 — SecurityConfig 참고)
     @GetMapping("/rooms/{roomId}/messages")
-    public ResponseEntity<List<ChatMessageResponse>> getChatMessages(
-            @PathVariable Long roomId,
-            Principal principal) {
-        return ResponseEntity.ok(chatService.getChatMessages(roomId, principal.getName()));
+    public ResponseEntity<List<ChatMessageResponse>> getChatMessages(@PathVariable Long roomId) {
+        return ResponseEntity.ok(chatService.getChatMessages(roomId));
+    }
+
+    // 공유 화면용 방 제목·기기 정보 (비로그인)
+    @GetMapping("/rooms/{roomId}/share-summary")
+    public ResponseEntity<ChatRoomResponse> getChatRoomShareSummary(@PathVariable Long roomId) {
+        return ResponseEntity.ok(chatService.getChatRoomShareSummary(roomId));
     }
 
     // 질문하기 및 AI 답변 받기

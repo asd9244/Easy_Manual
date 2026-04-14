@@ -37,19 +37,30 @@ public class ChatService {
                 .toList();
     }
 
+    /**
+     * 채팅 메시지 목록 조회.
+     * 공유 링크로 외부에 노출되므로, 방 ID만 알면 읽기 가능(링크 유출 시 대화 내용 노출 가능).
+     * 쓰기(질문/삭제 등)는 별도로 인증·소유권 검사를 유지합니다.
+     */
     @Transactional(readOnly = true)
-    public List<ChatMessageResponse> getChatMessages(Long roomId, String email) {
-        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+    public List<ChatMessageResponse> getChatMessages(Long roomId) {
+        chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
-
-        if (!chatRoom.getUserDevice().getUser().getEmail().equals(email)) {
-            throw new IllegalArgumentException("해당 채팅방에 접근할 권한이 없습니다.");
-        }
 
         List<ChatMessage> messages = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
         return messages.stream()
                 .map(message -> new ChatMessageResponse(message))
                 .toList();
+    }
+
+    /**
+     * 공유 화면용: 비로그인 사용자도 방 제목·기기명을 표시하기 위한 메타데이터
+     */
+    @Transactional(readOnly = true)
+    public ChatRoomResponse getChatRoomShareSummary(Long roomId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
+        return new ChatRoomResponse(chatRoom);
     }
 
     @Transactional

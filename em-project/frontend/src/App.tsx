@@ -240,7 +240,7 @@ const SidebarItem = ({ id, icon: Icon, label }: any) => {
 };
 
 // --- 채팅 로직 ---
-const showNav = !['splash', 'tutorial', 'auth'].includes(screen);
+const showNav = !['splash', 'tutorial', 'auth', 'share'].includes(screen);
 const handleSendMessage = (text: string) => { /* 로직 */ };
 const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직 */ };
 
@@ -257,6 +257,16 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
               setScreen('home');
             }} 
           />
+        ) : screen === 'share' ? (
+          <motion.div
+            key="share-only"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="min-h-dvh w-full"
+          >
+            <ShareView setScreen={setScreen} roomId={selectedRoomId} />
+          </motion.div>
         ) : !showNav ? (
           <motion.div 
             key="auth-flow"
@@ -363,7 +373,6 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                 {screen === 'theme-select' && (<ThemeSelect key="theme-select"setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />)}
                 {screen === 'profile' && (<Profile key="profile" setScreen={setScreen} />)}  
                 {screen === 'report' && (<DiagnosticReport key="report" setScreen={setScreen} />)}
-                {screen === 'share' && (<ShareView key="share" setScreen={setScreen} roomId={selectedRoomId} />)}
                 {screen === 'settings-notifications' && <SettingsSubpage key="s-notif" title="알림 설정" setScreen={setScreen} />}
                 {screen === 'settings-language' && <SettingsSubpage key="s-lang" title="언어 설정" setScreen={setScreen} />}
                 {screen === 'settings-privacy' && <SettingsSubpage key="s-priv" title="개인정보 처리방침" setScreen={setScreen} />}

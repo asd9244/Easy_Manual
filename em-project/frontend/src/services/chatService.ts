@@ -38,6 +38,17 @@ export const chatService = {
   },
 
   /**
+   * 공유 화면용: 비로그인으로 방 제목·기기명 조회
+   */
+  getShareRoomSummary: async (roomId: number) => {
+    const response = await api.get(`/chat/rooms/${roomId}/share-summary`);
+    return response.data as {
+      title?: string;
+      deviceName?: string;
+    };
+  },
+
+  /**
    * 대화 내역 조회
    */
   getMessages: async (roomId: number): Promise<Message[]> => {
