@@ -29,6 +29,14 @@ public class Manual extends BaseTimeEntity {
     @Column(nullable = false, length = 50)
     private String productType;
 
+    // [추가] 레거시 호환을 위한 전체 포함 모델명 목록
+    @Column(columnDefinition = "TEXT")
+    private String coveredModelNames;
+
+    // [추가] 매뉴얼 자체의 대표 QR 코드 (필요 시)
+    @Column(length = 1000)
+    private String qrCodeUrl;
+
     // 유저에게 보여줄 직관적인 대표 이름 (예: "휘센 벽걸이 에어컨 (SQ06EJ1WES 외)")을 저장하는 컬럼입니다.
     @Column(length = 100)
     private String representativeModelName;
@@ -37,10 +45,12 @@ public class Manual extends BaseTimeEntity {
     private List<Model> models = new ArrayList<>();
 
     @Builder
-    public Manual(String manualCode, String productType, String representativeModelName) {
+    public Manual(String manualCode, String productType, String representativeModelName, String coveredModelNames, String qrCodeUrl) {
         this.manualCode = manualCode;
         this.productType = productType;
         this.representativeModelName = representativeModelName;
+        this.coveredModelNames = coveredModelNames;
+        this.qrCodeUrl = qrCodeUrl;
     }
 
     public void addModel(Model model) {

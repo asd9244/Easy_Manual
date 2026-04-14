@@ -37,7 +37,7 @@ public class DataMigrationRunner implements CommandLineRunner {
 
         // 2. 엔티티에서는 삭제되었지만 물리적 DB에는 남아있는 레거시 컬럼 조회
         String legacyQuery = "SELECT id, covered_model_names FROM manuals";
-        
+
         try {
             List<Map<String, Object>> records = jdbcTemplate.queryForList(legacyQuery);
 
@@ -51,13 +51,15 @@ public class DataMigrationRunner implements CommandLineRunner {
 
                 // 매뉴얼 레퍼런스 조회
                 Manual manual = manualRepository.findById(manualId).orElse(null);
-                if (manual == null) continue;
+                if (manual == null)
+                    continue;
 
                 // 3. 콤마로 등록된 10개의 모델명을 분리하여 개별 모델 레코드 생성
                 String[] modelNames = coveredModelNames.split(",");
                 for (String mName : modelNames) {
                     String cleanName = mName.trim();
-                    if (cleanName.isBlank()) continue;
+                    if (cleanName.isBlank())
+                        continue;
 
                     // 4. 개별 모델마다 각각의 고유한 QR 코드를 발급받아 로컬 폴더에 저장
                     String qrUrl = qrCodeUtil.generateAndSaveQrCode(cleanName);
