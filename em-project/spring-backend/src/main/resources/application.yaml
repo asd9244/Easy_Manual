@@ -60,6 +60,10 @@ jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION}
 
+ai:
+  backend:
+    url: ${AI_BACKEND_URL:http://localhost:8088}
+
 logging:
   level:
     org.springframework.security: DEBUG

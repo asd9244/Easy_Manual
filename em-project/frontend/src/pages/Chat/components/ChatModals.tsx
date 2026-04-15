@@ -1,8 +1,9 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ArrowLeft, Mic, MessageCircle, Sparkle, ClipboardCheck, Share2 } from 'lucide-react';
+import { X, ArrowLeft, Mic, MessageCircle, Sparkle, ClipboardCheck, Share2, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { CategoryItem } from '../constants';
 
 // ── VideoModal ──
 interface VideoModalProps {
@@ -247,6 +248,82 @@ export const ResumeSheet: React.FC<ResumeSheetProps> = ({ rooms, onStartNew, onR
     </AnimatePresence>
   );
 };
+
+// ── CategorySelectSheet ──
+interface CategorySelectSheetProps {
+  isOpen: boolean;
+  deviceName: string | null;
+  categories: CategoryItem[];
+  onSelect: (category: CategoryItem) => void;
+}
+
+export const CategorySelectSheet: React.FC<CategorySelectSheetProps> = ({
+  isOpen,
+  deviceName,
+  categories,
+  onSelect,
+}) => (
+  <AnimatePresence>
+    {isOpen && (
+      <div className="fixed inset-0 z-[250] bg-black/40 backdrop-blur-sm flex items-end">
+        <motion.div
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="w-full bg-white rounded-t-[40px] p-6 pt-5 md:max-w-3xl md:mx-auto md:rounded-3xl md:mb-10 shadow-2xl max-h-[80vh] flex flex-col"
+        >
+          {/* 헤더 */}
+          <div className="shrink-0 mb-5">
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5" />
+            <h3 className="text-lg font-bold text-slate-800 leading-tight">
+              어떤 도움이 필요하신가요?
+            </h3>
+            <p className="text-sm text-slate-500 font-medium mt-1">
+              {deviceName
+                ? `${deviceName} 관련 주제를 선택하면 더 정확한 답변을 받을 수 있어요.`
+                : '주제를 선택하면 더 정확한 답변을 받을 수 있어요.'}
+            </p>
+          </div>
+
+          {/* 카테고리 그리드 */}
+          <div className="flex-1 overflow-y-auto no-scrollbar">
+            <div className="grid grid-cols-2 gap-2.5">
+              {categories.filter(c => c.value !== 'ETC').map((cat, idx) => (
+                <motion.button
+                  key={cat.value}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.04 }}
+                  onClick={() => onSelect(cat)}
+                  className="flex items-center justify-between gap-2 p-4 bg-slate-50 hover:bg-theme-primary/5 border border-slate-100 hover:border-theme-primary/30 rounded-2xl transition-all active:scale-[0.97] group text-left"
+                >
+                  <span className="text-sm font-semibold text-slate-700 group-hover:text-theme-primary transition-colors leading-snug">
+                    {cat.label}
+                  </span>
+                  <ChevronRight
+                    size={14}
+                    className="shrink-0 text-slate-300 group-hover:text-theme-primary transition-colors"
+                  />
+                </motion.button>
+              ))}
+            </div>
+          </div>
+
+          {/* 기타 버튼 */}
+          {categories.find(c => c.value === 'ETC') && (
+            <button
+              onClick={() => onSelect({ value: 'ETC', label: '기타' })}
+              className="w-full mt-4 py-3.5 bg-slate-100 text-slate-500 font-semibold rounded-2xl hover:bg-slate-200 transition-all active:scale-[0.98] shrink-0 text-sm"
+            >
+              해당하는 항목이 없어요 (기타)
+            </button>
+          )}
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
+);
 
 // ── SummaryModal ──
 interface SummaryModalProps {

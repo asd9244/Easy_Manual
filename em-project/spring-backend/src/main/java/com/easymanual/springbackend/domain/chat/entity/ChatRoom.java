@@ -21,23 +21,26 @@ public class ChatRoom extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 어떤 기기에 대한 질문 방인가?
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_device_id", nullable = false)
     private UserDevice userDevice;
 
-    // 🌟 프론트엔드 요구사항: 질문 내용 요약 타이틀 (예: "에어컨 필터 청소 방법")
     @Column(nullable = false, length = 200)
     private String title;
 
-    // 🌟 추가: 채팅방 삭제 시 소속된 메시지들도 함께 삭제되도록 연쇄 삭제(Cascade) 설정
+    // 채팅 시작 전 사용자가 선택한 질문 유형 (TOP 5 집계에 사용)
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private QuestionCategory questionCategory;
+
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ChatMessage> messages = new ArrayList<>();
 
     @Builder
-    public ChatRoom(UserDevice userDevice, String title) {
+    public ChatRoom(UserDevice userDevice, String title, QuestionCategory questionCategory) {
         this.userDevice = userDevice;
         this.title = title;
+        this.questionCategory = questionCategory;
     }
 
     // 채팅방 제목 변경 스위치

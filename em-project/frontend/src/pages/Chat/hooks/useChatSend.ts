@@ -22,6 +22,7 @@ interface UseChatSendParams {
   markRoomOwned: (id: number) => void;
   startLoading: () => void;
   stopLoading: () => void;
+  questionCategory?: string | null;
 }
 
 export function useChatSend({
@@ -43,6 +44,7 @@ export function useChatSend({
   markRoomOwned,
   startLoading,
   stopLoading,
+  questionCategory,
 }: UseChatSendParams) {
 
   const handleChatError = (error: any) => {
@@ -119,7 +121,7 @@ export function useChatSend({
 
         try {
           setIsGuestMode(true);
-          const guestRoom = await chatService.createChatRoom(0);
+          const guestRoom = await chatService.createChatRoom(0, questionCategory);
           const guestRoomId = guestRoom.roomId;
           markRoomOwned(guestRoomId);
           setActiveRoomId(guestRoomId);
@@ -138,7 +140,7 @@ export function useChatSend({
       }
 
       const devId = activeDeviceId ? String(activeDeviceId) : devices[0].id;
-      const newRoom = await chatService.createChatRoom(devId);
+      const newRoom = await chatService.createChatRoom(devId, questionCategory);
       const newRoomId = newRoom.roomId;
       markRoomOwned(newRoomId);
       setActiveRoomId(newRoomId);
@@ -185,7 +187,7 @@ export function useChatSend({
           setActiveRoomId(-1);
           await performAsk(-1, userText, userAttachments[0]);
         } else {
-          const newRoom = await chatService.createChatRoom(activeDeviceId);
+          const newRoom = await chatService.createChatRoom(activeDeviceId, questionCategory);
           if (newRoom?.roomId) {
             const newId = newRoom.roomId;
             markRoomOwned(newId);

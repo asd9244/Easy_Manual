@@ -4,8 +4,8 @@ import com.easymanual.springbackend.domain.chat.entity.ChatMessage;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Arrays;
+import java.util.List;
 
 // 클라이언트에게 반환할 개별 말풍선의 정보(메시지 내용, 보낸 사람, 미디어 URL, 참고 페이지, 보낸 시간)를 담는 데이터 전송 객체입니다.
 
@@ -30,9 +30,11 @@ public class ChatMessageResponse {
         this.mediaUrl = chatMessage.getMediaUrl();
         this.referencedPage = chatMessage.getReferencedPage();
         
-        // 콤마로 저장된 DB 문자열을 리스트형태로 분리해서 프론트로 응답합니다.
+        // 콤마로 저장된 DB 문자열을 리스트로 분리 후, 기존 절대 URL을 상대 경로로 정규화합니다.
         if (chatMessage.getManualImageUrl() != null && !chatMessage.getManualImageUrl().isEmpty()) {
-            this.manualImageUrls = Arrays.asList(chatMessage.getManualImageUrl().split(","));
+            this.manualImageUrls = Arrays.stream(chatMessage.getManualImageUrl().split(","))
+                    .map(url -> url.replaceAll("https?://[^/]+(/.+)", "$1"))
+                    .toList();
         } else {
             this.manualImageUrls = java.util.Collections.emptyList();
         }

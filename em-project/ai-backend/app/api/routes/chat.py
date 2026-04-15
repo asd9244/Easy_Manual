@@ -166,9 +166,9 @@ def ask_manual(request: ChatRequest):
 
     print(f"\n💡 [AI 생성 답변]\n{ai_answer}\n")
 
-    # 🌟 프론트 반환용 (AI는 이미지가 없어도, 사용자는 화면상으로 볼 수 있게 URL 전달)
+    # 프론트 반환용 이미지 경로 (상대 경로 사용 → Vite 프록시 또는 리버스 프록시를 통해 서빙)
     manual_image_urls = [
-        f"http://localhost:8000/manual_images/{target_manual}/{img_filename}"
+        f"/manual_images/{target_manual}/{img_filename}"
         for img_filename in all_image_filenames
     ]
 

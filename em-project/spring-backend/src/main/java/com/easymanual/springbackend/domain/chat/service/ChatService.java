@@ -132,6 +132,7 @@ public class ChatService {
         ChatRoom newChatRoom = ChatRoom.builder()
                 .userDevice(userDevice)
                 .title("새로운 대화")
+                .questionCategory(request.getQuestionCategory())
                 .build();
 
         ChatRoom savedChatRoom = chatRoomRepository.save(newChatRoom);

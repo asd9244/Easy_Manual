@@ -22,10 +22,11 @@ export const chatService = {
   /**
    * 채팅방 생성
    */
-  createChatRoom: async (userDeviceId: string | number) => {
+  createChatRoom: async (userDeviceId: string | number, questionCategory?: string | null) => {
     try {
-      const response = await api.post('/chat/rooms', { 
-        userDeviceId: Number(userDeviceId)
+      const response = await api.post('/chat/rooms', {
+        userDeviceId: Number(userDeviceId),
+        ...(questionCategory ? { questionCategory } : {}),
       });
       const data = response.data;
       return {

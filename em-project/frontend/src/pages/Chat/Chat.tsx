@@ -16,6 +16,7 @@ import {
   ResumeSheet,
   SummaryModal,
 } from './components';
+import { getCategoriesForDevice, CategoryItem } from './constants';
 
 interface ChatProps {
   setScreen: (screen: Screen) => void;
@@ -72,6 +73,22 @@ export const Chat: React.FC<ChatProps> = ({
 
   const [inputText, setInputText] = useState('');
 
+  // ── 카테고리 선택 상태 ──
+  const [selectedCategory, setSelectedCategory] = useState<CategoryItem | null>(null);
+
+  // 현재 기기의 제품명 (카테고리 목록 결정에 사용)
+  const currentDeviceName =
+    devices?.find(d => Number(d.id) === deviceId)?.name
+    ?? room.selectedMentionDevice
+    ?? null;
+
+  // 카테고리 칩 노출 조건: 읽기전용 아님 + 아직 방이 없음(새 대화) + 기기 있음
+  const showCategoryChips =
+    !isReadOnly &&
+    !room.activeRoomId &&
+    (deviceId !== null || room.activeDeviceId !== null) &&
+    messages.every(m => m.type === 'status');
+
   const { sendMessage, startNewChat } = useChatSend({
     activeRoomId: room.activeRoomId,
     setActiveRoomId: room.setActiveRoomId,
@@ -91,6 +108,7 @@ export const Chat: React.FC<ChatProps> = ({
     markRoomOwned: room.markRoomOwned,
     startLoading: room.startLoading,
     stopLoading: room.stopLoading,
+    questionCategory: selectedCategory?.value ?? null,
   });
 
   const speech = useSpeechRecognition(setInputText);
@@ -231,6 +249,44 @@ export const Chat: React.FC<ChatProps> = ({
           />
         ))}
 
+        {/* 새 대화 시작 시 카테고리 선택 칩 */}
+        {showCategoryChips && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-3"
+          >
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              {selectedCategory ? '선택된 주제' : '어떤 주제로 도움이 필요하신가요?'}
+            </p>
+            {selectedCategory ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-theme-primary text-white text-sm font-semibold rounded-full">
+                  {selectedCategory.label}
+                </span>
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition-colors"
+                >
+                  변경
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {getCategoriesForDevice(currentDeviceName).map(cat => (
+                  <button
+                    key={cat.value}
+                    onClick={() => setSelectedCategory(cat)}
+                    className="px-3.5 py-1.5 bg-white border border-slate-200 hover:border-theme-primary/60 hover:bg-theme-primary/5 text-slate-600 hover:text-theme-primary text-sm font-medium rounded-full transition-all active:scale-95"
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+
         <AnimatePresence mode="popLayout">
           {isAnalyzing && (
             <motion.div 
@@ -287,7 +343,10 @@ export const Chat: React.FC<ChatProps> = ({
 
       <ResumeSheet
         rooms={room.pendingResumeRooms}
-        onStartNew={room.handleStartNew}
+        onStartNew={() => {
+          room.handleStartNew();
+          setSelectedCategory(null);
+        }}
         onResume={room.handleConfirmResume}
         onBack={room.handleBackFromResumeList}
       />
