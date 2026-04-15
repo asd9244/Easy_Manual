@@ -33,7 +33,6 @@ import { AuthScreen } from '@/src/pages/Auth/Auth';
 import { OAuthRedirectHandler } from '@/src/pages/Auth/OAuthRedirectHandler';
 import { ScanScreen } from '@/src/pages/Scan/Scan'; 
 import { Profile } from './pages/Profile/Profile';
-import { DiagnosticReport } from '@/src/pages/Report/DiagnosticReport';
 import { ShareView } from '@/src/pages/Share/ShareView';
 import { SettingsSubpage } from '@/src/pages/Settings/SettingsSubpage';
 import { Toast } from '@/src/components/common/Toast';
@@ -374,8 +373,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                   } 
                 }} />}
                 {screen === 'theme-select' && (<ThemeSelect key="theme-select"setScreen={setScreen} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} />)}
-                {screen === 'profile' && (<Profile key="profile" setScreen={setScreen} />)}  
-                {screen === 'report' && (<DiagnosticReport key="report" setScreen={setScreen} />)}
+                {screen === 'profile' && (<Profile key="profile" setScreen={setScreen} />)}
                 {screen === 'settings-notifications' && <SettingsSubpage key="s-notif" title="알림 설정" setScreen={setScreen} />}
                 {screen === 'settings-language' && <SettingsSubpage key="s-lang" title="언어 설정" setScreen={setScreen} />}
                 {screen === 'settings-privacy' && <SettingsSubpage key="s-priv" title="개인정보 처리방침" setScreen={setScreen} />}

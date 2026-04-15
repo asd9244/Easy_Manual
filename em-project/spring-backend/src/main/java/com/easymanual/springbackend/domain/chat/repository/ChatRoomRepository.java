@@ -11,6 +11,8 @@ import java.util.List;
 
 public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
 
+    long countByUserDevice_Id(Long userDeviceId);
+
     @Query("SELECT c FROM ChatRoom c JOIN c.userDevice d WHERE d.user.email = :email ORDER BY c.createdAt DESC")
     List<ChatRoom> findAllByUserEmailOrderByCreatedAtDesc(@Param("email") String email);
 

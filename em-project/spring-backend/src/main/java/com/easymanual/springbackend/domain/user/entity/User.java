@@ -45,8 +45,8 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private Role role;
 
-    // 🌟 추가됨: 테마 (light, dark, modern, sepia 등)
-    @Column(nullable = false, columnDefinition = "varchar(50) default 'light'")
+    // 🌟 추가됨: 테마 (light, dark, modern, sepia 등). 기본값은 생성자에서 설정.
+    @Column(nullable = false, length = 50)
     private String theme;
 
     // 🌟 추가됨: 회원 탈퇴 여부 관리 (Soft Delete)

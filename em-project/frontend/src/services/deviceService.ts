@@ -52,20 +52,6 @@ export const deviceService = {
   },
 
   /**
-   * AI 진단 리포트 조회
-   * GET /api/reports/{roomId}
-   */
-  getDiagnosticReport: async (roomId: string) => {
-    try {
-      const response = await api.get(`/reports/${roomId}`);
-      return response.data;
-    } catch (error) {
-      console.error("진단 리포트 조회 실패:", error);
-      throw error;
-    }
-  },
-
-  /**
    * 기기 삭제 (Soft Delete)
    * DELETE /api/devices/{deviceId}
    */

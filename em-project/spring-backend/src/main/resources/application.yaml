@@ -1,10 +1,27 @@
 server:
   port: 8080
 
+# --- 더미 데이터 생성용 (로컬/개발) — global.seed.DummyDataSeedRunner 참고 ---
+# 각각 true일 때만 해당 시드 실행(순서: users → user-devices → chat-rooms). 전부 true면 전체 파이프라인.
+# 환경변수: APP_SEED_USERS_ENABLED, APP_SEED_USER_DEVICES_ENABLED, APP_SEED_CHAT_ROOMS_ENABLED (운영에서는 false 권장)
+app:
+  seed:
+    users:
+      enabled: ${APP_SEED_USERS_ENABLED:false}
+    user-devices:
+      enabled: ${APP_SEED_USER_DEVICES_ENABLED:false}
+    chat-rooms:
+      enabled: ${APP_SEED_CHAT_ROOMS_ENABLED:false}
+
+# --- DB 수동 정리 (진단 리포트 DiagnosticReport 엔티티 제거 후, 테이블이 DB에 남아 있을 때) ---
+# PostgreSQL 예시 — psql 또는 클라이언트에서 실행:
+#   DROP TABLE IF EXISTS diagnostic_reports;
+# (엔티티 삭제 후 ddl-auto: update 만으로는 테이블이 자동 삭제되지 않을 수 있음)
+
 spring:
   application:
     name: backend-core
-  
+
   output:
     ansi:
       enabled: ALWAYS
@@ -63,8 +80,3 @@ jwt:
 ai:
   backend:
     url: ${AI_BACKEND_URL:http://localhost:8000}
-
-logging:
-  level:
-    org.springframework.security: DEBUG
-    org.springframework.security.oauth2: DEBUG

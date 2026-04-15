@@ -11,6 +11,9 @@ import java.util.Optional;
 
 public interface ManualRepository extends JpaRepository<Manual, Long> {
 
+    /** 동일 제품군이 여러 건일 때를 대비해 id가 가장 작은 매뉴얼 한 건 */
+    Optional<Manual> findFirstByProductTypeOrderByIdAsc(String productType);
+
     // JPQL(Java Persistence Query Language)을 사용하여 커스텀 쿼리를 작성합니다.
     // models 테이블과 JOIN하여 클라이언트가 입력한 모델명이 포함되어 있는지 검색합니다.
     @Query("SELECT DISTINCT m FROM Manual m JOIN m.models mod WHERE mod.name LIKE %:modelName%")
