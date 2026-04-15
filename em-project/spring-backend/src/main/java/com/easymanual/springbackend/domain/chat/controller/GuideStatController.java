@@ -17,8 +17,9 @@ public class GuideStatController {
     private final GuideStatService guideStatService;
 
     /**
-     * 특정 제품 유형의 자주 찾는 가이드 TOP 5 조회
-     * 예) GET /api/guides/top5?productType=에어컨
+     * 자주 찾는 가이드 TOP 5 조회
+     * <p>
+     * {@code productType=전체}: 모든 제품군 합산. 그 외: 해당 제품군만 (예: 에어컨, 냉장고, 세탁기).
      */
     @GetMapping("/top5")
     public ResponseEntity<GuideTop5Response> getTop5(

@@ -7,14 +7,6 @@ export const MOCK_DEVICES: Device[] = [
   { id: '2', name: '공기 청정기', model: 'Dyson-PH04', image: 'https://picsum.photos/seed/purifier/400/400', icon: Wind },
 ];
 
-export const TOP_GUIDES = [
-  "필터 청소 가이드",
-  "에러 코드 E1 해결 방법",
-  "Wi-Fi 연결 설정",
-  "통살균 세척 방법",
-  "에너지 절약 모드 활용"
-];
-
 export const TUTORIAL_STEPS = [
   {
     icon: Camera,
