@@ -62,7 +62,7 @@ jwt:
 
 ai:
   backend:
-    url: ${AI_BACKEND_URL:http://localhost:8088}
+    url: ${AI_BACKEND_URL:http://localhost:8000}
 
 logging:
   level:

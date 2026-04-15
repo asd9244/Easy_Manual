@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => {
           secure: false,
         },
         '/manual_images': {
-          target: 'http://localhost:8088',
+          target: 'http://localhost:8000',
           changeOrigin: true,
           secure: false,
         }
