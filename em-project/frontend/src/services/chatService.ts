@@ -50,6 +50,24 @@ export const chatService = {
   },
 
   /**
+   * 본인 채팅방 대화 텍스트 AI 요약 (인증 필요)
+   */
+  summarizeConversation: async (roomId: number) => {
+    const response = await api.post(`/chat/rooms/${roomId}/summarize`);
+    return response.data as { summary: string };
+  },
+
+  /**
+   * 특정 AI 답변 한 턴만 요약 (직전 USER + 해당 AI, 인증 필요)
+   */
+  summarizeTurn: async (roomId: number, aiMessageId: string | number) => {
+    const response = await api.post(
+      `/chat/rooms/${roomId}/messages/${aiMessageId}/summarize`,
+    );
+    return response.data as { summary: string };
+  },
+
+  /**
    * 대화 내역 조회
    */
   getMessages: async (roomId: number): Promise<Message[]> => {

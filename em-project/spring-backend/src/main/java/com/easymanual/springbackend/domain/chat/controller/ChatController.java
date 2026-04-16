@@ -34,6 +34,23 @@ public class ChatController {
         return ResponseEntity.ok(chatService.getChatRoomShareSummary(roomId));
     }
 
+    // 로그인 사용자 본인 방 대화 텍스트 요약 (AI 백엔드 동일 LLM)
+    @PostMapping("/rooms/{roomId}/summarize")
+    public ResponseEntity<ConversationSummaryResponse> summarizeConversation(
+            @PathVariable Long roomId,
+            Principal principal) {
+        return ResponseEntity.ok(chatService.summarizeConversation(roomId, principal.getName()));
+    }
+
+    // 특정 AI 답변 한 턴만 요약 (직전 USER + 해당 AI)
+    @PostMapping("/rooms/{roomId}/messages/{messageId}/summarize")
+    public ResponseEntity<ConversationSummaryResponse> summarizeTurn(
+            @PathVariable Long roomId,
+            @PathVariable Long messageId,
+            Principal principal) {
+        return ResponseEntity.ok(chatService.summarizeTurn(roomId, messageId, principal.getName()));
+    }
+
     // 질문하기 및 AI 답변 받기
     @PostMapping("/rooms/{roomId}/ask")
     public ResponseEntity<ChatMessageResponse> askQuestion(

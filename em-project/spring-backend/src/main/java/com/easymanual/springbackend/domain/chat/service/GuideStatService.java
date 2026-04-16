@@ -16,13 +16,17 @@ import java.util.List;
 public class GuideStatService {
 
     private static final int TOP_N = 5;
+    /** 프론트 칩 "전체"와 동일한 값 */
+    public static final String PRODUCT_TYPE_ALL = "전체";
 
     private final ChatRoomRepository chatRoomRepository;
 
     @Transactional(readOnly = true)
     public GuideTop5Response getTop5(String productType) {
-        List<CategoryStatProjection> stats = chatRoomRepository.findCategoryStatsByProductType(
-                productType, PageRequest.of(0, TOP_N));
+        List<CategoryStatProjection> stats = PRODUCT_TYPE_ALL.equals(productType)
+                ? chatRoomRepository.findCategoryStatsAll(PageRequest.of(0, TOP_N))
+                : chatRoomRepository.findCategoryStatsByProductType(
+                        productType, PageRequest.of(0, TOP_N));
 
         List<GuideTop5Response.CategoryRankItem> items = new ArrayList<>();
         for (int i = 0; i < stats.size(); i++) {

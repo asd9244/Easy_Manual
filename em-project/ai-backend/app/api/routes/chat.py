@@ -1,8 +1,8 @@
 import os
 import json
 import re
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from neo4j import GraphDatabase
@@ -29,6 +29,79 @@ class ChatRequest(BaseModel):
     manual_id: str
     question: str
     media_url: Optional[str] = None  # 프론트엔드에서 전달받을 이미지 URL (선택 사항)
+
+
+class SummarizeRequest(BaseModel):
+    """텍스트 대화 로그만 요약 (이미지·URL 본문 미포함)."""
+    conversation_text: str = Field(..., min_length=1)
+
+
+# 채팅 질의(/ask)와 동일 LLM, 별도 태스크용 시스템 지시
+SUMMARY_SYSTEM_PROMPT = """너는 전자제품 고객 상담 대화를 정리하는 요약 전문가다.
+
+[출력 형식 — 반드시 준수, 마크다운·제목·번호·라벨 금지]
+- 출력은 **오직 아래 패턴만** 사용한다. `###`, `**`, `-`, 번호 목록을 쓰지 않는다.
+- USER 질문마다 **최대 3개**의 블록만 만든다. (USER 질문이 3개 미만이면 그 개수만큼만)
+- **한 블록**의 구조는 다음과 같다:
+  1) 첫 줄: 그 턴의 질문 내용을 **한 줄**로 짧게 (USER가 실제로 묻은 핵심)
+  2) **빈 줄 하나** (줄바꿈만)
+  3) 그 다음 줄부터: AI가 답한 내용을 **짧게 요약** (1~3문장, 한 덩어리로)
+- 블록과 블록 사이에는 **빈 줄 하나**로 구분한다.
+
+[출력 예시 — 형식만 참고, 내용은 대화에 맞게. 아래 박스 금지, 그냥 텍스트만 출력]
+(예시 시작)
+필터는 어떻게 빼요?
+
+분리 후 물에 헹구고 완전히 말린 뒤 끼우라고 안내함.
+
+전원이 안 켜져요?
+
+콘센트·차단기 확인 후 리셋 버튼을 눌러보라고 안내함.
+(예시 끝)
+
+[규칙]
+1. [대화 로그]에 나온 내용만 근거로 쓴다. 없는 사실을 지어내지 않는다.
+2. 한국어로 작성한다.
+3. 여러 번 질문이 있으면 대화 순서상 중요한 USER 질문부터 최대 3개만 고른다.
+4. 인사말·메타 코멘트·"요약:", "질문:" 같은 접두어는 넣지 않는다.
+5. 한 블록 안에서 질문 줄과 요약 줄 사이에는 반드시 빈 줄 1개가 있어야 한다.
+6. 답변(요약) 문단 **안에는 빈 줄을 넣지 않는다.** (한 덩어리로만 쓴다)"""
+
+
+def _llm_text_content(response) -> str:
+    if isinstance(response.content, list):
+        return "".join(
+            str(item.get("text", ""))
+            for item in response.content
+            if isinstance(item, dict) and "text" in item
+        )
+    return str(response.content)
+
+
+_MAX_CONVERSATION_CHARS = 100_000
+
+
+@router.post("/summarize")
+def summarize_conversation(request: SummarizeRequest):
+    text = request.conversation_text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="conversation_text is empty")
+
+    if len(text) > _MAX_CONVERSATION_CHARS:
+        text = text[:_MAX_CONVERSATION_CHARS]
+
+    prompt = f"""{SUMMARY_SYSTEM_PROMPT}
+
+[대화 로그]
+{text}"""
+
+    print("대화 로그 텍스트 요약 생성 중...")
+    response = llm.invoke(prompt)
+    summary = _llm_text_content(response).strip()
+    if not summary:
+        summary = "요약을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요."
+
+    return {"summary": summary}
 
 
 def _merge_images_ordered_by_page(records: list) -> List[str]:
@@ -96,7 +169,13 @@ def ask_manual(request: ChatRequest):
             "manual_id": target_manual,
             "question": user_question,
             "found_page": None,
-            "ai_answer": "해당 질문에 대한 관련 내용을 매뉴얼에서 찾을 수 없습니다.",
+            "ai_answer": (
+                "죄송합니다. 현재 등록된 매뉴얼에서 질문하신 내용과 관련된 정보를 찾지 못했습니다.\n\n"
+                "정확하지 않은 답변을 드리는 것보다는, 확인된 정보만 안내해 드리는 것이 맞다고 판단하여 "
+                "답변을 보류하게 되었습니다.\n\n"
+                "혹시 다른 표현으로 다시 질문해 주시면, 더 정확한 안내를 도와드릴 수 있습니다." 
+                "그래도 해결이 어려우시면 제조사 고객센터에 문의해 주시는 것을 권장드립니다."
+            ),
             "manual_image_urls": []
         }
 
@@ -143,7 +222,7 @@ def ask_manual(request: ChatRequest):
 
 [핵심 규칙]
 1. 반드시 아래 제공된 [매뉴얼 내용]만을 근거로 답변해. 없는 내용은 절대 추측하지 마.
-2. 확실하지 않은 내용이 있으면 "해당 내용은 제공된 매뉴얼에서 확인되지 않습니다. 고객센터에 문의해주세요."라고 솔직하게 답해.
+2. 확실하지 않은 내용이 있으면, "죄송합니다. 현재 매뉴얼에서 해당 내용을 확인하지 못했습니다. 정확하지 않은 정보를 안내해 드리는 것보다 확인된 내용만 전달해 드리는 것이 맞다고 판단했습니다. 다른 표현으로 다시 질문해 주시거나, 제조사 고객센터에 문의해 주시면 더 정확한 안내를 받으실 수 있습니다." 라는 취지로 부드럽게 답해.
 3. 답변할 때 참고한 섹션명이나 페이지 번호를 자연스럽게 언급해줘. (예: "[필터 청소하기] 섹션(p41~43)에 따르면...")
 4. 한국어로 정확하고 친절하게 답변해.
 
@@ -159,10 +238,7 @@ def ask_manual(request: ChatRequest):
     print(f"AI가 [{target_manual}]의 Section {len(records)}개를 참조하여 오직 텍스트만으로 초고속 답변을 생성 중입니다...")
 
     response = llm.invoke(prompt)
-    if isinstance(response.content, list):
-        ai_answer = "".join([str(item.get("text", "")) for item in response.content if isinstance(item, dict) and "text" in item])
-    else:
-        ai_answer = str(response.content)
+    ai_answer = _llm_text_content(response)
 
     print(f"\n💡 [AI 생성 답변]\n{ai_answer}\n")
 
