@@ -36,12 +36,21 @@ import { Profile } from './pages/Profile/Profile';
 import { ShareView } from '@/src/pages/Share/ShareView';
 import { SettingsSubpage } from '@/src/pages/Settings/SettingsSubpage';
 import { Toast } from '@/src/components/common/Toast';
+import { GuideDevicePickModal } from '@/src/components/common/GuideDevicePickModal';
 import { deviceService } from '@/src/services/deviceService';
 import { authService } from '@/src/services/authService';
+import type { GuideTop5ClickPayload } from '@/src/services/guideService';
+import { filterDevicesByGuideProductType } from '@/src/utils/guideTop5Device';
+import { useToastStore } from '@/src/store/useToastStore';
+
+const DEFAULT_CHAT_WELCOME_MESSAGES: Message[] = [
+  { id: '1', senderType: 'AI', text: '안녕하세요! 저는 픽시입니다. 무엇을 도와드릴까요?' },
+];
 
 export default function App() {
   // --- 전역 상태 관리 ---
-  
+  const { showToast } = useToastStore();
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [screen, setScreen] = useState<Screen>(() => {
@@ -60,9 +69,7 @@ export default function App() {
   });
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { id: '1', senderType: 'AI', text: '안녕하세요! 저는 픽시입니다. 무엇을 도와드릴까요?' }
-  ]);
+  const [messages, setMessages] = useState<Message[]>(DEFAULT_CHAT_WELCOME_MESSAGES);
   const [showGarageOptions, setShowGarageOptions] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'visit'>('all');
   const [tutorialStep, setTutorialStep] = useState(0);
@@ -90,13 +97,52 @@ export default function App() {
   });
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const [selectedDeviceName, setSelectedDeviceName] = useState<string | null>(null);
+  const [historyFocusMessageId, setHistoryFocusMessageId] = useState<string | null>(null);
   const [isChatOverlayOpen, setIsChatOverlayOpen] = useState(false);
+  const [initialQuestionCategory, setInitialQuestionCategory] = useState<string | null>(null);
+  const [guideDevicePick, setGuideDevicePick] = useState<{
+    devices: Device[];
+    displayTitle: string;
+    category: string;
+  } | null>(null);
 
-  const openChatOverlay = (deviceId?: number | null, query?: string) => {
+  const openChatOverlay = (
+    deviceId?: number | null,
+    query?: string,
+    questionCategory?: string | null,
+  ) => {
+    setMessages(DEFAULT_CHAT_WELCOME_MESSAGES);
     setSelectedRoomId(null);
     setSelectedDeviceId(deviceId ?? null);
     setInitialChatQuery(query || '');
+    setInitialQuestionCategory(questionCategory ?? null);
+    setIsChatReadOnly(false);
+    setHistoryFocusMessageId(null);
     setIsChatOverlayOpen(true);
+  };
+
+  const handleGuideTop5Click = (payload: GuideTop5ClickPayload) => {
+    const candidates = filterDevicesByGuideProductType(devices, payload.productTypeFilter);
+    if (candidates.length === 0) {
+      showToast('해당 제품군에 등록된 기기가 없습니다. 차고에서 기기를 등록해 주세요.', 'warning');
+      return;
+    }
+    if (candidates.length === 1) {
+      openChatOverlay(Number(candidates[0].id), payload.displayTitle, payload.category);
+      return;
+    }
+    setGuideDevicePick({
+      devices: candidates,
+      displayTitle: payload.displayTitle,
+      category: payload.category,
+    });
+  };
+
+  const handleGuideDevicePicked = (device: Device) => {
+    if (!guideDevicePick) return;
+    const { displayTitle, category } = guideDevicePick;
+    setGuideDevicePick(null);
+    openChatOverlay(Number(device.id), displayTitle, category);
   };
 
   const closeChatOverlay = () => {
@@ -105,6 +151,9 @@ export default function App() {
     setSelectedDeviceId(null);
     setSelectedDeviceName(null);
     setInitialChatQuery('');
+    setInitialQuestionCategory(null);
+    setIsChatReadOnly(false);
+    setHistoryFocusMessageId(null);
   };
 
   const handleMenuClick = (id: Screen) => {
@@ -115,8 +164,7 @@ export default function App() {
 
   //  모바일 하단 메뉴용 (App 내부에 정의하여 상태 공유)
   const NavItem = ({ id, icon: Icon, label }: any) => {
-    // 이력 탭의 경우 상세 보기(history-detail) 모드에서도 활성화 유지
-    const isActive = screen === id || (id === 'history' && screen === 'history-detail');
+    const isActive = screen === id;
     return (
       <button 
         onClick={() => handleMenuClick(id)}
@@ -216,8 +264,7 @@ export default function App() {
 
 // 데스크탑 사이드바 메뉴용 
 const SidebarItem = ({ id, icon: Icon, label }: any) => {
-  // 이력 탭의 경우 상세 보기(history-detail) 모드에서도 활성화 유지
-  const isActive = screen === id || (id === 'history' && screen === 'history-detail');
+  const isActive = screen === id;
   return (
     <button 
       onClick={() => handleMenuClick(id)}  
@@ -250,6 +297,12 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
   return (
     <div className="min-h-screen w-full overflow-x-hidden text-sm bg-fixie-mist text-fixie-steel font-sans selection:bg-theme-primary/30">
       <Toast />
+      <GuideDevicePickModal
+        isOpen={guideDevicePick !== null}
+        devices={guideDevicePick?.devices ?? []}
+        onClose={() => setGuideDevicePick(null)}
+        onSelect={handleGuideDevicePicked}
+      />
       <AnimatePresence mode="wait">
         {window.location.pathname === '/oauth2/redirect' ? (
           <OAuthRedirectHandler 
@@ -331,31 +384,21 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
             {/* 메인 콘텐츠 영역 */}
             <main className={`flex-1 ${showNav ? 'md:ml-64' : ''} p-6 pb-32`}>              
               <AnimatePresence mode="wait">
-                {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} isLoading={isLoadingDevices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} onGuideClick={(title: string) => openChatOverlay(null, title)} onOpenChat={(deviceId: number) => openChatOverlay(deviceId)} />}
+                {screen === 'home' && <Home key="home" setScreen={setScreen} devices={devices} isLoading={isLoadingDevices} sliderRef={sliderRef} sliderConstraints={sliderConstraints} onGuideClick={handleGuideTop5Click} onOpenChat={(deviceId: number) => openChatOverlay(deviceId)} />}
                 {screen === 'garage' && <Garage key="garage" setScreen={setScreen} devices={devices} setDevices={setDevices} showGarageOptions={showGarageOptions} setShowGarageOptions={setShowGarageOptions} scannedModel={scannedModel} setScannedModel={setScannedModel} onOpenChat={(deviceId: number) => openChatOverlay(deviceId)} />}
-                {screen === 'history' && <History key="history" historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} setScreen={setScreen} setIsChatReadOnly={setIsChatReadOnly} onRoomSelect={(id: number, name?: string) => { setSelectedRoomId(id); setSelectedDeviceName(name || null); setSelectedDeviceId(null); }} />}
-                {screen === 'history-detail' && (
-                  <Chat 
-                    key="history-detail" 
-                    setScreen={setScreen} 
-                    messages={messages} 
-                    isAnalyzing={isAnalyzing} 
-                    setIsAnalyzing={setIsAnalyzing} 
-                    attachedFiles={attachedFiles} 
-                    setAttachedFiles={setAttachedFiles} 
-                    chatEndRef={chatEndRef} 
-                    handleSendMessage={handleSendMessage} 
-                    handleFileChange={handleFileChange} 
-                    setMessages={setMessages} 
-                    isReadOnly={true} // 항상 읽기 전용
-                    removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))} 
-                    initialQuery={initialChatQuery} 
-                    setInitialQuery={setInitialChatQuery} 
-                    devices={devices} 
-                    isLoadingDevices={isLoadingDevices} 
-                    roomId={selectedRoomId} 
-                    deviceId={null}
-                    initialDeviceName={selectedDeviceName}
+                {screen === 'history' && (
+                  <History
+                    key="history"
+                    historyFilter={historyFilter}
+                    setHistoryFilter={setHistoryFilter}
+                    onRoomSelect={(id: number, name?: string, focusUserMessageId?: string) => {
+                      setSelectedRoomId(id);
+                      setSelectedDeviceName(name || null);
+                      setSelectedDeviceId(null);
+                      setHistoryFocusMessageId(focusUserMessageId ?? null);
+                      setIsChatReadOnly(true);
+                      setIsChatOverlayOpen(true);
+                    }}
                   />
                 )}
 
@@ -412,7 +455,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                       handleSendMessage={handleSendMessage}
                       handleFileChange={handleFileChange}
                       setMessages={setMessages}
-                      isReadOnly={false}
+                      isReadOnly={isChatReadOnly}
                       removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))}
                       initialQuery={initialChatQuery}
                       setInitialQuery={setInitialChatQuery}
@@ -421,8 +464,11 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                       roomId={selectedRoomId}
                       deviceId={selectedDeviceId}
                       initialDeviceName={selectedDeviceName}
+                      initialQuestionCategory={initialQuestionCategory}
                       onRoomCreated={setSelectedRoomId}
                       onClose={closeChatOverlay}
+                      focusMessageId={historyFocusMessageId}
+                      onConsumedFocusMessage={() => setHistoryFocusMessageId(null)}
                     />
                   </motion.div>
                 </motion.div>

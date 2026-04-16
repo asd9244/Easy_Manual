@@ -1,6 +1,6 @@
 import { LucideIcon } from 'lucide-react';
 // --- Types ---
-export type Screen = 'splash' | 'tutorial' | 'auth' | 'home' | 'garage' | 'chat' | 'history' | 'history-detail' | 'settings' | 'scan' | 'profile'| 'theme-select' | 'share' | 'settings-notifications' | 'settings-language' | 'settings-privacy' | 'settings-help';
+export type Screen = 'splash' | 'tutorial' | 'auth' | 'home' | 'garage' | 'chat' | 'history' | 'settings' | 'scan' | 'profile'| 'theme-select' | 'share' | 'settings-notifications' | 'settings-language' | 'settings-privacy' | 'settings-help';
 
 export type ThemeType = 'magician' | 'forest' | 'expert' | 'home';
 
@@ -13,10 +13,11 @@ export interface Theme {
 }
 
 export interface Device {
-  id: string; // 혹은 number
+  id: string;
   name: string;
-  model: string; // 모델명 (예: FQ17SADWE2)
-  alias?: string; // 유저 기기 등록 테이블(UserDevice)의 alias "거실 에어컨"
+  model: string;
+  alias?: string;
+  productType?: string;
   image?: string;
   icon?: any;
 }

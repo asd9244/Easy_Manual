@@ -2,6 +2,9 @@ package com.easymanual.springbackend.domain.chat.repository;
 
 import com.easymanual.springbackend.domain.chat.entity.ChatMessage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -13,4 +16,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     // 메서드 이름만으로 "SELECT * FROM chat_messages WHERE chat_room_id = ? ORDER BY created_at ASC" 쿼리가 자동 생성됩니다.
     // 과거 대화부터 순서대로 보여주기 위해 생성 시간(CreatedAt) 기준 오름차순(Asc)으로 정렬합니다.
     List<ChatMessage> findAllByChatRoomIdOrderByCreatedAtAsc(Long chatRoomId);
+
+    /** 시드 유저 기기에 연결된 채팅방의 메시지 일괄 삭제 (chat_rooms 삭제 전 FK 해제용) */
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM ChatMessage m WHERE m.chatRoom.userDevice.user.email LIKE :pattern")
+    int deleteAllForChatRoomsOfSeedUsers(@Param("pattern") String emailLikePattern);
 }

@@ -4,6 +4,7 @@ import com.easymanual.springbackend.domain.chat.entity.ChatRoom;
 import com.easymanual.springbackend.domain.chat.entity.QuestionCategory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -28,6 +29,20 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
            "ORDER BY COUNT(c) DESC")
     List<CategoryStatProjection> findCategoryStatsByProductType(
             @Param("productType") String productType, Pageable pageable);
+
+    /** 모든 제품군 합산 — 카테고리별 채팅방 수 (ETC 제외, 많은 순) */
+    @Query("SELECT c.questionCategory as category, COUNT(c) as count " +
+           "FROM ChatRoom c " +
+           "WHERE c.questionCategory IS NOT NULL " +
+           "AND c.questionCategory <> com.easymanual.springbackend.domain.chat.entity.QuestionCategory.ETC " +
+           "GROUP BY c.questionCategory " +
+           "ORDER BY COUNT(c) DESC")
+    List<CategoryStatProjection> findCategoryStatsAll(Pageable pageable);
+
+    /** 시드 유저(seed-user-*@localhost.local)에 연결된 채팅방만 삭제 */
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM ChatRoom c WHERE c.userDevice.user.email LIKE :pattern")
+    int deleteAllForSeedUsers(@Param("pattern") String emailLikePattern);
 
     // 집계용 인터페이스 프로젝션
     interface CategoryStatProjection {

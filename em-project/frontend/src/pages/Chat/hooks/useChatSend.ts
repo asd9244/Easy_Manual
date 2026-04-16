@@ -172,7 +172,9 @@ export function useChatSend({
     const userAttachments = [...attachedFiles];
 
     if (!userText.trim() && userAttachments.length === 0) return;
-    if (isLoadingDevices) return;
+    // 방이 이미 만들어진 뒤(예: startNewChat → sendMessage(roomId))에는 기기 목록 로딩과 무관하게 질문 전송해야 함.
+    // isLoadingDevices 시점에 여기서 return 하면 AI 요청이 조용히 생략되어 간헐적 미연결처럼 보임.
+    if (isLoadingDevices && !targetRoomId) return;
 
     const newUserMsg: Message = { id: Date.now().toString(), senderType: 'USER', text: userText, attachments: userAttachments };
     setMessages(prev => [...prev, newUserMsg]);

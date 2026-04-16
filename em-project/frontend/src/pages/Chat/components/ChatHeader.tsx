@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Sparkles, Share2 } from 'lucide-react';
+import { ArrowLeft, Share2 } from 'lucide-react';
 import { Screen, Device } from '@/src/types/index';
 
 interface ChatHeaderProps {
@@ -8,7 +8,6 @@ interface ChatHeaderProps {
   devices: Device[];
   isReadOnly?: boolean;
   setScreen: (screen: Screen) => void;
-  onSummarize: () => void;
   onShare: () => void;
   onClose?: () => void;
 }
@@ -19,7 +18,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   devices,
   isReadOnly,
   setScreen,
-  onSummarize,
   onShare,
   onClose,
 }) => {
@@ -57,13 +55,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         </div>
       </div>
       <div className="flex gap-2">
-        <button
-          onClick={onSummarize}
-          className="w-10 h-10 bg-theme-primary/5 border border-theme-primary/10 rounded-xl flex items-center justify-center text-theme-primary hover:bg-theme-primary/10 transition-all active:scale-95"
-          title="대화 요약"
-        >
-          <Sparkles size={18} />
-        </button>
         <button
           onClick={onShare}
           className="w-10 h-10 bg-fixie-steel/5 border border-fixie-steel/10 rounded-xl flex items-center justify-center text-fixie-steel hover:bg-fixie-steel/10 transition-all active:scale-95"
