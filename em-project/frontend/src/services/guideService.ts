@@ -5,6 +5,14 @@ export const GUIDE_PRODUCT_TYPE_FILTERS = ['전체', '에어컨', '냉장고', '
 
 export type GuideProductTypeFilter = (typeof GUIDE_PRODUCT_TYPE_FILTERS)[number];
 
+/** 홈 TOP 5 카드 클릭 시 부모로 전달하는 페이로드 */
+export interface GuideTop5ClickPayload {
+  displayTitle: string;
+  /** 백엔드 QuestionCategory 키 (createChatRoom 두 번째 인자) */
+  category: string;
+  productTypeFilter: GuideProductTypeFilter;
+}
+
 export interface GuideTop5CategoryItem {
   rank: number;
   category: string;

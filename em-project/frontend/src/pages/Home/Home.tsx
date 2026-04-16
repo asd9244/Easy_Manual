@@ -19,6 +19,7 @@ import {
   GUIDE_PRODUCT_TYPE_FILTERS,
   type GuideProductTypeFilter,
   type GuideTop5CategoryItem,
+  type GuideTop5ClickPayload,
 } from "@/src/services/guideService";
 
 const GUIDE_RANK_COLORS = [
@@ -36,7 +37,7 @@ interface HomeProps {
   sliderRef: React.RefObject<HTMLDivElement | null>;
   sliderConstraints: {left: number; right: number};
   isLoading?: boolean;
-  onGuideClick?: (title: string) => void;
+  onGuideClick?: (payload: GuideTop5ClickPayload) => void;
   onOpenChat?: (deviceId: number) => void;
 }
 
@@ -235,7 +236,14 @@ export const Home: React.FC<HomeProps> = ({
               <motion.div
                 key={`${item.category}-${item.rank}`}
                 whileTap={{ scale: 0.99 }}
-                onClick={() => onGuideClick && onGuideClick(displayTitle)}
+                onClick={() =>
+                  onGuideClick &&
+                  onGuideClick({
+                    displayTitle,
+                    category: item.category,
+                    productTypeFilter: guideFilter,
+                  })
+                }
                 className="bg-white/40 backdrop-blur-xl p-4 rounded-3xl flex justify-between items-center shadow-sm border border-white/20 hover:border-theme-primary/30 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-4">

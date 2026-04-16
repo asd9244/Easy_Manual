@@ -4,14 +4,14 @@ import { motion } from 'motion/react';
 import { 
   Share2, 
   FileText,
-  X,
-  Trash2
+  Trash2,
+  MessageCircle,
 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { chatService } from '@/src/services/chatService';
 import { Search, Edit2 } from 'lucide-react';
 import { SocialShareModal } from '../../components/common/SocialShareModal';
-import { Screen } from '@/src/types/index';
+import { QuestionListModal } from './QuestionListModal';
 
 // 로컬 스토리지에 기기 별명을 저장하던 로직을 백엔드로 이관하여 삭제하였습니다.
 
@@ -19,12 +19,10 @@ import { Screen } from '@/src/types/index';
 interface HistoryProps {
   historyFilter: 'all' | 'completed' | 'visit';
   setHistoryFilter: (filter: 'all' | 'completed' | 'visit') => void;
-  setScreen: (screen: Screen) => void;
-  setIsChatReadOnly: (readOnly: boolean) => void;
-  onRoomSelect?: (id: number, deviceName?: string) => void; // 수정: 기기 이름 전달 추가
+  onRoomSelect?: (id: number, deviceName?: string, focusUserMessageId?: string) => void;
 }
 
-export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilter, setScreen, setIsChatReadOnly, onRoomSelect }: HistoryProps) => {
+export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilter, onRoomSelect }: HistoryProps) => {
   const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedShareUrl, setSelectedShareUrl] = useState('');
@@ -34,6 +32,12 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState<number | null>(null);
   const [newTitle, setNewTitle] = useState('');
+  const [questionListOpen, setQuestionListOpen] = useState(false);
+  const [questionListContext, setQuestionListContext] = useState<{
+    roomId: number;
+    device: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -124,6 +128,16 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
     }
   };
 
+  const openQuestionList = (e: React.MouseEvent, item: { id: number; device: string; title: string }) => {
+    e.stopPropagation();
+    setQuestionListContext({
+      roomId: item.id,
+      device: item.device,
+      title: item.title,
+    });
+    setQuestionListOpen(true);
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8 no-scrollbar pb-20 px-4 md:px-8">
       <header className="flex justify-between items-center">
@@ -189,9 +203,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(i * 0.05, 0.4) }}
               onClick={() => {
-                if (onRoomSelect) onRoomSelect(item.id, item.device);
-                setIsChatReadOnly(true); 
-                setScreen('history-detail');
+                onRoomSelect?.(item.id, item.device, undefined);
               }}
               className="w-full bg-white/80 backdrop-blur-md p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow cursor-pointer group min-w-0"
             >
@@ -245,10 +257,12 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
               
               <div className="flex gap-2">
                 <button 
-                  onClick={(e) => { e.stopPropagation(); alert('AI 요약 기능을 준비 중입니다.'); }}
+                  type="button"
+                  onClick={(e) => openQuestionList(e, item)}
                   className="flex-1 h-11 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-[12px] font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"
                 >
-                  <FileText size={16} className="text-slate-400" /> 대화 요약
+                  <MessageCircle size={16} className="text-slate-400" />
+                  질문 목록
                 </button>
                 <button 
                   onClick={(e) => handleShare(e, item.id || i)}
@@ -310,6 +324,26 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
           </motion.div>
         )}
       </AnimatePresence>
+
+      {questionListContext && (
+        <QuestionListModal
+          isOpen={questionListOpen}
+          onClose={() => {
+            setQuestionListOpen(false);
+            setQuestionListContext(null);
+          }}
+          roomId={questionListContext.roomId}
+          deviceLabel={questionListContext.device}
+          roomTitle={questionListContext.title}
+          onSelectQuestion={(userMessageId) => {
+            onRoomSelect?.(
+              questionListContext.roomId,
+              questionListContext.device,
+              userMessageId,
+            );
+          }}
+        />
+      )}
 
       {/* 프리미엄 SNS 공유 모달 */}
       <SocialShareModal 

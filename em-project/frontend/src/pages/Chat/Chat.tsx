@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { SocialShareModal } from '@/src/components/common/SocialShareModal';
 import { Message, Screen, Device } from '@/src/types/index';
 import { api } from '@/src/api/apiService';
+import { chatService } from '@/src/services/chatService';
 
 import { useChatRoom, useChatSend, useSpeechRecognition } from './hooks';
 import {
@@ -38,8 +39,13 @@ interface ChatProps {
   roomId: number | null;
   deviceId: number | null;
   initialDeviceName?: string | null;
+  /** TOP 5 등에서 전달된 질문 카테고리(createChatRoom). 칩 선택이 없을 때만 사용 */
+  initialQuestionCategory?: string | null;
   onRoomCreated?: (id: number) => void;
   onClose?: () => void;
+  /** 이력 질문 목록에서 진입 시 스크롤할 메시지 id */
+  focusMessageId?: string | null;
+  onConsumedFocusMessage?: () => void;
 }
 
 export const Chat: React.FC<ChatProps> = ({ 
@@ -62,8 +68,11 @@ export const Chat: React.FC<ChatProps> = ({
   roomId,
   deviceId,
   initialDeviceName,
+  initialQuestionCategory = null,
   onRoomCreated,
-  onClose
+  onClose,
+  focusMessageId,
+  onConsumedFocusMessage,
 }) => {
   // ── 커스텀 훅 ──
   const room = useChatRoom({
@@ -82,11 +91,13 @@ export const Chat: React.FC<ChatProps> = ({
   const currentDeviceName = currentDevice?.name ?? room.selectedMentionDevice ?? null;
 
   // 카테고리 칩 노출 조건: 읽기전용 아님 + 아직 방이 없음(새 대화) + 기기 있음
+  // TOP 5 등으로 initialQuestionCategory가 이미 있으면 중복 선택 UI를 띄우지 않음
   const showCategoryChips =
     !isReadOnly &&
     !room.activeRoomId &&
     (deviceId !== null || room.activeDeviceId !== null) &&
-    messages.every(m => m.type === 'status');
+    messages.every(m => m.type === 'status') &&
+    !initialQuestionCategory;
 
   const { sendMessage, startNewChat } = useChatSend({
     activeRoomId: room.activeRoomId,
@@ -107,7 +118,7 @@ export const Chat: React.FC<ChatProps> = ({
     markRoomOwned: room.markRoomOwned,
     startLoading: room.startLoading,
     stopLoading: room.stopLoading,
-    questionCategory: selectedCategory?.value ?? null,
+    questionCategory: selectedCategory?.value ?? initialQuestionCategory ?? null,
   });
 
   const speech = useSpeechRecognition(setInputText);
@@ -121,30 +132,89 @@ export const Chat: React.FC<ChatProps> = ({
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [summaryText, setSummaryText] = useState('');
+  const [summaryHeaderOverride, setSummaryHeaderOverride] = useState<{
+    deviceLabel: string;
+    questionSummary: string;
+  } | null>(null);
+  const [summarizingAiMessageId, setSummarizingAiMessageId] = useState<string | null>(null);
 
   // 멘션(@) 관련 상태
   const [showMentionPopover, setShowMentionPopover] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  /** 이력 포커스 직후 chatEnd 자동 스크롤이 덮어쓰지 않도록, 이 시각(ms)까지 억제 */
+  const suppressAutoScrollUntilRef = useRef(0);
+  const prevMessageCountRef = useRef(0);
 
   // ── 파생 값 ──
   const canSend = (inputText.trim().length > 0 || attachedFiles.length > 0) && (!!room.selectedMentionDevice || !!room.activeRoomId);
 
+  const summaryModalDeviceLabel =
+    (currentDevice?.alias && currentDevice.alias.trim()) ||
+    currentDeviceName ||
+    room.selectedMentionDevice ||
+    '기기';
+
+  const firstUserMessage = messages
+    .filter((m) => m.senderType === 'USER')
+    .map((m) => m.text?.trim())
+    .find((t) => t && t.length > 0);
+
+  const summaryModalQuestionLine = firstUserMessage
+    ? (firstUserMessage.length > 56 ? `${firstUserMessage.slice(0, 56)}…` : firstUserMessage)
+    : '질문 요약';
+
   // ── 이펙트 ──
 
   useEffect(() => {
+    prevMessageCountRef.current = 0;
+  }, [roomId]);
+
+  useEffect(() => {
+    const count = messages.length;
+    const grew = count > prevMessageCountRef.current;
+    prevMessageCountRef.current = count;
+    const last = count > 0 ? messages[count - 1] : undefined;
+    const userJustSent = grew && last?.senderType === 'USER';
+
+    if (Date.now() < suppressAutoScrollUntilRef.current && !userJustSent) {
+      return;
+    }
     requestAnimationFrame(() => {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     });
   }, [messages, isAnalyzing]);
 
   useEffect(() => {
-    if (initialQuery && !room.hasProcessedInitialQuery.current) {
-      startNewChat(initialQuery);
-      room.hasProcessedInitialQuery.current = true;
-      if (setInitialQuery) setInitialQuery('');
+    if (!initialQuery || room.hasProcessedInitialQuery.current) return;
+    // 기기 목록이 아직이면 createChatRoom이 guest/잘못된 분기로 갈 수 있음. TOP 5 등 deviceId 진입 시 대기.
+    if (isLoadingDevices) return;
+    if (deviceId != null && (!devices || devices.length === 0)) return;
+
+    startNewChat(initialQuery);
+    room.hasProcessedInitialQuery.current = true;
+    if (setInitialQuery) setInitialQuery('');
+  }, [initialQuery, isLoadingDevices, deviceId, devices]);
+
+  useEffect(() => {
+    if (!focusMessageId || messages.length === 0) return;
+    const el = document.getElementById(`chat-msg-${focusMessageId}`);
+    if (!el) {
+      // 아직 버블이 마운트되기 전: 맨 아래로 끌려가는 것만 잠시 막음 (onConsumed 호출 전이라 id 유지)
+      suppressAutoScrollUntilRef.current = Math.max(
+        suppressAutoScrollUntilRef.current,
+        Date.now() + 8000,
+      );
+      return;
     }
-  }, [initialQuery]);
+
+    const t = window.setTimeout(() => {
+      suppressAutoScrollUntilRef.current = Date.now() + 3200;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      onConsumedFocusMessage?.();
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [focusMessageId, messages, onConsumedFocusMessage]);
 
   // ── 이벤트 핸들러 ──
 
@@ -202,14 +272,37 @@ export const Chat: React.FC<ChatProps> = ({
     setTimeout(() => inputRef.current?.focus(), 0);
   };
 
-  const handleSummarize = () => {
-    setIsSummaryModalOpen(true);
-    if (messages.length < 2) {
-      setSummaryText('대화가 부족하여 요약할 내용이 없습니다. 궁금한 점을 더 말씀해 주세요!');
-      return;
+  const handleSummarizeTurn = async (aiMessageId: string) => {
+    const rid = room.activeRoomId;
+    if (!rid) return;
+
+    let userQ = '';
+    const aiIdx = messages.findIndex((m) => m.id === aiMessageId);
+    for (let i = aiIdx - 1; i >= 0; i--) {
+      if (messages[i].senderType === 'USER') {
+        userQ = messages[i].text?.trim() || '';
+        break;
+      }
     }
-    const userQueries = messages.filter(m => m.senderType === 'USER').map(m => m.text).slice(0, 3);
-    setSummaryText(`이번 대화에서는 주로 **${room.selectedMentionDevice || '기기'}**의 **${userQueries[0]?.substring(0, 10) || '사용 방법'}** 등에 대해 알아보셨습니다. AI 가이드가 제안한 해결책을 확인하고 이 대화 내역을 공유해 보세요.`);
+    const qLine =
+      userQ.length > 80 ? `${userQ.slice(0, 80)}…` : userQ || '—';
+
+    setSummaryHeaderOverride({
+      deviceLabel: summaryModalDeviceLabel,
+      questionSummary: qLine,
+    });
+    setSummarizingAiMessageId(aiMessageId);
+    try {
+      const { summary } = await chatService.summarizeTurn(rid, aiMessageId);
+      setSummaryText(summary);
+      setIsSummaryModalOpen(true);
+    } catch (e) {
+      console.error('턴 요약 실패:', e);
+      alert('요약을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      setSummaryHeaderOverride(null);
+    } finally {
+      setSummarizingAiMessageId(null);
+    }
   };
 
   const openLightbox = (images: string[], index: number) => {
@@ -231,7 +324,6 @@ export const Chat: React.FC<ChatProps> = ({
         devices={devices}
         isReadOnly={isReadOnly}
         setScreen={setScreen}
-        onSummarize={handleSummarize}
         onShare={() => setIsShareModalOpen(true)}
         onClose={onClose}
       />
@@ -245,6 +337,9 @@ export const Chat: React.FC<ChatProps> = ({
             onFeedback={handleFeedback}
             onImageClick={openLightbox}
             onVideoClick={openVideo}
+            showSummarizeAction={!!room.activeRoomId}
+            onSummarizeAiTurn={handleSummarizeTurn}
+            summarizingAiMessageId={summarizingAiMessageId}
           />
         ))}
 
@@ -353,8 +448,13 @@ export const Chat: React.FC<ChatProps> = ({
       <SummaryModal
         isOpen={isSummaryModalOpen}
         summaryText={summaryText}
-        onClose={() => setIsSummaryModalOpen(false)}
+        onClose={() => {
+          setIsSummaryModalOpen(false);
+          setSummaryHeaderOverride(null);
+        }}
         onShare={() => setIsShareModalOpen(true)}
+        deviceLabel={summaryHeaderOverride?.deviceLabel ?? summaryModalDeviceLabel}
+        questionSummary={summaryHeaderOverride?.questionSummary ?? summaryModalQuestionLine}
       />
 
       <SocialShareModal

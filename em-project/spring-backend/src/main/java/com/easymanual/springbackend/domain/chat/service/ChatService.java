@@ -13,8 +13,10 @@ import com.easymanual.springbackend.domain.chat.dto.AiChatRequest;
 import com.easymanual.springbackend.domain.chat.dto.AiChatResponse;
 import com.easymanual.springbackend.domain.chat.dto.ChatAskRequest;
 import org.springframework.web.reactive.function.client.WebClient;
+import com.easymanual.springbackend.domain.chat.dto.AiSummarizeRequest;
 import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateRequest;
 import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateResponse;
+import com.easymanual.springbackend.domain.chat.dto.ConversationSummaryResponse;
 import com.easymanual.springbackend.domain.device.entity.UserDevice;
 import com.easymanual.springbackend.domain.device.repository.UserDeviceRepository;
 
@@ -23,6 +25,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ChatService {
+
+    private static final int MAX_CONVERSATION_TEXT_CHARS = 100_000;
 
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
@@ -61,6 +65,125 @@ public class ChatService {
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
         return new ChatRoomResponse(chatRoom);
+    }
+
+    /**
+     * 로그인한 사용자 본인 방만: DB 메시지 텍스트만 모아 AI 요약 (미디어 URL·이미지 제외).
+     */
+    @Transactional(readOnly = true)
+    public ConversationSummaryResponse summarizeConversation(Long roomId, String email) {
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
+
+        if (!chatRoom.getUserDevice().getUser().getEmail().equals(email)) {
+            throw new IllegalArgumentException("해당 채팅방에 접근할 권한이 없습니다.");
+        }
+
+        List<ChatMessage> messages = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
+        String conversationText = buildConversationTextForSummary(messages);
+        if (conversationText.isBlank()) {
+            throw new IllegalArgumentException("요약할 대화 내용이 없습니다.");
+        }
+
+        String payload = conversationText.length() > MAX_CONVERSATION_TEXT_CHARS
+                ? conversationText.substring(0, MAX_CONVERSATION_TEXT_CHARS)
+                : conversationText;
+
+        AiSummarizeRequest aiRequest = AiSummarizeRequest.builder()
+                .conversationText(payload)
+                .build();
+
+        ConversationSummaryResponse aiResponse = webClient.post()
+                .uri("/api/chat/summarize")
+                .bodyValue(aiRequest)
+                .retrieve()
+                .bodyToMono(ConversationSummaryResponse.class)
+                .block();
+
+        if (aiResponse == null || aiResponse.getSummary() == null || aiResponse.getSummary().isBlank()) {
+            throw new IllegalStateException("요약 응답이 비어 있습니다.");
+        }
+        return aiResponse;
+    }
+
+    /**
+     * 특정 AI 답변 한 턴만 요약: 직전 USER 질문 + 해당 AI 답 텍스트만 전달.
+     */
+    @Transactional(readOnly = true)
+    public ConversationSummaryResponse summarizeTurn(Long roomId, Long aiMessageId, String email) {
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
+
+        if (!chatRoom.getUserDevice().getUser().getEmail().equals(email)) {
+            throw new IllegalArgumentException("해당 채팅방에 접근할 권한이 없습니다.");
+        }
+
+        ChatMessage aiMsg = chatMessageRepository.findById(aiMessageId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 메시지를 찾을 수 없습니다."));
+
+        if (!aiMsg.getChatRoom().getId().equals(roomId)) {
+            throw new IllegalArgumentException("메시지가 해당 채팅방에 속하지 않습니다.");
+        }
+        if (aiMsg.getSenderType() != ChatMessage.SenderType.AI) {
+            throw new IllegalArgumentException("AI 답변 메시지만 요약할 수 있습니다.");
+        }
+
+        List<ChatMessage> ordered = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
+        ChatMessage userMsg = null;
+        for (int i = 0; i < ordered.size(); i++) {
+            if (ordered.get(i).getId().equals(aiMessageId)) {
+                for (int j = i - 1; j >= 0; j--) {
+                    if (ordered.get(j).getSenderType() == ChatMessage.SenderType.USER) {
+                        userMsg = ordered.get(j);
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        if (userMsg == null) {
+            throw new IllegalArgumentException("이 답변에 대응하는 사용자 질문을 찾을 수 없습니다.");
+        }
+
+        String u = userMsg.getMessage() != null ? userMsg.getMessage().trim() : "";
+        String a = aiMsg.getMessage() != null ? aiMsg.getMessage().trim() : "";
+        if (u.isBlank() && a.isBlank()) {
+            throw new IllegalArgumentException("요약할 텍스트가 없습니다.");
+        }
+
+        String conversationText = "[USER] " + u + "\n\n[AI] " + a;
+        if (conversationText.length() > MAX_CONVERSATION_TEXT_CHARS) {
+            conversationText = conversationText.substring(0, MAX_CONVERSATION_TEXT_CHARS);
+        }
+
+        AiSummarizeRequest aiRequest = AiSummarizeRequest.builder()
+                .conversationText(conversationText)
+                .build();
+
+        ConversationSummaryResponse aiResponse = webClient.post()
+                .uri("/api/chat/summarize")
+                .bodyValue(aiRequest)
+                .retrieve()
+                .bodyToMono(ConversationSummaryResponse.class)
+                .block();
+
+        if (aiResponse == null || aiResponse.getSummary() == null || aiResponse.getSummary().isBlank()) {
+            throw new IllegalStateException("요약 응답이 비어 있습니다.");
+        }
+        return aiResponse;
+    }
+
+    private String buildConversationTextForSummary(List<ChatMessage> messages) {
+        StringBuilder sb = new StringBuilder();
+        for (ChatMessage m : messages) {
+            String text = m.getMessage();
+            if (text == null || text.isBlank()) {
+                continue;
+            }
+            String role = m.getSenderType() == ChatMessage.SenderType.USER ? "USER" : "AI";
+            sb.append("[").append(role).append("] ").append(text.trim()).append("\n");
+        }
+        return sb.toString().trim();
     }
 
     @Transactional

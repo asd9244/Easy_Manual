@@ -1,6 +1,6 @@
 import { LucideIcon } from 'lucide-react';
 // --- Types ---
-export type Screen = 'splash' | 'tutorial' | 'auth' | 'home' | 'garage' | 'chat' | 'history' | 'history-detail' | 'settings' | 'scan' | 'profile'| 'theme-select' | 'share' | 'settings-notifications' | 'settings-language' | 'settings-privacy' | 'settings-help';
+export type Screen = 'splash' | 'tutorial' | 'auth' | 'home' | 'garage' | 'chat' | 'history' | 'settings' | 'scan' | 'profile'| 'theme-select' | 'share' | 'settings-notifications' | 'settings-language' | 'settings-privacy' | 'settings-help';
 
 export type ThemeType = 'magician' | 'forest' | 'expert' | 'home';
 
