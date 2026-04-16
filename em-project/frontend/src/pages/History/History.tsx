@@ -49,6 +49,7 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
             device: room.deviceAlias || room.deviceName || '알 수 없는 기기',
             model: room.modelName || '-',
             userDeviceId: room.userDeviceId,
+            categoryLabel: room.questionCategoryLabel || '미지정',
           };
         });
         setHistoryItems(items);
@@ -195,29 +196,11 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
               className="w-full bg-white/80 backdrop-blur-md p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col hover:shadow-md transition-shadow cursor-pointer group min-w-0"
             >
               <div className="flex justify-between items-start gap-3 mb-3">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 flex-1 text-xs leading-snug">
-                  <span className="font-bold text-slate-300 tracking-tight shrink-0">{item.date}</span>
-                  <span className="text-slate-200 select-none shrink-0" aria-hidden>·</span>
-                  <span
-                    className="font-semibold text-slate-600 min-w-0 break-words [overflow-wrap:anywhere]"
-                    title={item.device}
-                  >
-                    {item.device}
-                  </span>
-                  {item.model && item.model !== '-' ? (
-                    <>
-                      <span className="text-slate-200 select-none shrink-0" aria-hidden>·</span>
-                      <span
-                        className="font-semibold text-slate-500 min-w-0 break-words [overflow-wrap:anywhere]"
-                        title={item.model}
-                      >
-                        {item.model}
-                      </span>
-                    </>
-                  ) : null}
-                </div>
+                <span className="font-bold text-slate-400 tracking-tight shrink-0 text-xs">
+                  {item.date}
+                </span>
                 <div className="flex items-center gap-2 shrink-0">
-                  <div className={`px-2.5 py-0.5 rounded-lg text-[9px] font-bold ${
+                  <div className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${
                     item.status === 'completed' ? 'bg-theme-primary/10 text-theme-primary' : 'bg-theme-secondary/10 text-theme-secondary'
                   }`}>
                     {item.status === 'completed' ? '가이드 완료' : '방문 권장'}
@@ -227,11 +210,12 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
                     className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all"
                     title="삭제"
                   >
-                    <Trash2 size={13} />
+                    <Trash2 size={15} strokeWidth={2.5} />
                   </button>
                 </div>
               </div>
-              <div className="flex items-start gap-2 mb-4 group/title min-w-0">
+              
+              <div className="flex items-start gap-2 mb-3 group/title min-w-0">
                 <h4 className="min-w-0 flex-1 font-bold text-fixie-steel text-lg sm:text-xl group-hover:text-theme-primary transition-colors break-words [overflow-wrap:anywhere] leading-snug">
                   {item.title}
                 </h4>
@@ -245,13 +229,21 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
                 </button>
               </div>
               
-              <div className="flex items-center gap-2 mb-8">
-                <p className="text-[13px] font-bold text-theme-primary">{item.device}</p>
-                <div className="w-1 h-1 bg-slate-200 rounded-full" />
-                <p className="text-[13px] text-slate-400">{item.model}</p>
+              <div className="flex flex-wrap items-center gap-2 mt-auto pt-2 mb-4">
+                <span className="px-3 py-1.5 bg-wing-gradient/10 text-theme-primary border border-theme-primary/20 rounded-full text-xs font-bold truncate max-w-[150px]">
+                  {item.categoryLabel}
+                </span>
+                <span className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-full text-xs font-bold truncate max-w-[150px]">
+                  {item.device}
+                </span>
+                {item.model && item.model !== '-' && (
+                  <span className="px-3 py-1.5 bg-slate-50 text-slate-500 border border-slate-100 rounded-full text-xs font-semibold truncate max-w-[150px]">
+                    {item.model}
+                  </span>
+                )}
               </div>
               
-              <div className="flex gap-2 mt-auto">
+              <div className="flex gap-2">
                 <button 
                   onClick={(e) => { e.stopPropagation(); alert('AI 요약 기능을 준비 중입니다.'); }}
                   className="flex-1 h-11 bg-white border border-slate-100 rounded-2xl flex items-center justify-center gap-2 text-[12px] font-bold text-fixie-steel hover:bg-slate-50 transition-all shadow-sm"

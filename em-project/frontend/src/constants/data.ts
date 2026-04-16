@@ -29,8 +29,8 @@ export const TUTORIAL_STEPS = [
 ];
 
 export const THEMES: Theme[] = [
-  // 1. Base44 Sky: 맑고 쨍한 하늘색과 상큼한 복숭아 핑크
-  { id: 'magician', name: 'Base44 Sky', primary: '#8ACDF6', secondary: '#FFC8A8', vibe: 'Clear, Vibrant, Fresh' },
+  // 1. 새벽 (기본): 시원한 민트와 보라 톤
+  { id: 'magician', name: '새벽', primary: '#7DE3D1', secondary: '#C9AFFF', vibe: 'Calm, Pastel, Dreamy' },
   
   // 2. Morning Dew: 생기 도는 티파니 민트와 산뜻한 레몬 노랑
   { id: 'forest', name: 'Morning Dew', primary: '#6AD1C8', secondary: '#FDE073', vibe: 'Natural, Bright, Dewy' },

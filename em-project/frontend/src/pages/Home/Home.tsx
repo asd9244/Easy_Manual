@@ -84,10 +84,6 @@ export const Home: React.FC<HomeProps> = ({
             내 대시보드
           </h1>
         </div>
-        {/* 우측 상단 프로필 이미지 영역 */}
-        <div className="w-12 h-12 rounded-full bg-wing-gradient flex items-center justify-center text-white shadow-lg shadow-theme-primary/20 cursor-pointer hover:scale-105 transition-transform">
-          <span className="font-bold">U</span>
-        </div>
       </header>
 
       {/* 2. 기기 상태 대시보드 섹션 */}
