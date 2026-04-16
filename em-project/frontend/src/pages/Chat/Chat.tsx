@@ -16,7 +16,7 @@ import {
   ResumeSheet,
   SummaryModal,
 } from './components';
-import { getCategoriesForDevice, CategoryItem } from './constants';
+import { getCategoriesForProductType, CategoryItem } from './constants';
 
 interface ChatProps {
   setScreen: (screen: Screen) => void;
@@ -76,11 +76,10 @@ export const Chat: React.FC<ChatProps> = ({
   // ── 카테고리 선택 상태 ──
   const [selectedCategory, setSelectedCategory] = useState<CategoryItem | null>(null);
 
-  // 현재 기기의 제품명 (카테고리 목록 결정에 사용)
-  const currentDeviceName =
-    devices?.find(d => Number(d.id) === deviceId)?.name
-    ?? room.selectedMentionDevice
-    ?? null;
+  // 현재 기기의 제품군 + 기기명 (카테고리 목록 결정에 사용)
+  const currentDevice = devices?.find(d => Number(d.id) === deviceId);
+  const currentProductType = currentDevice?.productType ?? null;
+  const currentDeviceName = currentDevice?.name ?? room.selectedMentionDevice ?? null;
 
   // 카테고리 칩 노출 조건: 읽기전용 아님 + 아직 방이 없음(새 대화) + 기기 있음
   const showCategoryChips =
@@ -273,7 +272,7 @@ export const Chat: React.FC<ChatProps> = ({
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {getCategoriesForDevice(currentDeviceName).map(cat => (
+                {getCategoriesForProductType(currentProductType, currentDeviceName).map(cat => (
                   <button
                     key={cat.value}
                     onClick={() => setSelectedCategory(cat)}

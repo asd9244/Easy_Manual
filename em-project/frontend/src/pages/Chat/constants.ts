@@ -23,7 +23,7 @@ const PRODUCT_CATEGORIES: Record<string, CategoryItem[]> = {
     { value: 'MALFUNCTION', label: '세탁기 고장' },
     { value: 'USAGE', label: '세탁기 사용법' },
     { value: 'REPAIR', label: '세탁기 수리' },
-    { value: 'WINTER_CARE', label: '겨울철 관리' },
+    { value: 'WINTER_CARE', label: '겨울철 세탁기 관리' },
     { value: 'ETC', label: '기타' },
   ],
   '냉장고': [
@@ -48,10 +48,20 @@ const DEFAULT_CATEGORIES: CategoryItem[] = [
   { value: 'ETC', label: '기타' },
 ];
 
-export function getCategoriesForDevice(deviceName: string | null): CategoryItem[] {
-  if (!deviceName) return DEFAULT_CATEGORIES;
-  for (const key of Object.keys(PRODUCT_CATEGORIES)) {
-    if (deviceName.includes(key)) return PRODUCT_CATEGORIES[key];
+/**
+ * productType이 있으면 정확히 매칭, 없으면 deviceName에서 키워드로 추측 (폴백).
+ */
+export function getCategoriesForProductType(
+  productType: string | null | undefined,
+  deviceName?: string | null,
+): CategoryItem[] {
+  if (productType && PRODUCT_CATEGORIES[productType]) {
+    return PRODUCT_CATEGORIES[productType];
+  }
+  if (deviceName) {
+    for (const key of Object.keys(PRODUCT_CATEGORIES)) {
+      if (deviceName.includes(key)) return PRODUCT_CATEGORIES[key];
+    }
   }
   return DEFAULT_CATEGORIES;
 }

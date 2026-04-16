@@ -22,8 +22,8 @@ export const deviceService = {
           name: d.alias || d.representativeModelName || '이름 없는 기기',
           model: d.representativeModelName || '',
           alias: d.alias,
+          productType: d.productType || '',
           image: d.image || 'https://picsum.photos/seed/appliance/400/400',
-          // 모델명에 따른 아이콘 매핑 (임시)
           icon: deviceService.getIconByModel(d.representativeModelName || '')
         }));
       }

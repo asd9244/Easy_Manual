@@ -11,27 +11,32 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * 더미 데이터(테스트용 chat_rooms) 생성 전용.
+ * 더미 데이터(테스트용 {@code chat_rooms}) 생성 전용.
  * <p>
- * 기동 시 시드 유저 기기마다 기존 채팅방·메시지를 지우고, 제품군별로 고정된 제목·카테고리 2건씩 다시 넣는다.
- * (프론트 {@code guideService.ts}의 TOP 5 표시 문구와 맞춤)
+ * 시드 유저 기기마다 채팅방을 {@link #ROOMS_PER_DEVICE}개씩 넣는다. 카테고리·제목은 프론트
+ * {@code Chat/constants.ts}의 제품군별 칩과 동일한 순서이며, 제품군 내 기기는 ID 순으로 두고
+ * 카테고리 풀을 라운드로빈하여 배정한다 ({@code (deviceIndex * ROOMS_PER_DEVICE + r) % poolSize}).
  * <p>
- * {@code chat_messages}는 시드로 넣지 않더라도, 이후 앱에서 대화가 생기면 FK 때문에 방 삭제 전에 비워야 한다.
- * 벌크 DELETE는 {@code clearAutomatically}로 영속성 컨텍스트를 비우므로, 삭제 전에 {@code product_type}을 스냅샷하고
- * 삭제 후 {@link UserDevice}를 다시 조회해 삽입한다.
+ * 기동 시 시드 계정의 기존 채팅방·메시지를 지운 뒤 삽입한다. 벌크 DELETE 후 영속성 컨텍스트가
+ * 비워지므로 삭제 전에 {@code product_type}을 스냅샷하고, 삭제 후 {@link UserDevice}를 다시 조회한다.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ChatRoomSeedService {
 
-    /** {@link UserDeviceRepository#findAllActiveForSeedUsers} 와 동일한 시드 계정 패턴 */
     private static final String SEED_USER_EMAIL_LIKE = "seed-user-%@localhost.local";
+
+    /** 시드 기기당 생성할 채팅방 수 (프론트 칩 종류를 순회·분산하기 위한 단위) */
+    private static final int ROOMS_PER_DEVICE = 3;
 
     private static final int TITLE_MAX = 200;
 
@@ -58,48 +63,96 @@ public class ChatRoomSeedService {
         log.info("시드 chat_rooms 초기화: chat_messages {}건 삭제, chat_rooms {}건 삭제", deletedMsg, deletedRooms);
 
         List<UserDevice> refreshed = userDeviceRepository.findAllById(deviceIds);
+
+        Map<String, List<UserDevice>> byProductType = refreshed.stream()
+                .collect(Collectors.groupingBy(ud -> {
+                    String pt = productTypeByDeviceId.get(ud.getId());
+                    return pt != null ? pt : "_UNKNOWN_";
+                }));
+
         int created = 0;
-        for (UserDevice ud : refreshed) {
-            String productType = productTypeByDeviceId.get(ud.getId());
-            for (FixedRoom spec : fixedRoomsForProductType(productType)) {
-                String title = truncateTitle(spec.title());
-                ChatRoom room = ChatRoom.builder()
-                        .userDevice(ud)
-                        .title(title)
-                        .questionCategory(spec.category())
-                        .build();
-                chatRoomRepository.save(room);
-                created++;
+        for (Map.Entry<String, List<UserDevice>> entry : byProductType.entrySet()) {
+            String productTypeKey = entry.getKey();
+            List<UserDevice> group = new ArrayList<>(entry.getValue());
+            group.sort(Comparator.comparing(UserDevice::getId));
+
+            List<CategorySpec> pool = categoryPoolForProductType(productTypeKey);
+            int n = pool.size();
+            if (n == 0) {
+                log.warn("제품군 '{}'에 대한 카테고리 풀이 비어 있어 건너뜁니다.", productTypeKey);
+                continue;
+            }
+
+            for (int deviceIndex = 0; deviceIndex < group.size(); deviceIndex++) {
+                UserDevice ud = group.get(deviceIndex);
+                int base = deviceIndex * ROOMS_PER_DEVICE;
+                for (int r = 0; r < ROOMS_PER_DEVICE; r++) {
+                    CategorySpec spec = pool.get((base + r) % n);
+                    String title = truncateTitle(spec.title());
+                    ChatRoom room = ChatRoom.builder()
+                            .userDevice(ud)
+                            .title(title)
+                            .questionCategory(spec.category())
+                            .build();
+                    chatRoomRepository.save(room);
+                    created++;
+                }
             }
         }
 
         int perDevice = refreshed.isEmpty() ? 0 : created / refreshed.size();
-        log.info("시드 chat_rooms {}건을 삽입했습니다. (시드 기기 {}대 × 기기당 평균 {}건, 제목·카테고리 고정)", created,
-                refreshed.size(), perDevice);
+        log.info(
+                "시드 chat_rooms {}건 삽입 (시드 기기 {}대, 기기당 {}건, 제품군별 칩 순서 라운드로빈)",
+                created,
+                refreshed.size(),
+                perDevice);
     }
 
     /**
-     * 제품군별로 TOP 5 집계에 쓰이는 카테고리만 쓰고, 홈에 보이는 문장형 제목과 동일하게 맞춘다.
+     * 프론트 {@code Chat/constants.ts}의 PRODUCT_CATEGORIES와 동일한 순서·라벨.
      */
-    private static List<FixedRoom> fixedRoomsForProductType(String productType) {
-        if (productType == null) {
+    private static List<CategorySpec> categoryPoolForProductType(String productTypeKey) {
+        if ("_UNKNOWN_".equals(productTypeKey)) {
             return List.of(
-                    new FixedRoom(QuestionCategory.USAGE, "사용법을 알고 싶어요"),
-                    new FixedRoom(QuestionCategory.MALFUNCTION, "고장·이상 증상을 해결하고 싶어요"));
+                    new CategorySpec(QuestionCategory.USAGE, "사용법"),
+                    new CategorySpec(QuestionCategory.MALFUNCTION, "고장"),
+                    new CategorySpec(QuestionCategory.CLEANING, "청소"));
         }
-        return switch (productType) {
+        return switch (productTypeKey) {
             case "에어컨" -> List.of(
-                    new FixedRoom(QuestionCategory.FILTER, "필터 관련 가이드가 필요해요"),
-                    new FixedRoom(QuestionCategory.REMOTE, "리모컨 사용법을 알려주세요"));
-            case "냉장고" -> List.of(
-                    new FixedRoom(QuestionCategory.ICE_MAKER, "아이스 메이커 사용법이 궁금해요"),
-                    new FixedRoom(QuestionCategory.TEMPERATURE, "온도 설정·조절이 궁금해요"));
+                    new CategorySpec(QuestionCategory.MODEL_REGISTER, "모델 등록"),
+                    new CategorySpec(QuestionCategory.CLEANING, "에어컨 청소"),
+                    new CategorySpec(QuestionCategory.FILTER, "에어컨 필터"),
+                    new CategorySpec(QuestionCategory.MALFUNCTION, "에어컨 고장"),
+                    new CategorySpec(QuestionCategory.REPAIR, "에어컨 수리"),
+                    new CategorySpec(QuestionCategory.REMOTE, "에어컨 리모컨"),
+                    new CategorySpec(QuestionCategory.INSTALL, "에어컨 설치"),
+                    new CategorySpec(QuestionCategory.ETC, "기타"));
             case "세탁기" -> List.of(
-                    new FixedRoom(QuestionCategory.CLEANING, "청소하는 방법을 알려주세요"),
-                    new FixedRoom(QuestionCategory.USAGE, "사용법을 알고 싶어요"));
+                    new CategorySpec(QuestionCategory.MODEL_REGISTER, "모델 등록"),
+                    new CategorySpec(QuestionCategory.CLEANING, "세탁기 청소"),
+                    new CategorySpec(QuestionCategory.FILTER, "세탁기 필터"),
+                    new CategorySpec(QuestionCategory.MALFUNCTION, "세탁기 고장"),
+                    new CategorySpec(QuestionCategory.USAGE, "세탁기 사용법"),
+                    new CategorySpec(QuestionCategory.REPAIR, "세탁기 수리"),
+                    new CategorySpec(QuestionCategory.WINTER_CARE, "겨울철 세탁기 관리"),
+                    new CategorySpec(QuestionCategory.ETC, "기타"));
+            case "냉장고" -> List.of(
+                    new CategorySpec(QuestionCategory.MODEL_REGISTER, "모델 등록"),
+                    new CategorySpec(QuestionCategory.CLEANING, "냉장고 청소"),
+                    new CategorySpec(QuestionCategory.ICE_MAKER, "아이스 메이커"),
+                    new CategorySpec(QuestionCategory.MALFUNCTION, "냉장고 고장"),
+                    new CategorySpec(QuestionCategory.USAGE, "냉장고 사용법"),
+                    new CategorySpec(QuestionCategory.FREEZER_USAGE, "냉동고 사용법"),
+                    new CategorySpec(QuestionCategory.REPAIR, "냉장고 수리"),
+                    new CategorySpec(QuestionCategory.TEMPERATURE, "냉장고 온도"),
+                    new CategorySpec(QuestionCategory.ETC, "기타"));
             default -> List.of(
-                    new FixedRoom(QuestionCategory.USAGE, "사용법을 알고 싶어요"),
-                    new FixedRoom(QuestionCategory.CLEANING, "청소하는 방법을 알려주세요"));
+                    new CategorySpec(QuestionCategory.MODEL_REGISTER, "모델 등록"),
+                    new CategorySpec(QuestionCategory.USAGE, "사용법"),
+                    new CategorySpec(QuestionCategory.MALFUNCTION, "고장"),
+                    new CategorySpec(QuestionCategory.CLEANING, "청소"),
+                    new CategorySpec(QuestionCategory.ETC, "기타"));
         };
     }
 
@@ -110,6 +163,6 @@ public class ChatRoomSeedService {
         return raw.substring(0, TITLE_MAX);
     }
 
-    private record FixedRoom(QuestionCategory category, String title) {
+    private record CategorySpec(QuestionCategory category, String title) {
     }
 }

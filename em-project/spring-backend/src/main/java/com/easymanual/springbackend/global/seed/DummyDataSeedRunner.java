@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
  * <p>
  * {@code users} → {@link UserSeedService},
  * {@code user-devices} → {@link UserDeviceSeedService},
- * {@code chat-rooms} → {@link ChatRoomSeedService} (시드 계정의 기존 방·메시지 삭제 후 고정 더미 재삽입).
+ * {@code chat-rooms} → {@link ChatRoomSeedService} (시드 계정의 기존 방·메시지 삭제 후, 기기당 3개·제품군별 칩 라운드로빈 삽입).
  * 셋 다 {@code true}면 기존과 같이 전체가 순서대로 채워진다.
  */
 @Slf4j
