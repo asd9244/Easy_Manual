@@ -37,7 +37,7 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.spring
     container_name: pixie-spring-prod
-    env_file: em-project/spring-backend/.env
+    env_file: .env
     depends_on:
       - postgres
       - neo4j
@@ -63,7 +63,7 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.ai
     container_name: pixie-ai-prod
-    env_file: em-project/ai-backend/.env
+    env_file: .env
     depends_on:
       - neo4j
     environment:
