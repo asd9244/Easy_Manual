@@ -2,6 +2,7 @@
 FROM gradle:8.5-jdk17 AS build
 WORKDIR /home/gradle/src
 COPY --chown=gradle:gradle em-project/spring-backend /home/gradle/src
+RUN chmod +x ./gradlew
 RUN ./gradlew build --no-daemon -x test
 
 # 실행 단계
