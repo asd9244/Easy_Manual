@@ -8,7 +8,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 
@@ -30,23 +29,31 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // 1. 인증 객체(Authentication)에서 소셜 로그인으로 가져온 유저 정보(OAuth2User)를 추출합니다.
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
 
-        // 2. 유저 정보에서 이메일을 꺼냅니다. (구글은 "email", 카카오는 "kakao_account" 안에 중첩되어 있으므로 안전하게 추출해야 합니다.)
+        // 2. 유저 정보에서 이메일을 꺼냅니다.
         String email = extractEmail(oAuth2User);
 
         // 3. 추출한 이메일을 기반으로 우리 서버 전용 JWT 토큰을 생성합니다.
         String token = jwtProvider.createToken(email);
 
-        // 4. 환경변수로 설정된 프론트엔드 주소로 리다이렉트합니다. (개발환경은 localhost:3000)
-        String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/auth/success")
-                .queryParam("token", token)
-                .build().toUriString();
+        // 4. Vercel 배포 보호(Deployment Protection)를 우회하기 위해,
+        //    HTTP redirect 대신 HTML 페이지를 직접 응답합니다.
+        //    이 HTML이 브라우저에서 실행되면서 localStorage에 토큰을 저장하고 프론트로 이동합니다.
+        String safeToken = token.replace("\"", "").replace("<", "").replace(">", "").replace("&", "");
+        String safeFrontendUrl = frontendUrl.replace("\"", "");
 
-        // 5. 조립된 URL로 클라이언트의 브라우저를 강제 이동(Redirect)시킵니다.
-        getRedirectStrategy().sendRedirect(request, response, targetUrl);
+        response.setContentType("text/html;charset=UTF-8");
+        response.setStatus(HttpServletResponse.SC_OK);
+        response.getWriter().write(
+            "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>" +
+            "<script>" +
+            "localStorage.setItem('accessToken','" + safeToken + "');" +
+            "window.location.replace('" + safeFrontendUrl + "');" +
+            "</script>" +
+            "<p>로그인 처리 중입니다...</p>" +
+            "</body></html>"
+        );
     }
 
-    // [수정] CustomOAuth2UserService에서 무조건 최상단에 "email"을 주입하도록 보장했으므로,
-    // 분기 처리 없이 바로 "email" 키로 값을 추출합니다.
     private String extractEmail(OAuth2User oAuth2User) {
         Object emailObj = oAuth2User.getAttributes().get("email");
         if (emailObj != null) {
