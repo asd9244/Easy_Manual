@@ -1,7 +1,7 @@
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "https://api.fixieeasymanualonline.tech/api/$1" },
-    { "source": "/oauth2/(.*)", "destination": "https://api.fixieeasymanualonline.tech/oauth2/$1" },
+    { "source": "/oauth2/authorization/(.*)", "destination": "https://api.fixieeasymanualonline.tech/oauth2/authorization/$1" },
     { "source": "/login/oauth2/(.*)", "destination": "https://api.fixieeasymanualonline.tech/login/oauth2/$1" },
     { "source": "/uploads/(.*)", "destination": "https://api.fixieeasymanualonline.tech/uploads/$1" },
     { "source": "/manual_images/(.*)", "destination": "https://api.fixieeasymanualonline.tech/manual_images/$1" },
