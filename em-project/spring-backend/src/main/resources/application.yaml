@@ -32,6 +32,7 @@ logging:
     org.springframework.security: DEBUG
     org.springframework.web: DEBUG
 
+spring:
   config:
     import: optional:file:.env[.properties]
   datasource:
