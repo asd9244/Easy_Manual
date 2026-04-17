@@ -3,8 +3,9 @@ version: '3.8'
 services:
   # 데이터베이스: PostgreSQL
   postgres:
-    image: postgres:18
+    image: postgres:17-alpine
     container_name: pixie-postgres-prod
+    env_file: .env
     ports:
       - "5432:5432"
     environment:
@@ -19,6 +20,7 @@ services:
   neo4j:
     image: neo4j:5
     container_name: pixie-neo4j-prod
+    env_file: .env
     ports:
       - "7474:7474"
       - "7687:7687"
@@ -35,6 +37,7 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.spring
     container_name: pixie-spring-prod
+    env_file: em-project/spring-backend/.env
     depends_on:
       - postgres
       - neo4j
@@ -60,6 +63,7 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.ai
     container_name: pixie-ai-prod
+    env_file: em-project/ai-backend/.env
     depends_on:
       - neo4j
     environment:
@@ -76,6 +80,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: pixie-tunnel
+    env_file: .env
     restart: always
     command: tunnel --no-autoupdate run
     environment:
