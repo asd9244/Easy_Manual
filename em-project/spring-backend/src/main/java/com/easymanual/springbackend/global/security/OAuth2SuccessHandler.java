@@ -37,7 +37,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         // 4. Vercel 배포 보호(Deployment Protection)를 우회하기 위해,
         //    HTTP redirect 대신 HTML 페이지를 직접 응답합니다.
-        //    이 HTML이 브라우저에서 실행되면서 localStorage에 토큰을 저장하고 프론트로 이동합니다.
+        //    토큰을 URL 파라미터로 프론트엔드에 전달합니다.
+        //    (localStorage는 도메인별로 분리되어 있어서 백엔드 도메인에서 저장하면 프론트에서 읽을 수 없습니다.)
         String safeToken = token.replace("\"", "").replace("<", "").replace(">", "").replace("&", "");
         String safeFrontendUrl = frontendUrl.replace("\"", "");
 
@@ -46,8 +47,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         response.getWriter().write(
             "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>" +
             "<script>" +
-            "localStorage.setItem('accessToken','" + safeToken + "');" +
-            "window.location.replace('" + safeFrontendUrl + "');" +
+            "window.location.replace('" + safeFrontendUrl + "/auth/success?token=" + safeToken + "');" +
             "</script>" +
             "<p>로그인 처리 중입니다...</p>" +
             "</body></html>"
