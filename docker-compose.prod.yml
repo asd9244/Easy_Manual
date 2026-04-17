@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # 데이터베이스: PostgreSQL
+  postgres:
+    image: postgres:18
+    container_name: pixie-postgres-prod
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-1234}
+      POSTGRES_DB: ${DB_NAME:-pixie}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    restart: always
+
+  # 데이터베이스: Neo4j
+  neo4j:
+    image: neo4j:5
+    container_name: pixie-neo4j-prod
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/12341234}
+    volumes:
+      - neo4j_prod_data:/data
+    restart: always
+
+  # AI 모델 서버: Ollama
+  ollama:
+    image: ollama/ollama:latest
+    container_name: pixie-ollama-prod
+    volumes:
+      - ollama_prod_data:/root/.ollama
+    restart: always
+
+  # 백엔드: Spring Boot
+  spring-backend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.spring
+    container_name: pixie-spring-prod
+    depends_on:
+      - postgres
+      - neo4j
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-pixie}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-1234}
+      # 필요한 다른 환경 변수들 추가
+    ports:
+      - "8080:8080"
+    restart: always
+
+  # 백엔드: AI Service (FastAPI)
+  ai-backend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.ai
+    container_name: pixie-ai-prod
+    depends_on:
+      - ollama
+      - neo4j
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      NEO4J_URL: bolt://neo4j:7687
+    ports:
+      - "8000:8000"
+    restart: always
+
+  # Cloudflare Tunnel
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: pixie-tunnel
+    restart: always
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+
+volumes:
+  postgres_prod_data:
+  neo4j_prod_data:
+  ollama_prod_data:

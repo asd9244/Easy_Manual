@@ -12,12 +12,21 @@ function isShareViewContext(): boolean {
  * 전역 API 서비스 (axios 인스턴스)
  * 모든 요청에 자동으로 JWT 토큰을 주입하고, 401/403 에러를 처리합니다.
  */
+// 환경 변수가 있으면 사용하고, 없으면 로컬 프록시(/api)를 기본값으로 사용합니다.
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+
+/**
+ * 전역 API 서비스 (axios 인스턴스)
+ * 모든 요청에 자동으로 JWT 토큰을 주입하고, 401/403 에러를 처리합니다.
+ */
 export const api = axios.create({
-  baseURL: "/api", // Vite 프록시 (/api -> http://localhost:8080) 활용
+  baseURL: BASE_URL,
   timeout: 120000,
   withCredentials: true, // CORS 및 쿠키 공유를 위해 true 설정
   headers: {
     "Content-Type": "application/json",
+    // ngrok 무료 버전 사용 시 나타나는 경고 페이지를 우회하기 위한 헤더 (Cloudflare 사용 시에는 무시됨)
+    "ngrok-skip-browser-warning": "69420",
   },
 });
 
