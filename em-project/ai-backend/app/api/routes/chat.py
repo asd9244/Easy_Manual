@@ -4,9 +4,10 @@ import re
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
-from langchain_ollama import OllamaEmbeddings, ChatOllama
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
+from langchain_ollama import OllamaEmbeddings, ChatOllama
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 
 load_dotenv()
 URI = os.getenv("NEO4J_URI")
@@ -14,14 +15,24 @@ USER = os.getenv("NEO4J_USER")
 PASSWORD = os.getenv("NEO4J_PASSWORD")
 router = APIRouter()
 
-OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+AI_MODE = os.getenv("AI_MODE", "ollama")
 
-embeddings_model = OllamaEmbeddings(model="bge-m3", base_url=OLLAMA_BASE)
-llm = ChatOllama(
-    model="gemma4:e4b",
-    base_url=OLLAMA_BASE,
-    temperature=0.1,
-)
+if AI_MODE == "gemini":
+    print("🚀 AI Mode: Cloud Gemini")
+    embeddings_model = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        temperature=0.1,
+    )
+else:
+    print("🏠 AI Mode: Local Ollama")
+    OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    embeddings_model = OllamaEmbeddings(model="bge-m3", base_url=OLLAMA_BASE)
+    llm = ChatOllama(
+        model="gemma4:e4b",
+        base_url=OLLAMA_BASE,
+        temperature=0.1,
+    )
 
 
 

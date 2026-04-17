@@ -1,7 +1,7 @@
-import os
 from neo4j import GraphDatabase
-from langchain_ollama import OllamaEmbeddings
 from dotenv import load_dotenv
+from langchain_ollama import OllamaEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import time
 
 load_dotenv()
@@ -9,23 +9,31 @@ URI = os.getenv("NEO4J_URI")
 USER = os.getenv("NEO4J_USER")
 PASSWORD = os.getenv("NEO4J_PASSWORD")
 
-# Ollama 모델 설정
-embeddings_model = OllamaEmbeddings(
-    model="bge-m3",
-    base_url="http://127.0.0.1:11434"
-)
+AI_MODE = os.getenv("AI_MODE", "ollama")
+
+if AI_MODE == "gemini":
+    print("🚀 Vector Mode: Cloud Gemini")
+    embeddings_model = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    VECTOR_DIM = 768
+else:
+    print("🏠 Vector Mode: Local Ollama")
+    embeddings_model = OllamaEmbeddings(
+        model="bge-m3",
+        base_url="http://127.0.0.1:11434"
+    )
+    VECTOR_DIM = 1024
 
 
 def create_vector_index(session):
     print("🛠️ Vector Index 세팅 중...")
     session.run("DROP INDEX page_text_embeddings IF EXISTS")
-    session.run("""
+    session.run(f"""
         CREATE VECTOR INDEX page_text_embeddings IF NOT EXISTS
         FOR (p:Page) ON (p.embedding)
-        OPTIONS {indexConfig: {
-            `vector.dimensions`: 1024,
+        OPTIONS {{indexConfig: {{
+            `vector.dimensions`: {VECTOR_DIM},
             `vector.similarity_function`: 'cosine'
-        }}
+        }}}}
     """)
     print("   ✅ Index 생성 완료.")
 
