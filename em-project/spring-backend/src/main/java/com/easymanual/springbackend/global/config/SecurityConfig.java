@@ -34,10 +34,13 @@ public class SecurityConfig {
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
                 // 프론트엔드 주소 허용 (localhost, 127.0.0.1 및 Vercel 배포 도메인 허용)
-                configuration.setAllowedOrigins(List.of(
+                // allowCredentials가 true일 때는 setAllowedOrigins 에 * 패턴을 바로 지정할 수 없으므로 setAllowedOriginPatterns 사용
+                configuration.setAllowedOriginPatterns(List.of(
                         "http://localhost:3000",
                         "http://127.0.0.1:3000",
-                        "https://*.vercel.app"
+                        "https://*.vercel.app",
+                        "https://*.fixieeasymanualonline.tech",
+                        "https://fixieeasymanualonline.tech"
                 ));
                 // GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용
                 configuration.setAllowedMethods(List.of("*"));

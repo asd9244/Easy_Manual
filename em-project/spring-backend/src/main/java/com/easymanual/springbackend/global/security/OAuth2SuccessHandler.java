@@ -20,6 +20,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
     private final JwtProvider jwtProvider;
 
+    @org.springframework.beans.factory.annotation.Value("${FRONTEND_URL:http://localhost:3000}")
+    private String frontendUrl;
+
     // 소셜 로그인이 성공적으로 완료되면 Spring Security가 이 메서드를 자동으로 호출합니다.
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
@@ -33,9 +36,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // 3. 추출한 이메일을 기반으로 우리 서버 전용 JWT 토큰을 생성합니다.
         String token = jwtProvider.createToken(email);
 
-        // 4. 클라이언트가 처음 요청한 도메인(localhost 또는 127.0.0.1)을 그대로 유지하며 리다이렉트합니다.
-        String serverName = request.getServerName();
-        String targetUrl = UriComponentsBuilder.fromUriString("http://" + serverName + ":3000/oauth2/redirect")
+        // 4. 환경변수로 설정된 프론트엔드 주소로 리다이렉트합니다. (개발환경은 localhost:3000)
+        String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/oauth2/redirect")
                 .queryParam("token", token)
                 .build().toUriString();
 
