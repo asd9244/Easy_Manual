@@ -1,6 +1,10 @@
 server:
   port: 8080
   forward-headers-strategy: native
+  tomcat:
+    remote-ip-header: x-forwarded-for
+    protocol-header: x-forwarded-proto
+    internal-proxies: .*
 
 # --- 더미 데이터 생성용 (로컬/개발) — global.seed.DummyDataSeedRunner 참고 ---
 # 각각 true일 때만 해당 시드 실행(순서: users → user-devices → chat-rooms). 전부 true면 전체 파이프라인.
