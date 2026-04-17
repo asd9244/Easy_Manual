@@ -37,7 +37,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         String token = jwtProvider.createToken(email);
 
         // 4. 환경변수로 설정된 프론트엔드 주소로 리다이렉트합니다. (개발환경은 localhost:3000)
-        String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/oauth2/redirect")
+        String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/auth/success")
                 .queryParam("token", token)
                 .build().toUriString();
 

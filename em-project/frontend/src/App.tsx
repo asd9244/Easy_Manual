@@ -57,7 +57,7 @@ export default function App() {
     const path = window.location.pathname;
     const searchParams = new URLSearchParams(window.location.search);
     
-    if (path === '/oauth2/redirect') return 'splash';
+    if (path === '/auth/success') return 'splash';
     if (path.startsWith('/share/') || searchParams.has('share')) return 'share';
     
     const token = localStorage.getItem('accessToken');
@@ -304,7 +304,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
         onSelect={handleGuideDevicePicked}
       />
       <AnimatePresence mode="wait">
-        {window.location.pathname === '/oauth2/redirect' ? (
+        {window.location.pathname === '/auth/success' ? (
           <OAuthRedirectHandler 
             key="oauth-handler"
             onLogin={() => {
