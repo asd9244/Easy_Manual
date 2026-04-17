@@ -27,6 +27,11 @@ spring:
     ansi:
       enabled: ALWAYS
 
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+
   config:
     import: optional:file:.env[.properties]
   datasource:
