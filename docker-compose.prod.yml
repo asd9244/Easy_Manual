@@ -42,7 +42,7 @@ services:
       - postgres
       - neo4j
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-pixie}
+      SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/pixie}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-1234}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
