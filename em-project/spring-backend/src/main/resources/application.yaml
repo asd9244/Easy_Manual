@@ -19,6 +19,11 @@ app:
 #   DROP TABLE IF EXISTS diagnostic_reports;
 # (엔티티 삭제 후 ddl-auto: update 만으로는 테이블이 자동 삭제되지 않을 수 있음)
 
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+
 spring:
   application:
     name: backend-core
@@ -27,12 +32,6 @@ spring:
     ansi:
       enabled: ALWAYS
 
-logging:
-  level:
-    org.springframework.security: DEBUG
-    org.springframework.web: DEBUG
-
-spring:
   config:
     import: optional:file:.env[.properties]
   datasource:
