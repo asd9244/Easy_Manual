@@ -71,6 +71,8 @@ public class SecurityConfig {
                         ).permitAll()
                         // QR·업로드 정적 파일: <img src="/uploads/..."> 는 Authorization 헤더를 붙이지 않음
                         .requestMatchers("/uploads/**").permitAll()
+                        // 매뉴얼 이미지: AI backend 프록시 경로 (비로그인 접근 허용)
+                        .requestMatchers("/manual_images/**").permitAll()
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/oauth2/**",       // 추가: 소셜 로그인 요청 진입점 허용
