@@ -1,3 +1,4 @@
+import os
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 from langchain_ollama import OllamaEmbeddings
