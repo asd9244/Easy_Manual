@@ -69,8 +69,8 @@ def update_embeddings(tx, model_name):
             print(f"   ⏭️  '{title}' 섹션 건너뜀 (텍스트 없음)")
             continue
 
-        # 429 대비 재시도 로직 (최대 3회, 60초 대기)
-        for attempt in range(3):
+        # 429 대비 재시도 로직 (최대 4회, 60초 대기)
+        for attempt in range(4):
             try:
                 embedding_vector = embeddings_model.embed_query(text)
                 tx.run("""
@@ -78,28 +78,35 @@ def update_embeddings(tx, model_name):
                     SET s.embedding = $embedding
                 """, node_id=node_id, embedding=embedding_vector)
                 print(f"   ✅ '{title}' 섹션 완료")
-                time.sleep(0.7)  # 분당 100회 한도 방지 (약 85req/min)
+                time.sleep(0.7)  # 분당 100회 한도 방지
                 break
             except Exception as e:
                 err = str(e)
                 if "429" in err or "RESOURCE_EXHAUSTED" in err:
-                    wait = 60
-                    print(f"   ⏳ Rate limit 도달. {wait}초 대기 후 재시도... (시도 {attempt+1}/3)")
+                    wait = 65
+                    print(f"   ⏳ Rate limit 도달. {wait}초 대기 후 재시도... (시도 {attempt+1}/4)")
                     time.sleep(wait)
                 else:
                     print(f"   ❌ '{title}' 섹션 실패: {e}")
                     break
 
 
-def run_vectorization(model_name: str):
+if __name__ == "__main__":
+    manuals = [
+        "GMDS_MFL71890611_05_250625_00_WEB",       # 에어컨
+        "WM_KOR_MFL71792815_11_251204_00_OM_WEB",  # 세탁기
+        "REF_KOR_MFL71401523_00_250731_00_OM_WEB", # 냉장고
+    ]
+    
     with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as driver:
         with driver.session() as session:
-            # 1. 인덱스 생성
+            # 1. 인덱스 생성 (이미 있으면 유지)
             create_vector_index(session)
-            # 2. 임베딩 작업 (transaction 없이 직접 실행하여 타임아웃 방지)
-            session.execute_write(update_embeddings, model_name)
-            print(f"🎉 [{model_name}] 벡터화 공정 종료")
-
-
-if __name__ == "__main__":
-    run_vectorization("GMDS_MFL71890611_05_250625_00_WEB")  # 통합 파이프라인에서 쓴 이름과 맞춰주세요!
+            
+            # 2. 모든 매뉴얼 순차 벡터화
+            for manual in manuals:
+                print(f"\n📦 [{manual}] 공정 시작...")
+                session.execute_write(update_embeddings, manual)
+                print(f"🎉 [{manual}] 완료!")
+    
+    print("\n✨ 모든 매뉴얼 벡터화가 완료되었습니다.")

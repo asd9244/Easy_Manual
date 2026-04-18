@@ -238,7 +238,21 @@ def ask_manual(request: ChatRequest):
     if target_manual != input_manual:
         print(f"🔍 Manual Mapping: {input_manual} -> {target_manual}")
 
-    question_vector = embeddings_model.embed_query(user_question)
+    # 2. 질문 벡터화
+    try:
+        question_vector = embeddings_model.embed_query(user_question)
+    except Exception as e:
+        err_msg = str(e)
+        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+            return {
+                "manual_id": target_manual,
+                "question": user_question,
+                "found_page": None,
+                "ai_answer": "죄송합니다. 현재 AI 검색 기능의 일시적인 사용량 초과로 답변을 드릴 수 없습니다. 약 1분 후 다시 시도해 주시면 정상적으로 답변이 가능합니다.",
+                "manual_image_urls": []
+            }
+        print(f"Embedding 오류: {err_msg}")
+        raise
 
     with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as driver:
         with driver.session() as session:
