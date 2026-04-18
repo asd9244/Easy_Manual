@@ -43,10 +43,12 @@ def create_vector_index(session):
 
 
 def update_embeddings(tx, model_name):
-    # 아직 임베딩이 없는 섹션만 가져오기
+    # 빈 텍스트 제외, 아직 임베딩 없는 섹션만 가져오기
     result = tx.run("""
         MATCH (s:Section {product_name: $model_name})
-        WHERE s.combined_text IS NOT NULL AND s.embedding IS NULL
+        WHERE s.combined_text IS NOT NULL
+          AND trim(s.combined_text) <> ''
+          AND s.embedding IS NULL
         RETURN elementId(s) AS node_id, s.title AS title, s.combined_text AS combined_text
     """, model_name=model_name)
 
@@ -58,24 +60,35 @@ def update_embeddings(tx, model_name):
     print(f"🚀 [{model_name}] 총 {len(records)}개 섹션 벡터화 시작...")
 
     for record in records:
-        try:
-            node_id = record["node_id"]
-            text = record["combined_text"]
-            title = record["title"]
+        node_id = record["node_id"]
+        text = record["combined_text"]
+        title = record["title"]
 
-            # 임베딩 생성
-            embedding_vector = embeddings_model.embed_query(text)
-
-            # 섹션 업데이트
-            tx.run("""
-                MATCH (s:Section) WHERE elementId(s) = $node_id
-                SET s.embedding = $embedding
-            """, node_id=node_id, embedding=embedding_vector)
-
-            print(f"   ✅ '{title}' 섹션 완료")
-        except Exception as e:
-            print(f"   ❌ '{record['title']}' 섹션 실패: {e}")
+        # 빈 텍스트 최종 방어
+        if not text or not text.strip():
+            print(f"   ⏭️  '{title}' 섹션 건너뜀 (텍스트 없음)")
             continue
+
+        # 429 대비 재시도 로직 (최대 3회, 60초 대기)
+        for attempt in range(3):
+            try:
+                embedding_vector = embeddings_model.embed_query(text)
+                tx.run("""
+                    MATCH (s:Section) WHERE elementId(s) = $node_id
+                    SET s.embedding = $embedding
+                """, node_id=node_id, embedding=embedding_vector)
+                print(f"   ✅ '{title}' 섹션 완료")
+                time.sleep(0.7)  # 분당 100회 한도 방지 (약 85req/min)
+                break
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                    wait = 60
+                    print(f"   ⏳ Rate limit 도달. {wait}초 대기 후 재시도... (시도 {attempt+1}/3)")
+                    time.sleep(wait)
+                else:
+                    print(f"   ❌ '{title}' 섹션 실패: {e}")
+                    break
 
 
 def run_vectorization(model_name: str):
