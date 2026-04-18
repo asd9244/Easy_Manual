@@ -19,7 +19,7 @@ AI_MODE = os.getenv("AI_MODE", "ollama")
 
 if AI_MODE == "gemini":
     print("🚀 AI Mode: Cloud Gemini")
-    embeddings_model = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.0-flash",
         temperature=0.1,

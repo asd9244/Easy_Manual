@@ -13,7 +13,7 @@ AI_MODE = os.getenv("AI_MODE", "ollama")
 
 if AI_MODE == "gemini":
     print("🚀 Vector Mode: Cloud Gemini")
-    embeddings_model = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     VECTOR_DIM = 768
 else:
     print("🏠 Vector Mode: Local Ollama")
