@@ -18,7 +18,7 @@ if AI_MODE == "gemini":
         model="models/gemini-embedding-001",
         task_type="retrieval_document"
     )
-    VECTOR_DIM = 768
+    VECTOR_DIM = 3072
 else:
     print("🏠 Vector Mode: Local Ollama")
     embeddings_model = OllamaEmbeddings(
