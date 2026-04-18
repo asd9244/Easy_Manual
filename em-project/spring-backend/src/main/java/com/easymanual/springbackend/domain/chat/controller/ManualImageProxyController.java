@@ -27,6 +27,17 @@ public class ManualImageProxyController {
     private final WebClient webClient;
     private final com.easymanual.springbackend.domain.manual.repository.ManualRepository manualRepository;
 
+    public ManualImageProxyController(
+            @org.springframework.beans.factory.annotation.Value("${ai.backend.url}") String aiBackendUrl,
+            com.easymanual.springbackend.domain.manual.repository.ManualRepository manualRepository) {
+        this.manualRepository = manualRepository;
+        // 빈(Bean) 대신 직접 생성하여 설정 꼬임 방지 (50MB 제한)
+        this.webClient = WebClient.builder()
+                .baseUrl(aiBackendUrl)
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(50 * 1024 * 1024))
+                .build();
+    }
+
     @GetMapping("/{productName}/{filename}")
     public ResponseEntity<byte[]> proxyManualImage(
             @PathVariable String productName,
@@ -45,13 +56,15 @@ public class ManualImageProxyController {
         }
 
         try {
+            System.out.println("🚀 Proxying to AI: /manual_images/" + targetFolder + "/" + filename);
             byte[] imageBytes = webClient.get()
                     .uri("/manual_images/{targetFolder}/{filename}", targetFolder, filename)
                     .retrieve()
                     .bodyToMono(byte[].class)
-                    .block();
+                    .block(java.time.Duration.ofSeconds(30)); // 타임아웃 30초로 한 명의 지은이도 놓치지 않게 연장
 
             if (imageBytes == null || imageBytes.length == 0) {
+                System.err.println("⚠️ Image Not Found or Empty: " + targetFolder + "/" + filename);
                 return ResponseEntity.notFound().build();
             }
 
@@ -66,7 +79,12 @@ public class ManualImageProxyController {
                     .body(imageBytes);
 
         } catch (Exception e) {
-            System.err.println("❌ Image Proxy Error [" + targetFolder + "/" + filename + "]: " + e.getMessage());
+            String errorMsg = e.getMessage();
+            System.err.println("❌ Image Proxy Error [" + targetFolder + "/" + filename + "]: " + errorMsg);
+            
+            if (errorMsg != null && errorMsg.contains("404")) {
+                return ResponseEntity.notFound().build();
+            }
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
     }

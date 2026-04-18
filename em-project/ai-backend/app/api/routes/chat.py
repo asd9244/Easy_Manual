@@ -10,6 +10,7 @@ from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import traceback
 
 load_dotenv()
 URI = os.getenv("NEO4J_URI")
@@ -31,47 +32,40 @@ else:
     print("🏠 AI Mode: Local Ollama")
     embeddings_model = OllamaEmbeddings(model="bge-m3", base_url=OLLAMA_BASE)
 
-# ─── LLM 폴백 체인 Def ───────────────────────────────────────────────────────
-# Gemini 모델들 (각각 별도 일일 할당량 풀)
+# Gemini 모델들 (가장 표준적인 이름으로 고정)
 GEMINI_LLM_CASCADE = [
-    "gemini-2.5-flash-preview-04-17",  # 1순위: 성능 최고
-    "gemini-2.0-flash",                # 2순위: 안정적
-    "gemini-1.5-flash",                # 3순위: 구버전 별도 풀
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "models/gemini-1.5-flash",
+    "models/gemini-1.5-pro"
 ]
-# 로컬 Ollama Gemma3 (최후 폴백, 완전 무료)
-_ollama_llm = ChatOllama(model="gemma3:4b", base_url=OLLAMA_BASE, temperature=0.1)
-
 
 def invoke_llm_with_fallback(prompt: str) -> str:
     """
-    Gemini 모델들을 순서대로 시도하고, 모두 429 에러이면
-    로컬 Ollama gemma3:4b로 폴백합니다.
+    어떤 에러가 나도 로컬 Ollama까지 끈질기게 내려가도록 설계
     """
-    if AI_MODE == "gemini":
-        for model_name in GEMINI_LLM_CASCADE:
-            try:
-                llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.1)
-                response = llm.invoke(prompt)
-                active_model = model_name
-                print(f"✅ LLM 사용 모델: {active_model}")
-                return _llm_text_content(response)
-            except Exception as e:
-                err = str(e)
-                if "429" in err or "RESOURCE_EXHAUSTED" in err:
-                    print(f"⚠️ [{model_name}] 할당량 초과, 다음 모델 시도...")
-                    continue
-                else:
-                    print(f"❌ [{model_name}] 예상치 못한 오류: {err}")
-                    raise
+    for model_name in GEMINI_LLM_CASCADE:
+        try:
+            print(f"📡 Attempting Gemini model: {model_name}")
+            llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.1)
+            response = llm.invoke(prompt)
+            # 확실하게 텍스트 추출
+            if hasattr(response, 'content'):
+                return response.content
+            return str(response)
+        except Exception as e:
+            print(f"⚠️ [{model_name}] Fail: {e}")
+            continue
 
-    # Gemini 전부 실패 or ollama 모드 → 로컬 Ollama 폴백
-    print("🏠 Ollama gemma3:4b 로컬 폴백 실행 중...")
+    print("🏠 Falling back to Ollama gemma3:4b...")
     try:
         response = _ollama_llm.invoke(prompt)
-        return _llm_text_content(response)
+        if hasattr(response, 'content'):
+            return response.content
+        return str(response)
     except Exception as e:
-        print(f"❌ Ollama 폴백도 실패: {e}")
-        raise
+        print(f"❌ Final Fallback Fail: {e}")
+        return "AI 서비스에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
 
 # PostgreSQL Configuration
@@ -238,16 +232,21 @@ def ask_manual(request: ChatRequest):
     user_question = request.question
     input_manual = request.manual_id
     
-    # 🌟 매핑 로직 적용: S836P022 -> REF_KOR_...
-    target_manual = get_manual_code(input_manual)
-    if target_manual != input_manual:
-        print(f"🔍 Manual Mapping: {input_manual} -> {target_manual}")
+    # 1. 매핑 로직 적용: S836P022 -> REF_KOR_...
+    try:
+        target_manual = get_manual_code(input_manual)
+        if target_manual != input_manual:
+            print(f"🔍 Manual Mapping: {input_manual} -> {target_manual}")
+    except Exception:
+        print(f"⚠️ Mapping failed for {input_manual}, using original.")
+        target_manual = input_manual
 
     # 2. 질문 벡터화
     try:
         question_vector = embeddings_model.embed_query(user_question)
     except Exception as e:
         err_msg = str(e)
+        print(f"❌ Embedding Error: {err_msg}")
         if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
             return {
                 "manual_id": target_manual,
@@ -256,36 +255,45 @@ def ask_manual(request: ChatRequest):
                 "ai_answer": "죄송합니다. 현재 AI 검색 기능의 일시적인 사용량 초과로 답변을 드릴 수 없습니다. 약 1분 후 다시 시도해 주시면 정상적으로 답변이 가능합니다.",
                 "manual_image_urls": []
             }
-        print(f"Embedding 오류: {err_msg}")
         raise
 
-    with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as driver:
-        with driver.session() as session:
-            # 🌟 1단계: 벡터 유사도 검색으로 가장 관련 높은 Section 확보 (최대 3개)
-            # 다른 매뉴얼 인덱스가 섞이는 것을 방지하기 위해 5개 검색 후 product_name 필터링 + Limit 3
-            result = session.run("""
-                CALL db.index.vector.queryNodes('section_text_embeddings', 5, $question_vector)
-                YIELD node AS section, score
-                WHERE section.product_name = $manual_id
-                
-                MATCH (section)-[:COVERS_PAGE]->(page:Page)
-                WHERE page.image_filename IS NOT NULL AND trim(page.image_filename) <> ''
-                WITH section, score, page
-                ORDER BY page.page_num
-                WITH section, score,
-                     collect(page.page_num) AS page_nums,
-                     collect(page.image_filename) AS image_filenames
-                RETURN section.title AS section_title,
-                       section.hierarchy AS hierarchy,
-                       section.combined_text AS combined_text,
-                       score,
-                       page_nums,
-                       image_filenames
-                ORDER BY score DESC
-                LIMIT 3
-            """, question_vector=question_vector, manual_id=target_manual)
+    try:
+        with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as driver:
+            with driver.session() as session:
+                # 🌟 1단계: 벡터 유사도 검색으로 가장 관련 높은 Section 확보 (최대 3개)
+                result = session.run("""
+                    CALL db.index.vector.queryNodes('section_text_embeddings', 5, $question_vector)
+                    YIELD node AS section, score
+                    WHERE section.product_name = $manual_id
+                    
+                    MATCH (section)-[:COVERS_PAGE]->(page:Page)
+                    WHERE page.image_filename IS NOT NULL AND trim(page.image_filename) <> ''
+                    WITH section, score, page
+                    ORDER BY page.page_num
+                    WITH section, score,
+                         collect(page.page_num) AS page_nums,
+                         collect(page.image_filename) AS image_filenames
+                    RETURN section.title AS section_title,
+                           section.hierarchy AS hierarchy,
+                           section.combined_text AS combined_text,
+                           score,
+                           page_nums,
+                           image_filenames
+                    ORDER BY score DESC
+                    LIMIT 3
+                """, question_vector=question_vector, manual_id=target_manual)
 
-            records = list(result)
+                records = list(result)
+    except Exception as neo_err:
+        print(f"❌ Neo4j Query Error: {neo_err}")
+        traceback.print_exc()
+        return {
+            "manual_id": target_manual,
+            "question": user_question,
+            "found_page": None,
+            "ai_answer": "AI 데이터베이스 검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+            "manual_image_urls": []
+        }
 
     if not records:
         return {
