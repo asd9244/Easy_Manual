@@ -251,8 +251,19 @@ def ask_manual(request: ChatRequest):
 
     print(f"AI가 [{target_manual}]의 Section {len(records)}개를 참조하여 오직 텍스트만으로 초고속 답변을 생성 중입니다...")
 
-    response = llm.invoke(prompt)
-    ai_answer = _llm_text_content(response)
+    try:
+        response = llm.invoke(prompt)
+        ai_answer = _llm_text_content(response)
+    except Exception as llm_error:
+        err_msg = str(llm_error)
+        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+            ai_answer = (
+                "현재 AI 서비스 요청이 너무 많아 일시적으로 답변을 생성하지 못했습니다.\n\n"
+                "잠시 후 다시 시도해 주시면 정상적으로 답변이 가능합니다."
+            )
+        else:
+            print(f"LLM 오류: {err_msg}")
+            ai_answer = "AI 답변 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
     print(f"\n💡 [AI 생성 답변]\n{ai_answer}\n")
 
