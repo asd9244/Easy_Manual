@@ -18,26 +18,61 @@ PASSWORD = os.getenv("NEO4J_PASSWORD")
 router = APIRouter()
 
 AI_MODE = os.getenv("AI_MODE", "ollama")
+OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
 
+# ─── 임베딩: Gemini (별도 할당량 풀 → 안정적) ───────────────────────────────
 if AI_MODE == "gemini":
-    print("🚀 AI Mode: Cloud Gemini (v1)")
+    print("🚀 AI Mode: Hybrid (Gemini Primary + Ollama Fallback)")
     embeddings_model = GoogleGenerativeAIEmbeddings(
         model="models/gemini-embedding-001",
         task_type="retrieval_query"
     )
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-preview-04-17",
-        temperature=0.1,
-    )
 else:
     print("🏠 AI Mode: Local Ollama")
-    OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
     embeddings_model = OllamaEmbeddings(model="bge-m3", base_url=OLLAMA_BASE)
-    llm = ChatOllama(
-        model="gemma4:e4b",
-        base_url=OLLAMA_BASE,
-        temperature=0.1,
-    )
+
+# ─── LLM 폴백 체인 Def ───────────────────────────────────────────────────────
+# Gemini 모델들 (각각 별도 일일 할당량 풀)
+GEMINI_LLM_CASCADE = [
+    "gemini-2.5-flash-preview-04-17",  # 1순위: 성능 최고
+    "gemini-2.0-flash",                # 2순위: 안정적
+    "gemini-1.5-flash",                # 3순위: 구버전 별도 풀
+]
+# 로컬 Ollama Gemma3 (최후 폴백, 완전 무료)
+_ollama_llm = ChatOllama(model="gemma3:4b", base_url=OLLAMA_BASE, temperature=0.1)
+
+
+def invoke_llm_with_fallback(prompt: str) -> str:
+    """
+    Gemini 모델들을 순서대로 시도하고, 모두 429 에러이면
+    로컬 Ollama gemma3:4b로 폴백합니다.
+    """
+    if AI_MODE == "gemini":
+        for model_name in GEMINI_LLM_CASCADE:
+            try:
+                llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.1)
+                response = llm.invoke(prompt)
+                active_model = model_name
+                print(f"✅ LLM 사용 모델: {active_model}")
+                return _llm_text_content(response)
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                    print(f"⚠️ [{model_name}] 할당량 초과, 다음 모델 시도...")
+                    continue
+                else:
+                    print(f"❌ [{model_name}] 예상치 못한 오류: {err}")
+                    raise
+
+    # Gemini 전부 실패 or ollama 모드 → 로컬 Ollama 폴백
+    print("🏠 Ollama gemma3:4b 로컬 폴백 실행 중...")
+    try:
+        response = _ollama_llm.invoke(prompt)
+        return _llm_text_content(response)
+    except Exception as e:
+        print(f"❌ Ollama 폴백도 실패: {e}")
+        raise
+
 
 # PostgreSQL Configuration
 DB_HOST = os.getenv("DB_HOST", "postgres")
@@ -157,15 +192,10 @@ def summarize_conversation(request: SummarizeRequest):
 
     print("대화 로그 텍스트 요약 생성 중...")
     try:
-        response = llm.invoke(prompt)
-        summary = _llm_text_content(response).strip()
+        summary = invoke_llm_with_fallback(prompt).strip()
     except Exception as e:
-        err_msg = str(e)
-        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-            summary = "현재 요약 기능의 사용량이 많아 일시적으로 제한되었습니다. 잠시 후 다시 시도해 주세요."
-        else:
-            print(f"Summary 오류: {e}")
-            summary = "요약을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요."
+        print(f"Summary 오류: {e}")
+        summary = ""
 
     if not summary:
         summary = "요약을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요."
@@ -309,21 +339,13 @@ def ask_manual(request: ChatRequest):
 [유저 질문]
 {user_question}"""
 
-    print(f"AI가 [{target_manual}]의 Section {len(records)}개를 참조하여 오직 텍스트만으로 초고속 답변을 생성 중입니다...")
+    print(f"AI가 [{target_manual}]의 Section {len(records)}개를 참조하여 답변 생성 중...")
 
     try:
-        response = llm.invoke(prompt)
-        ai_answer = _llm_text_content(response)
+        ai_answer = invoke_llm_with_fallback(prompt)
     except Exception as llm_error:
-        err_msg = str(llm_error)
-        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-            ai_answer = (
-                "현재 AI 서비스 요청이 너무 많아 일시적으로 답변을 생성하지 못했습니다.\n\n"
-                "잠시 후 다시 시도해 주시면 정상적으로 답변이 가능합니다."
-            )
-        else:
-            print(f"LLM 오류: {err_msg}")
-            ai_answer = "AI 답변 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        print(f"LLM 전체 챔인 실패: {llm_error}")
+        ai_answer = "AI 답변 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
     print(f"\n💡 [AI 생성 답변]\n{ai_answer}\n")
 
