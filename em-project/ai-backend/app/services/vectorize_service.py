@@ -29,8 +29,8 @@ else:
 
 
 def create_vector_index(session):
-    print("🛠️ Vector Index 세팅 중...")
-    session.run("DROP INDEX section_text_embeddings IF EXISTS")
+    print("🛠️ Vector Index 상태 확인 중...")
+    # 인덱스가 이미 있으면 삭제하지 않고 유지 (속도 및 데이터 무결성)
     session.run(f"""
         CREATE VECTOR INDEX section_text_embeddings IF NOT EXISTS
         FOR (s:Section) ON (s.embedding)
@@ -39,7 +39,7 @@ def create_vector_index(session):
             `vector.similarity_function`: 'cosine'
         }}}}
     """)
-    print("   ✅ Index 생성 완료.")
+    print("   ✅ Index 확인/생성 완료.")
 
 
 def update_embeddings(tx, model_name):
