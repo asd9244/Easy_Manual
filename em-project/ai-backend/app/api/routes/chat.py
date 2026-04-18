@@ -21,7 +21,7 @@ if AI_MODE == "gemini":
     print("🚀 AI Mode: Cloud Gemini")
     embeddings_model = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash",
         temperature=0.1,
     )
 else:
