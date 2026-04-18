@@ -49,6 +49,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-1234}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       API_URL: "https://api.fixieeasymanualonline.tech"
+      AI_BACKEND_URL: "http://ai-backend:8000"
       # JWT & Security Settings
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION}
