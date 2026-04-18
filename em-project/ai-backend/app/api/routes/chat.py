@@ -8,6 +8,8 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 load_dotenv()
 URI = os.getenv("NEO4J_URI")
@@ -36,6 +38,50 @@ else:
         base_url=OLLAMA_BASE,
         temperature=0.1,
     )
+
+# PostgreSQL Configuration
+DB_HOST = os.getenv("DB_HOST", "postgres")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "pixie")
+DB_USER = os.getenv("DB_USERNAME", "postgres")
+DB_PASS = os.getenv("DB_PASSWORD", "1234")
+
+def get_manual_code(manual_id_or_name: str) -> str:
+    """
+    프론트에서 온 manual_id(PK) 또는 model_name(S836P022 등)을 
+    Neo4j에 저장된 실제 manual_code(REF_KOR_...)로 매핑합니다.
+    """
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS
+        )
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # 1. manual_id(숫자형)로 검색
+            if manual_id_or_name.isdigit():
+                cur.execute("SELECT manual_code FROM manuals WHERE id = %s", (manual_id_or_name,))
+                row = cur.fetchone()
+                if row: return row['manual_code']
+
+            # 2. model_name(문자열)로 검색
+            cur.execute("""
+                SELECT m.manual_code 
+                FROM manuals m
+                JOIN product_models p ON p.manual_id = m.id
+                WHERE p.model_name = %s
+            """, (manual_id_or_name,))
+            row = cur.fetchone()
+            if row: return row['manual_code']
+            
+            # 3. 직접 manual_code일 가능성 확인 (이미 변환된 값이면 그대로 반환)
+            cur.execute("SELECT manual_code FROM manuals WHERE manual_code = %s", (manual_id_or_name,))
+            row = cur.fetchone()
+            if row: return row['manual_code']
+
+        conn.close()
+    except Exception as e:
+        print(f"PostgreSQL 매핑 오류: {e}")
+    
+    return manual_id_or_name # 매핑 실패 시 원본 반환 (Neo4j에 직접 저장된 경우 대비)
 
 
 
@@ -110,8 +156,17 @@ def summarize_conversation(request: SummarizeRequest):
 {text}"""
 
     print("대화 로그 텍스트 요약 생성 중...")
-    response = llm.invoke(prompt)
-    summary = _llm_text_content(response).strip()
+    try:
+        response = llm.invoke(prompt)
+        summary = _llm_text_content(response).strip()
+    except Exception as e:
+        err_msg = str(e)
+        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+            summary = "현재 요약 기능의 사용량이 많아 일시적으로 제한되었습니다. 잠시 후 다시 시도해 주세요."
+        else:
+            print(f"Summary 오류: {e}")
+            summary = "요약을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요."
+
     if not summary:
         summary = "요약을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요."
 
@@ -146,7 +201,12 @@ def _merge_images_ordered_by_page(records: list) -> List[str]:
 @router.post("/ask")
 def ask_manual(request: ChatRequest):
     user_question = request.question
-    target_manual = request.manual_id
+    input_manual = request.manual_id
+    
+    # 🌟 매핑 로직 적용: S836P022 -> REF_KOR_...
+    target_manual = get_manual_code(input_manual)
+    if target_manual != input_manual:
+        print(f"🔍 Manual Mapping: {input_manual} -> {target_manual}")
 
     question_vector = embeddings_model.embed_query(user_question)
 
