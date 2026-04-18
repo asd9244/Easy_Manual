@@ -17,6 +17,7 @@ neo4j==6.1.0
 langchain==1.2.14
 langchain-ollama
 langchain-google-genai==2.5.4
+google-genai
 openai==2.30.0
 langchain-openai==1.1.12
 

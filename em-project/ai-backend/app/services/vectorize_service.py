@@ -1,8 +1,9 @@
 import os
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
+from langchain_core.embeddings import Embeddings
 from langchain_ollama import OllamaEmbeddings
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from typing import List
 import time
 
 load_dotenv()
@@ -12,11 +13,33 @@ PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 AI_MODE = os.getenv("AI_MODE", "ollama")
 
+
+# ✅ 새 google-genai SDK를 직접 사용하는 커스텀 임베딩 클래스 (v1 API 사용!)
+class GeminiV1Embeddings(Embeddings):
+    def __init__(self, model: str, task_type: str = "RETRIEVAL_DOCUMENT"):
+        from google import genai
+        self.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+        self.model = model
+        self.task_type = task_type
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return [self.embed_query(text) for text in texts]
+
+    def embed_query(self, text: str) -> List[float]:
+        from google.genai import types
+        response = self.client.models.embed_content(
+            model=self.model,
+            contents=text,
+            config=types.EmbedContentConfig(task_type=self.task_type)
+        )
+        return response.embeddings[0].values
+
+
 if AI_MODE == "gemini":
-    print("🚀 Vector Mode: Cloud Gemini")
-    embeddings_model = GoogleGenerativeAIEmbeddings(
-        model="models/text-embedding-004",
-        task_type="retrieval_document"
+    print("🚀 Vector Mode: Cloud Gemini (v1 API)")
+    embeddings_model = GeminiV1Embeddings(
+        model="text-embedding-004",
+        task_type="RETRIEVAL_DOCUMENT"
     )
     VECTOR_DIM = 768
 else:
