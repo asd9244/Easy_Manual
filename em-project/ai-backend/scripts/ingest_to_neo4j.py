@@ -136,8 +136,10 @@ def run_pipeline(model_name: str):
 
 
 if __name__ == "__main__":
-    # 🌟 다른 매뉴얼을 넣고 싶다면?
-    # 1. pdf_service, ocr_service, toc_service 에서 model_name="samsung_tv" 로 돌린다.
-    # 2. 여기서 run_pipeline("samsung_tv") 라고 적고 실행하면 끝!
-
-    run_pipeline("GMDS_MFL71890611_05_250625_00_WEB")
+    manuals = [
+        "GMDS_MFL71890611_05_250625_00_WEB",       # 에어컨
+        "WM_KOR_MFL71792815_11_251204_00_OM_WEB",  # 세탁기
+        "REF_KOR_MFL71401523_00_250731_00_OM_WEB", # 냉장고
+    ]
+    for model in manuals:
+        run_pipeline(model)
