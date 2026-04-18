@@ -24,15 +24,28 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class ManualImageProxyController {
 
     private final WebClient webClient;
+    private final com.easymanual.springbackend.domain.manual.repository.ManualRepository manualRepository;
 
     @GetMapping("/{productName}/{filename}")
     public ResponseEntity<byte[]> proxyManualImage(
             @PathVariable String productName,
             @PathVariable String filename) {
 
+        String targetFolder = productName;
+        
+        // 1. productName이 모델명이면 실제 매뉴얼 코드(폴더명)로 변환
+        // 예: SQ06EJ1WES -> GMDS_MFL71890611_05_250625_00_WEB
+        Optional<com.easymanual.springbackend.domain.manual.entity.Manual> manualOpt = 
+                manualRepository.findByModelNameContaining(productName);
+        
+        if (manualOpt.isPresent()) {
+            targetFolder = manualOpt.get().getManualCode();
+            System.out.println("🖼️ Image Proxy Mapping: " + productName + " -> " + targetFolder);
+        }
+
         try {
             byte[] imageBytes = webClient.get()
-                    .uri("/manual_images/{productName}/{filename}", productName, filename)
+                    .uri("/manual_images/{targetFolder}/{filename}", targetFolder, filename)
                     .retrieve()
                     .bodyToMono(byte[].class)
                     .block();
@@ -52,6 +65,7 @@ public class ManualImageProxyController {
                     .body(imageBytes);
 
         } catch (Exception e) {
+            System.err.println("❌ Image Proxy Error [" + targetFolder + "/" + filename + "]: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
     }

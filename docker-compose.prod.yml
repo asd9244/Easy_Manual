@@ -74,6 +74,7 @@ services:
     depends_on:
       - neo4j
       - ollama
+      - postgres
     environment:
       AI_MODE: gemini
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}

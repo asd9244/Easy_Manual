@@ -83,36 +83,46 @@ DB_PASS = os.getenv("DB_PASSWORD", "1234")
 
 def get_manual_code(manual_id_or_name: str) -> str:
     """
-    프론트에서 온 manual_id(PK) 또는 model_name(S836P022 등)을 
+    프론트에서 온 manual_id(PK) 또는 model_name(SQ06... 등)을 
     Neo4j에 저장된 실제 manual_code(REF_KOR_...)로 매핑합니다.
     """
+    if not manual_id_or_name:
+        return ""
+
     try:
         conn = psycopg2.connect(
-            host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS
+            host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS,
+            connect_timeout=3  # 3초 타임아웃 추가
         )
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # 1. manual_id(숫자형)로 검색
+            # 1. manual_id(PK 숫자)로 검색
             if manual_id_or_name.isdigit():
                 cur.execute("SELECT manual_code FROM manuals WHERE id = %s", (manual_id_or_name,))
                 row = cur.fetchone()
-                if row: return row['manual_code']
+                if row: 
+                    conn.close()
+                    return row['manual_code']
 
-            # 2. model_name(문자열)로 검색
+            # 2. model_name(SQ06... 등)으로 검색 (LIKE 사용)
             cur.execute("""
                 SELECT m.manual_code 
                 FROM manuals m
-                JOIN product_models p ON p.manual_id = m.id
-                WHERE p.model_name = %s
-            """, (manual_id_or_name,))
+                JOIN models mod ON m.id = mod.manual_id
+                WHERE mod.name LIKE %s
+                LIMIT 1
+            """, (f"%{manual_id_or_name}%",))
             row = cur.fetchone()
-            if row: return row['manual_code']
-            
-            # 3. 직접 manual_code일 가능성 확인 (이미 변환된 값이면 그대로 반환)
-            cur.execute("SELECT manual_code FROM manuals WHERE manual_code = %s", (manual_id_or_name,))
-            row = cur.fetchone()
-            if row: return row['manual_code']
-
+            if row:
+                conn.close()
+                return row['manual_code']
+        
         conn.close()
+    except Exception as e:
+        # DB 오류가 전체 답변을 중단시키지 않도록 로깅만 하고 폴백
+        print(f"⚠️ [PostgreSQL Mapping Error]: {e}")
+    
+    # 매핑 실패 시 입력값을 그대로 반환 (Neo4j에 이미 manual_code가 들어올 경우 대비)
+    return manual_id_or_name
     except Exception as e:
         print(f"PostgreSQL 매핑 오류: {e}")
     
