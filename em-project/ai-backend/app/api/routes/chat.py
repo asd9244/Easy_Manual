@@ -24,7 +24,7 @@ if AI_MODE == "gemini":
         task_type="retrieval_query"
     )
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash-preview-04-17",
         temperature=0.1,
     )
 else:
