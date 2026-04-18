@@ -20,12 +20,11 @@ services:
   neo4j:
     image: neo4j:5
     container_name: pixie-neo4j-prod
-    env_file: .env
     ports:
       - "7474:7474"
       - "7687:7687"
     environment:
-      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/12341234}
+      NEO4J_AUTH: neo4j/12341234
       NEO4J_server_memory_heap_initial__size: 512m
       NEO4J_server_memory_heap_max__size: 512m
       NEO4J_server_memory_pagecache_size: 256m
