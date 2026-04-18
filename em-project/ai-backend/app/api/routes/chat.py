@@ -123,11 +123,6 @@ def get_manual_code(manual_id_or_name: str) -> str:
     
     # 매핑 실패 시 입력값을 그대로 반환 (Neo4j에 이미 manual_code가 들어올 경우 대비)
     return manual_id_or_name
-    except Exception as e:
-        print(f"PostgreSQL 매핑 오류: {e}")
-    
-    return manual_id_or_name # 매핑 실패 시 원본 반환 (Neo4j에 직접 저장된 경우 대비)
-
 
 
 class ChatRequest(BaseModel):
