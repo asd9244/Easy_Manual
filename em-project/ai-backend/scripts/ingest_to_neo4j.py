@@ -17,12 +17,12 @@ def ingest_manual_to_graph(tx, model_name, ocr_data, toc_data):
     """
 
     # ==========================================
-    # 1. 제품(Product) 노드와 전체 페이지(Page) 노드 생성 (OCR 텍스트 주입)
+    # 1. 제품(Product) 노드와 전체 페이지(Page) 노드 생성
     # ==========================================
-    # 제품 노드 생성
     tx.run("MERGE (p:Product {name: $model_name})", model_name=model_name)
 
-    # OCR 데이터를 돌면서 모든 페이지 노드를 만들고 텍스트/이미지 정보를 넣습니다.
+    page_map = {p['page_num']: p.get('text', '') for p in ocr_data}
+    
     for page in ocr_data:
         tx.run("""
             MATCH (p:Product {name: $model_name})
@@ -37,48 +37,68 @@ def ingest_manual_to_graph(tx, model_name, ocr_data, toc_data):
                text=page.get('text', ''))
 
     # ==========================================
-    # 2. 목차(Topic) 노드 생성 및 페이지와 연결 (TOC 데이터 주입)
+    # 2. 섹션(Section) 노드 생성 및 페이지 범위 계산 (TOC 데이터 주입)
     # ==========================================
-    for item in toc_data:
+    # 2-1. 목차 정렬 (페이지 순)
+    sorted_toc = sorted(toc_data, key=lambda x: x['page_num'])
+    max_page = max(page_map.keys()) if page_map else 0
+
+    for idx, item in enumerate(sorted_toc):
         hierarchy = item['hierarchy']
-        page_num = item['page_num']
+        start_page = item['page_num']
+        
+        # 다음 목차 시작 전까지를 해당 섹션의 범위로 간주
+        if idx + 1 < len(sorted_toc):
+            end_page = sorted_toc[idx+1]['page_num'] - 1
+        else:
+            end_page = max_page
+        
+        # 실제 텍스트 합산
+        section_text_parts = []
+        for p_num in range(start_page, end_page + 1):
+            if p_num in page_map:
+                section_text_parts.append(page_map[p_num])
+        
+        combined_text = "\n\n".join(section_text_parts)
+        hierarchy_str = " > ".join(hierarchy)
 
         for i in range(len(hierarchy)):
             current_title = hierarchy[i]
             current_level = i + 1
-            # 고유 ID 생성 시 제품명도 포함하여 완벽히 격리 (예: "lg_aircon_안전을 위해 주의하기")
             current_id = f"{model_name}_{' > '.join(hierarchy[:i + 1])}"
 
-            # 목차 노드 생성
+            # 섹션 노드 생성 (라벨을 Section으로 통일)
             tx.run("""
-                MERGE (t:Topic {id: $id, product_name: $model_name})
-                ON CREATE SET t.title = $title, t.level = $level
-            """, id=current_id, model_name=model_name, title=current_title, level=current_level)
+                MERGE (s:Section {id: $id, product_name: $model_name})
+                ON CREATE SET s.title = $title, s.level = $level
+                SET s.hierarchy = $hierarchy_str,
+                    s.combined_text = $combined_text
+            """, id=current_id, model_name=model_name, title=current_title, level=current_level, 
+                hierarchy_str=hierarchy_str, combined_text=combined_text)
 
             # 관계 연결
             if i == 0:
-                # 대분류는 제품 노드와 연결
                 tx.run("""
                     MATCH (p:Product {name: $model_name})
-                    MATCH (t:Topic {id: $id})
-                    MERGE (p)-[:HAS_TOPIC]->(t)
+                    MATCH (s:Section {id: $id})
+                    MERGE (p)-[:HAS_SECTION]->(s)
                 """, model_name=model_name, id=current_id)
             else:
-                # 중/소분류는 부모 목차와 연결
                 parent_id = f"{model_name}_{' > '.join(hierarchy[:i])}"
                 tx.run("""
-                    MATCH (parent:Topic {id: $parent_id})
-                    MATCH (child:Topic {id: $child_id})
-                    MERGE (parent)-[:HAS_TOPIC]->(child)
+                    MATCH (parent:Section {id: $parent_id})
+                    MATCH (child:Section {id: $child_id})
+                    MERGE (parent)-[:HAS_SECTION]->(child)
                 """, parent_id=parent_id, child_id=current_id)
 
-        # 마지막으로 해당 목차를 실제 '페이지' 노드와 연결
-        lowest_topic_id = f"{model_name}_{' > '.join(hierarchy)}"
-        tx.run("""
-            MATCH (t:Topic {id: $topic_id})
-            MATCH (pg:Page {product_name: $model_name, page_num: $page_num})
-            MERGE (t)-[:STARTS_AT_PAGE]->(pg)
-        """, topic_id=lowest_topic_id, model_name=model_name, page_num=page_num)
+        # 2-2. 섹션과 페이지들 연결 (COVERS_PAGE)
+        lowest_section_id = f"{model_name}_{' > '.join(hierarchy)}"
+        for p_num in range(start_page, end_page + 1):
+            tx.run("""
+                MATCH (s:Section {id: $section_id})
+                MATCH (pg:Page {product_name: $model_name, page_num: $page_num})
+                MERGE (s)-[:COVERS_PAGE]->(pg)
+            """, section_id=lowest_section_id, model_name=model_name, page_num=p_num)
 
 
 # ==========================================

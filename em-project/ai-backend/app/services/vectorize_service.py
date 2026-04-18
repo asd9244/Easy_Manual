@@ -30,10 +30,10 @@ else:
 
 def create_vector_index(session):
     print("🛠️ Vector Index 세팅 중...")
-    session.run("DROP INDEX page_text_embeddings IF EXISTS")
+    session.run("DROP INDEX section_text_embeddings IF EXISTS")
     session.run(f"""
-        CREATE VECTOR INDEX page_text_embeddings IF NOT EXISTS
-        FOR (p:Page) ON (p.embedding)
+        CREATE VECTOR INDEX section_text_embeddings IF NOT EXISTS
+        FOR (s:Section) ON (s.embedding)
         OPTIONS {{indexConfig: {{
             `vector.dimensions`: {VECTOR_DIM},
             `vector.similarity_function`: 'cosine'
@@ -43,39 +43,39 @@ def create_vector_index(session):
 
 
 def update_embeddings(tx, model_name):
-    # 아직 임베딩이 없는 페이지만 가져오기
+    # 아직 임베딩이 없는 섹션만 가져오기
     result = tx.run("""
-        MATCH (p:Page {product_name: $model_name})
-        WHERE p.text IS NOT NULL AND p.embedding IS NULL
-        RETURN elementId(p) AS node_id, p.text AS text, p.page_num AS page_num
+        MATCH (s:Section {product_name: $model_name})
+        WHERE s.combined_text IS NOT NULL AND s.embedding IS NULL
+        RETURN elementId(s) AS node_id, s.title AS title, s.combined_text AS combined_text
     """, model_name=model_name)
 
     records = list(result)
     if not records:
-        print(f"✨ [{model_name}] 모든 페이지가 이미 벡터화되어 있습니다!")
+        print(f"✨ [{model_name}] 모든 섹션이 이미 벡터화되어 있습니다!")
         return
 
-    print(f"🚀 [{model_name}] 총 {len(records)}개 페이지 벡터화 시작...")
+    print(f"🚀 [{model_name}] 총 {len(records)}개 섹션 벡터화 시작...")
 
     for record in records:
         try:
             node_id = record["node_id"]
-            text = record["text"]
-            page_num = record["page_num"]
+            text = record["combined_text"]
+            title = record["title"]
 
-            # Ollama 호출 (여기서 시간이 걸릴 수 있음)
+            # 임베딩 생성
             embedding_vector = embeddings_model.embed_query(text)
 
-            # 한 페이지씩 즉시 업데이트
+            # 섹션 업데이트
             tx.run("""
-                MATCH (p:Page) WHERE elementId(p) = $node_id
-                SET p.embedding = $embedding
+                MATCH (s:Section) WHERE elementId(s) = $node_id
+                SET s.embedding = $embedding
             """, node_id=node_id, embedding=embedding_vector)
 
-            print(f"   ✅ {page_num}페이지 완료")
+            print(f"   ✅ '{title}' 섹션 완료")
         except Exception as e:
-            print(f"   ❌ {record['page_num']}페이지 실패: {e}")
-            continue  # 실패해도 다음 페이지로 진행
+            print(f"   ❌ '{record['title']}' 섹션 실패: {e}")
+            continue
 
 
 def run_vectorization(model_name: str):
