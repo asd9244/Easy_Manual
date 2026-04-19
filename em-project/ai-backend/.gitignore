@@ -19,7 +19,7 @@ env/
 # 3. 로컬 데이터 및 미디어 파일 (Data & Media)
 # ==========================================
 # (PDF 원본은 깃허브 용량 초과의 주범이므로 무시하지만, 서비스에 필수적인 가공 데이터는 허용합니다)
-data/
+data/*
 !data/processed_images/
 !data/extracted_texts/
 !data/extracted_toc/
