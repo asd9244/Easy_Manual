@@ -90,6 +90,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-1234}
     ports:
       - "8000:8000"
+    volumes:
+      - ./data/processed_images:/app/data/processed_images
     restart: always
 
   # 로컬 LLM: Ollama (Gemini 할당량 소진 시 폴백)

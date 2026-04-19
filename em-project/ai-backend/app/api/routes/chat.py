@@ -36,6 +36,8 @@ else:
 GEMINI_LLM_CASCADE = [
     "gemini-1.5-flash",
     "gemini-1.5-pro",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-pro-latest",
     "models/gemini-1.5-flash",
     "models/gemini-1.5-pro"
 ]
@@ -44,6 +46,8 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     """
     어떤 에러가 나도 로컬 Ollama까지 끈질기게 내려가도록 설계
     """
+    # 전역 설정을 함수 내에서 로컬하게 초기화하여 NameError 방지
+    ollama_llm = ChatOllama(model="gemma3:4b", base_url=OLLAMA_BASE)
     for model_name in GEMINI_LLM_CASCADE:
         try:
             print(f"📡 Attempting Gemini model: {model_name}")
@@ -59,7 +63,7 @@ def invoke_llm_with_fallback(prompt: str) -> str:
 
     print("🏠 Falling back to Ollama gemma3:4b...")
     try:
-        response = _ollama_llm.invoke(prompt)
+        response = ollama_llm.invoke(prompt)
         if hasattr(response, 'content'):
             return response.content
         return str(response)
@@ -115,6 +119,29 @@ def get_manual_code(manual_id_or_name: str) -> str:
         # DB 오류가 전체 답변을 중단시키지 않도록 로깅만 하고 폴백
         print(f"⚠️ [PostgreSQL Mapping Error]: {e}")
     
+    # 3. 파일 시스템 디스커버리 (Failsafe)
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__)) # app/api/routes
+        # app/api/routes -> app/api -> app -> ai-backend
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        images_dir = os.path.join(project_root, "data", "processed_images")
+        
+        if os.path.exists(images_dir):
+            folders = os.listdir(images_dir)
+            # 1단계: 대소문자 무시 정확히 일치 확인
+            for folder in folders:
+                if folder.lower() == manual_id_or_name.lower():
+                    print(f"📂 FS Discovery (Exact): {manual_id_or_name} -> {folder}")
+                    return folder
+            
+            # 2단계: 포함 관계 확인 (모델명이 폴더명에 포함되거나 그 반대)
+            for folder in folders:
+                if manual_id_or_name.lower() in folder.lower() or folder.lower() in manual_id_or_name.lower():
+                    print(f"📂 FS Discovery (Partial): {manual_id_or_name} -> {folder}")
+                    return folder
+    except Exception as fs_err:
+        print(f"⚠️ [FS Discovery Error]: {fs_err}")
+
     # 매핑 실패 시 입력값을 그대로 반환 (Neo4j에 이미 manual_code가 들어올 경우 대비)
     return manual_id_or_name
 
