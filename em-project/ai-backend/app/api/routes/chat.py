@@ -32,14 +32,13 @@ else:
     print("🏠 AI Mode: Local Ollama")
     embeddings_model = OllamaEmbeddings(model="bge-m3", base_url=OLLAMA_BASE)
 
-# Gemini 모델들 (가장 표준적인 이름으로 고정)
+# Gemini 모델들 (최신 순으로 정렬 - 빠른 모델 우선)
 GEMINI_LLM_CASCADE = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-pro-latest",
-    "models/gemini-1.5-flash",
-    "models/gemini-1.5-pro"
+    "gemini-2.5-flash-preview-04-17",  # 최신 2.5 (학교에서 됐던 버전)
+    "gemini-2.0-flash",                # 2.0 최신
+    "gemini-2.0-flash-lite",           # 2.0 경량
+    "gemini-1.5-flash",                # 1.5 안정
+    "gemini-1.5-pro",                  # 1.5 고성능
 ]
 
 def invoke_llm_with_fallback(prompt: str) -> str:
