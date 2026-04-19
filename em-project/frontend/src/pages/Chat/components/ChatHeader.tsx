@@ -31,7 +31,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   })();
 
   return (
-    <header className="p-5 md:p-7 bg-white/80 backdrop-blur-md flex items-center justify-between border-b border-white/20 z-10">
+    <header className="shrink-0 p-5 md:p-7 bg-white/80 backdrop-blur-md flex items-center justify-between border-b border-white/20 z-10">
       <div className="flex items-center gap-4">
         <button
           onClick={() => {

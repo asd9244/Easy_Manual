@@ -209,7 +209,7 @@ public class ChatService {
                 .chatRoom(chatRoom)
                 .senderType(ChatMessage.SenderType.USER)
                 .message(request.getMessage())
-                .mediaUrl(request.getMediaUrl())
+                .mediaUrl(null)
                 .build();
         chatMessageRepository.save(userMessage);
 
@@ -217,7 +217,6 @@ public class ChatService {
         AiChatRequest aiRequest = AiChatRequest.builder()
                 .manual_id(manualCode)
                 .question(request.getMessage())
-                .media_url(request.getMediaUrl())
                 .build();
 
         AiChatResponse aiResponse = webClient.post()

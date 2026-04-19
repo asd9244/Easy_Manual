@@ -44,10 +44,8 @@ export interface Message {
   type?: 'guide' | 'status';
   videoUrl?: string; // 옵션
   locatorImage?: string; // 옵션
-  mediaUrl?: string; // S3 주소 등을 담을 사진/음성 첨부 기능
   referencedPage?: number | string; // AI의 답변 출처를 표기하기 위해
   manualImageUrls?: string[]; // 백엔드에서 AI가 찾은 매뉴얼 이미지 URL 리스트
-  attachments?: string[]; // 프론트엔드 UI용 배열
   manualLink?: string; // 추가: 매뉴얼 버튼용 링크
   solutionStats?: string; // 추가: 해결 통계 지표 (예: "10명 중 3명 해결")
 }

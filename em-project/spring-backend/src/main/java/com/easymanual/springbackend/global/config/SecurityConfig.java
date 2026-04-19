@@ -9,7 +9,9 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -34,7 +36,13 @@ public class SecurityConfig {
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
                 // 프론트엔드 주소 허용 (localhost 와 127.0.0.1 둘 다 허용)
-                configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://127.0.0.1:3000"));
+                // LAN(예: http://192.168.x.x:3000)에서 Vite 접속 시 CORS 허용
+                configuration.setAllowedOriginPatterns(List.of(
+                        "http://localhost:*",
+                        "http://127.0.0.1:*",
+                        "http://192.168.*:*",
+                        "http://10.*:*"
+                ));
                 // GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용
                 configuration.setAllowedMethods(List.of("*"));
                 // 모든 헤더(Authorization 등) 허용
@@ -74,6 +82,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/chat/rooms/*/share-summary").permitAll()
                         .anyRequest().authenticated()
                 )
+                // REST 클라이언트(fetch/axios)는 302 로그인 페이지 대신 401을 받아야 한다. (리다이렉트 따라가며 HTML을 성공으로 오인 방지)
+                .exceptionHandling(ex -> ex.defaultAuthenticationEntryPointFor(
+                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                        request -> request.getRequestURI().startsWith("/api/")
+                ))
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler)

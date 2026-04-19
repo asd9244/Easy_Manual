@@ -52,7 +52,6 @@ export default function App() {
   const { showToast } = useToastStore();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [screen, setScreen] = useState<Screen>(() => {
     const path = window.location.pathname;
     const searchParams = new URLSearchParams(window.location.search);
@@ -124,7 +123,7 @@ export default function App() {
   const handleGuideTop5Click = (payload: GuideTop5ClickPayload) => {
     const candidates = filterDevicesByGuideProductType(devices, payload.productTypeFilter);
     if (candidates.length === 0) {
-      showToast('해당 제품군에 등록된 기기가 없습니다. 차고에서 기기를 등록해 주세요.', 'warning');
+      showToast('해당 제품군에 등록된 기기가 없습니다. 나의 가전에서 기기를 등록해 주세요.', 'warning');
       return;
     }
     if (candidates.length === 1) {
@@ -288,11 +287,8 @@ const SidebarItem = ({ id, icon: Icon, label }: any) => {
   );
 };
 
-// --- 채팅 로직 ---
+// --- 채팅 오버레이 표시 여부 ---
 const showNav = !['splash', 'tutorial', 'auth', 'share'].includes(screen);
-const handleSendMessage = (text: string) => { /* 로직 */ };
-const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직 */ };
-
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden text-sm bg-fixie-mist text-fixie-steel font-sans selection:bg-theme-primary/30">
@@ -432,15 +428,15 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm"
+                  className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-3 sm:p-5 md:p-8"
                   onClick={closeChatOverlay}
                 >
                   <motion.div
-                    initial={{ y: '100%' }}
-                    animate={{ y: 0 }}
-                    exit={{ y: '100%' }}
-                    transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-                    className="absolute bottom-0 left-0 right-0 h-[95vh] md:h-[90vh] md:top-[5vh] md:left-auto md:right-4 md:w-[480px] md:rounded-2xl bg-white rounded-t-3xl shadow-2xl overflow-hidden flex flex-col"
+                    initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                    transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+                    className="relative w-full max-w-[560px] h-[min(92vh,820px)] rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <Chat
@@ -449,14 +445,9 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* 로직
                       messages={messages}
                       isAnalyzing={isAnalyzing}
                       setIsAnalyzing={setIsAnalyzing}
-                      attachedFiles={attachedFiles}
-                      setAttachedFiles={setAttachedFiles}
                       chatEndRef={chatEndRef}
-                      handleSendMessage={handleSendMessage}
-                      handleFileChange={handleFileChange}
                       setMessages={setMessages}
                       isReadOnly={isChatReadOnly}
-                      removeAttachment={(idx: number) => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))}
                       initialQuery={initialChatQuery}
                       setInitialQuery={setInitialChatQuery}
                       devices={devices}

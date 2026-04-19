@@ -24,14 +24,9 @@ interface ChatProps {
   messages: Message[];
   isAnalyzing: boolean;
   chatEndRef: React.RefObject<HTMLDivElement | null>;
-  handleSendMessage: (text: string) => void;
-  handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  removeAttachment: (index: number) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   isReadOnly?: boolean;
   setIsAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
-  attachedFiles: string[];
-  setAttachedFiles: React.Dispatch<React.SetStateAction<string[]>>;
   initialQuery?: string;
   setInitialQuery?: (query: string) => void;
   devices: Device[];
@@ -53,14 +48,9 @@ export const Chat: React.FC<ChatProps> = ({
   messages, 
   isAnalyzing, 
   setIsAnalyzing, 
-  attachedFiles, 
-  setAttachedFiles, 
   chatEndRef, 
-  handleSendMessage, 
-  handleFileChange, 
   setMessages, 
   isReadOnly, 
-  removeAttachment,
   initialQuery,
   setInitialQuery,
   devices,
@@ -111,8 +101,6 @@ export const Chat: React.FC<ChatProps> = ({
     setIsAnalyzing,
     inputText,
     setInputText,
-    attachedFiles,
-    setAttachedFiles,
     setMessages,
     onRoomCreated,
     markRoomOwned: room.markRoomOwned,
@@ -147,7 +135,16 @@ export const Chat: React.FC<ChatProps> = ({
   const prevMessageCountRef = useRef(0);
 
   // ── 파생 값 ──
-  const canSend = (inputText.trim().length > 0 || attachedFiles.length > 0) && (!!room.selectedMentionDevice || !!room.activeRoomId);
+  const hasSendContext =
+    !!room.selectedMentionDevice ||
+    !!room.activeRoomId ||
+    deviceId != null ||
+    room.activeDeviceId != null;
+
+  const canSend =
+    !isReadOnly &&
+    inputText.trim().length > 0 &&
+    hasSendContext;
 
   const summaryModalDeviceLabel =
     (currentDevice?.alias && currentDevice.alias.trim()) ||
@@ -317,7 +314,7 @@ export const Chat: React.FC<ChatProps> = ({
 
   // ── 렌더링 ──
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 bg-slate-50">
       <ChatHeader
         selectedMentionDevice={room.selectedMentionDevice}
         activeDeviceId={room.activeDeviceId}
@@ -328,8 +325,8 @@ export const Chat: React.FC<ChatProps> = ({
         onClose={onClose}
       />
 
-      {/* 메시지 리스트 영역 */}
-      <div className="flex-1 overflow-y-auto p-5 md:p-8 space-y-6 no-scrollbar pb-[280px]">
+      {/* 메시지 리스트: min-h-0으로 플렉스 자식 스크롤 영역 확보 (입력창과 겹침 방지) */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-8 space-y-6 no-scrollbar">
         {messages.map(msg => (
           <MessageBubble
             key={msg.id}
@@ -400,7 +397,7 @@ export const Chat: React.FC<ChatProps> = ({
       <ChatComposer
         inputText={inputText}
         canSend={canSend}
-        attachedFiles={attachedFiles}
+        isReadOnly={isReadOnly}
         selectedMentionDevice={room.selectedMentionDevice}
         showMentionPopover={showMentionPopover}
         mentionQuery={mentionQuery}
@@ -410,8 +407,6 @@ export const Chat: React.FC<ChatProps> = ({
         onSend={() => sendMessage()}
         onSendAndClearMention={() => { sendMessage(); room.setSelectedMentionDevice(null); }}
         onVoiceOpen={() => setIsVoiceModalOpen(true)}
-        onFileChange={handleFileChange}
-        onRemoveAttachment={removeAttachment}
         onToggleMentionPopover={() => { setShowMentionPopover(prev => !prev); setMentionQuery(''); }}
         onSelectMention={handleSelectMention}
       />

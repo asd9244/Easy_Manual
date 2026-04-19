@@ -15,8 +15,6 @@ interface UseChatSendParams {
   setIsAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
   inputText: string;
   setInputText: (v: string) => void;
-  attachedFiles: string[];
-  setAttachedFiles: React.Dispatch<React.SetStateAction<string[]>>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   onRoomCreated?: (id: number) => void;
   markRoomOwned: (id: number) => void;
@@ -37,8 +35,6 @@ export function useChatSend({
   setIsAnalyzing,
   inputText,
   setInputText,
-  attachedFiles,
-  setAttachedFiles,
   setMessages,
   onRoomCreated,
   markRoomOwned,
@@ -64,7 +60,7 @@ export function useChatSend({
     setMessages(prev => [...prev, errorMsg]);
   };
 
-  const performAsk = async (roomId: number, text: string, mediaUrl?: string) => {
+  const performAsk = async (roomId: number, text: string) => {
     const minDelay = new Promise(resolve => setTimeout(resolve, MIN_LOADING_TIME));
 
     try {
@@ -80,7 +76,7 @@ export function useChatSend({
                 800,
               ),
             )
-          : chatService.askQuestion(roomId, text, mediaUrl);
+          : chatService.askQuestion(roomId, text);
 
       const response = await responsePromise;
       await minDelay;
@@ -97,7 +93,6 @@ export function useChatSend({
         type: 'guide',
         referencedPage,
         manualImageUrls,
-        mediaUrl: data.mediaUrl || data.media_url,
       };
 
       setMessages(prev => [...prev, fixieMsg]);
@@ -114,7 +109,7 @@ export function useChatSend({
         const welcomeMsg: Message = {
           id: 'guest-notice-' + Date.now(),
           senderType: 'AI',
-          text: '등록된 기기 정보가 없지만, 보내주신 이미지를 기반으로 분석을 시작할 수 있습니다. 어떤 도움이 필요하신가요?',
+          text: '등록된 기기가 없습니다. 나의 가전에서 기기를 등록한 뒤 질문해 주세요.',
           type: 'status',
         };
         setMessages(prev => [...prev, welcomeMsg]);
@@ -169,17 +164,15 @@ export function useChatSend({
     if (isAnalyzing && !targetRoomId) return;
 
     const userText = customText || inputText;
-    const userAttachments = [...attachedFiles];
 
-    if (!userText.trim() && userAttachments.length === 0) return;
+    if (!userText.trim()) return;
     // 방이 이미 만들어진 뒤(예: startNewChat → sendMessage(roomId))에는 기기 목록 로딩과 무관하게 질문 전송해야 함.
     // isLoadingDevices 시점에 여기서 return 하면 AI 요청이 조용히 생략되어 간헐적 미연결처럼 보임.
     if (isLoadingDevices && !targetRoomId) return;
 
-    const newUserMsg: Message = { id: Date.now().toString(), senderType: 'USER', text: userText, attachments: userAttachments };
+    const newUserMsg: Message = { id: Date.now().toString(), senderType: 'USER', text: userText };
     setMessages(prev => [...prev, newUserMsg]);
     setInputText('');
-    setAttachedFiles([]);
 
     if (!targetRoomId && !activeRoomId) {
       startLoading();
@@ -187,7 +180,7 @@ export function useChatSend({
         if (!devices || devices.length === 0 || !activeDeviceId) {
           setIsGuestMode(true);
           setActiveRoomId(-1);
-          await performAsk(-1, userText, userAttachments[0]);
+          await performAsk(-1, userText);
         } else {
           const newRoom = await chatService.createChatRoom(activeDeviceId, questionCategory);
           if (newRoom?.roomId) {
@@ -195,7 +188,7 @@ export function useChatSend({
             markRoomOwned(newId);
             setActiveRoomId(newId);
             onRoomCreated?.(newId);
-            await performAsk(newId, userText, userAttachments[0]);
+            await performAsk(newId, userText);
           } else {
             throw new Error('채팅방을 생성할 수 없습니다.');
           }
@@ -203,14 +196,14 @@ export function useChatSend({
       } catch {
         setIsGuestMode(true);
         setActiveRoomId(-1);
-        await performAsk(-1, userText, userAttachments[0]);
+        await performAsk(-1, userText);
       } finally {
         stopLoading();
       }
     } else {
       startLoading();
       try {
-        await performAsk(targetRoomId || activeRoomId!, userText, userAttachments[0]);
+        await performAsk(targetRoomId || activeRoomId!, userText);
       } catch (error) {
         handleChatError(error);
       } finally {

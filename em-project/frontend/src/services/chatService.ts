@@ -94,12 +94,9 @@ export const chatService = {
   /**
    * AI에게 질문하기
    */
-  askQuestion: async (roomId: number, message: string, mediaUrl?: string) => {
+  askQuestion: async (roomId: number, message: string) => {
     try {
-      const response = await api.post(`/chat/rooms/${roomId}/ask`, { 
-        message,
-        mediaUrl: mediaUrl || null
-      });
+      const response = await api.post(`/chat/rooms/${roomId}/ask`, { message });
       return response.data; // ChatMessageResponse
     } catch (error) {
       console.error("AI 질문 실패:", error);
@@ -144,5 +141,5 @@ export const chatService = {
       console.error("채팅방 제목 수정 실패:", error);
       throw error;
     }
-  }
+  },
 };

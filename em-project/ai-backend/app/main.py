@@ -1,3 +1,17 @@
+import logging
+from dotenv import load_dotenv
+
+# uvicorn이 이 모듈을 먼저 로드하므로, 여기서 한 번 로드해 두면
+# 이후 모든 하위 모듈에서 ``os.getenv`` / ``load_dotenv`` 순서 문제를 줄인다.
+load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+    force=True,
+)
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles # 정적 파일 서빙을 위해 추가
 from app.api.routes import chat

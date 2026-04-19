@@ -22,6 +22,11 @@ spring:
   application:
     name: backend-core
 
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 16MB
+
   output:
     ansi:
       enabled: ALWAYS
