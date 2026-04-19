@@ -21,7 +21,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
  */
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 120000,
+  timeout: 300000, // Ollama 폴백 시 느린 응답을 기다리기 위해 5분으로 설정
   withCredentials: true, // CORS 및 쿠키 공유를 위해 true 설정
   headers: {
     "Content-Type": "application/json",
