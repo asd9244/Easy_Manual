@@ -21,7 +21,6 @@ import org.springframework.web.reactive.function.client.WebClient;
  */
 @RestController
 @RequestMapping("/manual_images")
-@RequiredArgsConstructor
 public class ManualImageProxyController {
 
     private final WebClient webClient;
