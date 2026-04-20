@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
-from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_xai import ChatXAI
 from langchain_huggingface import HuggingFaceEndpoint
@@ -20,21 +19,16 @@ USER = os.getenv("NEO4J_USER")
 PASSWORD = os.getenv("NEO4J_PASSWORD")
 router = APIRouter()
 
-AI_MODE = os.getenv("AI_MODE", "ollama")
-OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+AI_MODE = os.getenv("AI_MODE", "gemini")
 XAI_API_KEY = os.getenv("XAI_API_KEY")
 HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
-# ─── 임베딩: Gemini (별도 할당량 풀 → 안정적) ───────────────────────────────
-if AI_MODE == "gemini":
-    print("🚀 AI Mode: Hybrid (Gemini Primary + Ollama Fallback)")
-    embeddings_model = GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001",
-        task_type="retrieval_query"
-    )
-else:
-    print("🏠 AI Mode: Local Ollama")
-    embeddings_model = OllamaEmbeddings(model="bge-m3", base_url=OLLAMA_BASE)
+# ─── 임베딩: Gemini (외부 API 사용으로 서버 자원 절약) ──────────────────────────
+print("🚀 AI Mode: Cloud API Only (Gemini Embeddings)")
+embeddings_model = GoogleGenerativeAIEmbeddings(
+    model="models/gemini-embedding-001",
+    task_type="retrieval_query"
+)
 
 # Gemini 모델들 (최신 순으로 정렬 - 빠른 모델 우선)
 GEMINI_LLM_CASCADE = [
@@ -92,17 +86,9 @@ def invoke_llm_with_fallback(prompt: str) -> str:
         except Exception as e:
             print(f"⚠️ [Hugging Face] Fallback Fail: {e}")
 
-    # 4. Local Ollama (최후의 보루 - 초경량 젬마 2b)
-    print("🏠 [Ollama] Falling back to local gemma2:2b...")
-    try:
-        ollama_llm = ChatOllama(model="gemma2:2b", base_url=OLLAMA_BASE)
-        response = ollama_llm.invoke(prompt)
-        if hasattr(response, 'content'):
-            return response.content
-        return str(response)
-    except Exception as e:
-        print(f"❌ [Final] All Fallbacks Failed: {e}")
-        return "AI 서비스에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+    # 4. Final Fallback (서버 안정성을 위해 로컬 Ollama 대신 에러 메시지 반환)
+    print("❌ [Final] All Fallbacks Failed.")
+    return "죄송합니다. 현재 모든 AI 서비스 연결이 원활하지 않습니다. 잠시 후 다시 시도해 주세요."
 
 
 # PostgreSQL Configuration
