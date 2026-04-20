@@ -8,6 +8,8 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_xai import ChatXAI
+from langchain_huggingface import HuggingFaceEndpoint
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import traceback
@@ -20,6 +22,8 @@ router = APIRouter()
 
 AI_MODE = os.getenv("AI_MODE", "ollama")
 OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+XAI_API_KEY = os.getenv("XAI_API_KEY")
+HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
 # ─── 임베딩: Gemini (별도 할당량 풀 → 안정적) ───────────────────────────────
 if AI_MODE == "gemini":
@@ -43,31 +47,61 @@ GEMINI_LLM_CASCADE = [
 
 def invoke_llm_with_fallback(prompt: str) -> str:
     """
-    어떤 에러가 나도 로컬 Ollama까지 끈질기게 내려가도록 설계
+    제미나이 -> 그록(xAI) -> 허깅페이스(HF) -> 로컬 Ollama 순으로 시도
     """
-    # 전역 설정을 함수 내에서 로컬하게 초기화하여 NameError 방지
-    ollama_llm = ChatOllama(model="gemma3:4b", base_url=OLLAMA_BASE)
+    # 1. Gemini Cascade (가장 먼저 시도)
     for model_name in GEMINI_LLM_CASCADE:
         try:
-            print(f"📡 Attempting Gemini model: {model_name}")
+            print(f"📡 [Gemini] Attempting: {model_name}")
             llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.1)
             response = llm.invoke(prompt)
-            # 확실하게 텍스트 추출
             if hasattr(response, 'content'):
                 return response.content
             return str(response)
         except Exception as e:
-            print(f"⚠️ [{model_name}] Fail: {e}")
+            print(f"⚠️ [Gemini] {model_name} Fail: {e}")
             continue
 
-    print("🏠 Falling back to Ollama gemma3:4b...")
+    # 2. Grok (xAI) Fallback
+    if XAI_API_KEY:
+        try:
+            print("🌌 [Grok] Attempting fallback...")
+            # langchain-xai 또는 langchain-openai(base_url 설정) 사용
+            grok_llm = ChatXAI(model="grok-beta", xai_api_key=XAI_API_KEY)
+            response = grok_llm.invoke(prompt)
+            if hasattr(response, 'content'):
+                return response.content
+            return str(response)
+        except Exception as e:
+            print(f"⚠️ [Grok] Fallback Fail: {e}")
+
+    # 3. Hugging Face Inference API Fallback
+    if HF_TOKEN:
+        try:
+            print("🤗 [Hugging Face] Attempting fallback...")
+            # 서버 자원을 쓰지 않는 가벼운 API 호출 방식
+            hf_llm = HuggingFaceEndpoint(
+                repo_id="google/gemma-2-2b-it",
+                huggingfacehub_api_token=HF_TOKEN,
+                temperature=0.1,
+                max_new_tokens=1024
+            )
+            # HuggingFaceEndpoint는 직접 invoke 가능
+            response = hf_llm.invoke(prompt)
+            return str(response)
+        except Exception as e:
+            print(f"⚠️ [Hugging Face] Fallback Fail: {e}")
+
+    # 4. Local Ollama (최후의 보루 - 초경량 젬마 2b)
+    print("🏠 [Ollama] Falling back to local gemma2:2b...")
     try:
+        ollama_llm = ChatOllama(model="gemma2:2b", base_url=OLLAMA_BASE)
         response = ollama_llm.invoke(prompt)
         if hasattr(response, 'content'):
             return response.content
         return str(response)
     except Exception as e:
-        print(f"❌ Final Fallback Fail: {e}")
+        print(f"❌ [Final] All Fallbacks Failed: {e}")
         return "AI 서비스에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
 

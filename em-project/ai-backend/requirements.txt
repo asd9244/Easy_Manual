@@ -21,6 +21,8 @@ langchain-google-genai==4.2.2
 google-genai
 openai
 langchain-openai
+langchain-xai
+langchain-huggingface
 
 # ==========================================
 # 4. Document & Image Processing
