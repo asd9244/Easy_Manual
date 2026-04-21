@@ -36,7 +36,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # 모델 초기화 (임베딩: 제미나이 활용)
 embeddings_model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GOOGLE_API_KEY)
-vlm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=GOOGLE_API_KEY, temperature=0.1)
+vlm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GOOGLE_API_KEY, temperature=0.1)
 
 
 # ==========================================
@@ -115,16 +115,31 @@ OCR이 놓칠 수 있는 시각적 정보에 집중해주세요. 특히:
     if image_count == 0:
         return ""
 
-    try:
-        messages = [HumanMessage(content=content_blocks)]
-        response = vlm.invoke(messages)
-
-        if isinstance(response.content, list):
-            return "".join([str(item.get("text", "")) for item in response.content if isinstance(item, dict) and "text" in item])
-        return str(response.content)
-    except Exception as e:
-        print(f"      [!] 제미나이 호출 실패: {e}")
+    if image_count == 0:
         return ""
+
+    # 재시도 로직 추가 (429 에러 대응)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            messages = [HumanMessage(content=content_blocks)]
+            response = vlm.invoke(messages)
+
+            if isinstance(response.content, list):
+                return "".join([str(item.get("text", "")) for item in response.content if isinstance(item, dict) and "text" in item])
+            return str(response.content)
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                wait_time = (attempt + 1) * 10  # 10초, 20초, 30초 점진적 대기
+                print(f"      [!] 제미나이 할당량 초과. {wait_time}초 후 다시 시도합니다... ({attempt+1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+            else:
+                print(f"      [!] 제미나이 호출 실패: {e}")
+                return ""
+    
+    print("      [!] 최대 재시도 횟수를 초과하여 시각 정보 추출을 건너뜁니다.")
+    return ""
 
 
 # ==========================================
