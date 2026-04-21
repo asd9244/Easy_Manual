@@ -8,13 +8,14 @@ import com.easymanual.springbackend.domain.manual.entity.Manual;
 import com.easymanual.springbackend.domain.manual.repository.ManualRepository;
 import com.easymanual.springbackend.domain.user.entity.User;
 import com.easymanual.springbackend.domain.user.repository.UserRepository;
+import com.easymanual.springbackend.global.error.ErrorMessages;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.easymanual.springbackend.domain.device.dto.ManualSearchResponse;
-import java.util.Optional;
 
 import java.util.List;
+import java.util.Optional;
 
 // 클라이언트가 보낸 모델명으로 DB에서 Manual 엔티티를 조회하고, 인증된 이메일로 User 엔티티를 조회합니다.
 // 두 엔티티를 연결하여 새로운 UserDevice 엔티티를 생성하고 DB에 저장(Persist)하는 비즈니스 로직을 담당합니다.
@@ -34,11 +35,11 @@ public class DeviceService {
 
         // 1. SecurityContext에서 추출한 이메일로 User 엔티티를 DB에서 조회합니다.
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_NOT_FOUND));
 
         // 2. 클라이언트가 요청 DTO에 담아 보낸 모델명(modelName)이 포함된 Manual 엔티티를 DB에서 조회합니다.
         Manual manual = manualRepository.findByModelNameContaining(request.getModelName())
-                .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 모델명입니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.MANUAL_MODEL_NOT_SUPPORTED));
 
         // 3. 조회된 User와 Manual 엔티티를 연관관계로 설정하여 새로운 UserDevice 엔티티 객체를 생성합니다.
         UserDevice newDevice = UserDevice.builder()
@@ -61,7 +62,7 @@ public class DeviceService {
 
         // 1. SecurityContext에서 전달받은 이메일로 DB에서 User 엔티티를 조회합니다.
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_NOT_FOUND));
 
         // 2. 조회된 User 엔티티를 조건으로, 해당 유저가 등록한 기기 중 삭제되지 않은(ACTIVE) 목록만 조회합니다.
         List<UserDevice> devices = userDeviceRepository.findAllByUserAndStatus(user, UserDevice.DeviceStatus.ACTIVE);
@@ -100,11 +101,11 @@ public class DeviceService {
     public void deleteDevice(Long deviceId, String email) {
         // 1. 디바이스 ID로 기기 조회
         UserDevice userDevice = userDeviceRepository.findById(deviceId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 기기를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.DEVICE_NOT_FOUND));
 
         // 2. 본인의 기기인지 확인 (보안 검증)
         if (!userDevice.getUser().getEmail().equals(email)) {
-            throw new IllegalArgumentException("해당 기기를 삭제할 권한이 없습니다.");
+            throw new IllegalArgumentException(ErrorMessages.DEVICE_DELETE_FORBIDDEN);
         }
 
         // 3. 물리적 삭제가 아닌 상태값만 DELETED로 변경 (Soft Delete)
@@ -116,11 +117,11 @@ public class DeviceService {
     public void updateDeviceAlias(Long deviceId, String email, String newAlias) {
         // 1. 디바이스 ID로 기기 조회
         UserDevice userDevice = userDeviceRepository.findById(deviceId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 기기를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.DEVICE_NOT_FOUND));
 
         // 2. 본인의 기기인지 확인
         if (!userDevice.getUser().getEmail().equals(email)) {
-            throw new IllegalArgumentException("해당 기기의 이름을 수정할 권한이 없습니다.");
+            throw new IllegalArgumentException(ErrorMessages.DEVICE_ALIAS_UPDATE_FORBIDDEN);
         }
 
         // 3. 엔티티 상태 변경 (별명 업데이트)

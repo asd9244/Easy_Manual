@@ -1,5 +1,6 @@
 package com.easymanual.springbackend.domain.file.service;
 
+import com.easymanual.springbackend.global.error.ErrorMessages;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,7 +15,7 @@ public class FileService {
 
     public String uploadImage(MultipartFile file) {
         if (file.isEmpty()) {
-            throw new IllegalArgumentException("업로드할 파일이 없습니다.");
+            throw new IllegalArgumentException(ErrorMessages.FILE_UPLOAD_EMPTY);
         }
 
         File directory = new File(uploadDir);

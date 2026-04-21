@@ -1,24 +1,25 @@
 package com.easymanual.springbackend.domain.chat.service;
 
+import com.easymanual.springbackend.domain.chat.dto.AiChatRequest;
+import com.easymanual.springbackend.domain.chat.dto.AiChatResponse;
+import com.easymanual.springbackend.domain.chat.dto.AiSummarizeRequest;
+import com.easymanual.springbackend.domain.chat.dto.ChatAskRequest;
 import com.easymanual.springbackend.domain.chat.dto.ChatMessageResponse;
+import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateRequest;
+import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateResponse;
 import com.easymanual.springbackend.domain.chat.dto.ChatRoomResponse;
+import com.easymanual.springbackend.domain.chat.dto.ConversationSummaryResponse;
 import com.easymanual.springbackend.domain.chat.entity.ChatMessage;
 import com.easymanual.springbackend.domain.chat.entity.ChatRoom;
-import com.easymanual.springbackend.domain.chat.repository.ChatRoomRepository;
 import com.easymanual.springbackend.domain.chat.repository.ChatMessageRepository;
+import com.easymanual.springbackend.domain.chat.repository.ChatRoomRepository;
+import com.easymanual.springbackend.domain.device.entity.UserDevice;
+import com.easymanual.springbackend.domain.device.repository.UserDeviceRepository;
+import com.easymanual.springbackend.global.error.ErrorMessages;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.easymanual.springbackend.domain.chat.dto.AiChatRequest;
-import com.easymanual.springbackend.domain.chat.dto.AiChatResponse;
-import com.easymanual.springbackend.domain.chat.dto.ChatAskRequest;
 import org.springframework.web.reactive.function.client.WebClient;
-import com.easymanual.springbackend.domain.chat.dto.AiSummarizeRequest;
-import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateRequest;
-import com.easymanual.springbackend.domain.chat.dto.ChatRoomCreateResponse;
-import com.easymanual.springbackend.domain.chat.dto.ConversationSummaryResponse;
-import com.easymanual.springbackend.domain.device.entity.UserDevice;
-import com.easymanual.springbackend.domain.device.repository.UserDeviceRepository;
 
 import java.util.List;
 
@@ -33,11 +34,29 @@ public class ChatService {
     private final WebClient webClient;
     private final UserDeviceRepository userDeviceRepository;
 
+    private ChatRoom requireChatRoom(Long roomId) {
+        return chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.CHAT_ROOM_NOT_FOUND));
+    }
+
+    /**
+     * 채팅방 존재 + 요청 이메일이 방 소유자와 일치하는지 검사한다.
+     *
+     * @param notOwnerMessage 소유자가 아닐 때 사용할 {@link IllegalArgumentException} 메시지
+     */
+    private ChatRoom requireOwnedChatRoom(Long roomId, String email, String notOwnerMessage) {
+        ChatRoom chatRoom = requireChatRoom(roomId);
+        if (!chatRoom.getUserDevice().getUser().getEmail().equals(email)) {
+            throw new IllegalArgumentException(notOwnerMessage);
+        }
+        return chatRoom;
+    }
+
     @Transactional(readOnly = true)
     public List<ChatRoomResponse> getMyChatRooms(String email) {
         List<ChatRoom> chatRooms = chatRoomRepository.findAllByUserEmailOrderByCreatedAtDesc(email);
         return chatRooms.stream()
-                .map(chatRoom -> new ChatRoomResponse(chatRoom))
+                .map(ChatRoomResponse::new)
                 .toList();
     }
 
@@ -48,12 +67,11 @@ public class ChatService {
      */
     @Transactional(readOnly = true)
     public List<ChatMessageResponse> getChatMessages(Long roomId) {
-        chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
+        requireChatRoom(roomId);
 
         List<ChatMessage> messages = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
         return messages.stream()
-                .map(message -> new ChatMessageResponse(message))
+                .map(ChatMessageResponse::new)
                 .toList();
     }
 
@@ -62,8 +80,7 @@ public class ChatService {
      */
     @Transactional(readOnly = true)
     public ChatRoomResponse getChatRoomShareSummary(Long roomId) {
-        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
+        ChatRoom chatRoom = requireChatRoom(roomId);
         return new ChatRoomResponse(chatRoom);
     }
 
@@ -72,17 +89,12 @@ public class ChatService {
      */
     @Transactional(readOnly = true)
     public ConversationSummaryResponse summarizeConversation(Long roomId, String email) {
-        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
-
-        if (!chatRoom.getUserDevice().getUser().getEmail().equals(email)) {
-            throw new IllegalArgumentException("해당 채팅방에 접근할 권한이 없습니다.");
-        }
+        requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_ACCESS_DENIED);
 
         List<ChatMessage> messages = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
         String conversationText = buildConversationTextForSummary(messages);
         if (conversationText.isBlank()) {
-            throw new IllegalArgumentException("요약할 대화 내용이 없습니다.");
+            throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_EMPTY);
         }
 
         String payload = conversationText.length() > MAX_CONVERSATION_TEXT_CHARS
@@ -101,7 +113,7 @@ public class ChatService {
                 .block();
 
         if (aiResponse == null || aiResponse.getSummary() == null || aiResponse.getSummary().isBlank()) {
-            throw new IllegalStateException("요약 응답이 비어 있습니다.");
+            throw new IllegalStateException(ErrorMessages.CHAT_SUMMARY_AI_EMPTY);
         }
         return aiResponse;
     }
@@ -111,21 +123,16 @@ public class ChatService {
      */
     @Transactional(readOnly = true)
     public ConversationSummaryResponse summarizeTurn(Long roomId, Long aiMessageId, String email) {
-        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
-
-        if (!chatRoom.getUserDevice().getUser().getEmail().equals(email)) {
-            throw new IllegalArgumentException("해당 채팅방에 접근할 권한이 없습니다.");
-        }
+        requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_ACCESS_DENIED);
 
         ChatMessage aiMsg = chatMessageRepository.findById(aiMessageId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 메시지를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.CHAT_MESSAGE_NOT_FOUND));
 
         if (!aiMsg.getChatRoom().getId().equals(roomId)) {
-            throw new IllegalArgumentException("메시지가 해당 채팅방에 속하지 않습니다.");
+            throw new IllegalArgumentException(ErrorMessages.CHAT_MESSAGE_WRONG_ROOM);
         }
         if (aiMsg.getSenderType() != ChatMessage.SenderType.AI) {
-            throw new IllegalArgumentException("AI 답변 메시지만 요약할 수 있습니다.");
+            throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_ONLY_AI);
         }
 
         List<ChatMessage> ordered = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
@@ -142,13 +149,13 @@ public class ChatService {
             }
         }
         if (userMsg == null) {
-            throw new IllegalArgumentException("이 답변에 대응하는 사용자 질문을 찾을 수 없습니다.");
+            throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_NO_USER_FOR_AI);
         }
 
         String u = userMsg.getMessage() != null ? userMsg.getMessage().trim() : "";
         String a = aiMsg.getMessage() != null ? aiMsg.getMessage().trim() : "";
         if (u.isBlank() && a.isBlank()) {
-            throw new IllegalArgumentException("요약할 텍스트가 없습니다.");
+            throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_NO_TEXT);
         }
 
         String conversationText = "[USER] " + u + "\n\n[AI] " + a;
@@ -168,7 +175,7 @@ public class ChatService {
                 .block();
 
         if (aiResponse == null || aiResponse.getSummary() == null || aiResponse.getSummary().isBlank()) {
-            throw new IllegalStateException("요약 응답이 비어 있습니다.");
+            throw new IllegalStateException(ErrorMessages.CHAT_SUMMARY_AI_EMPTY);
         }
         return aiResponse;
     }
@@ -188,12 +195,7 @@ public class ChatService {
 
     @Transactional
     public ChatMessageResponse askQuestion(Long roomId, String email, ChatAskRequest request) {
-        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
-
-        if (!chatRoom.getUserDevice().getUser().getEmail().equals(email)) {
-            throw new IllegalArgumentException("해당 채팅방에 접근할 권한이 없습니다.");
-        }
+        ChatRoom chatRoom = requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_ACCESS_DENIED);
 
         boolean isFirstMessage = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId).isEmpty();
 
@@ -245,10 +247,10 @@ public class ChatService {
     @Transactional
     public ChatRoomCreateResponse createChatRoom(String email, ChatRoomCreateRequest request) {
         UserDevice userDevice = userDeviceRepository.findById(request.getUserDeviceId())
-                .orElseThrow(() -> new IllegalArgumentException("해당 기기를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.DEVICE_NOT_FOUND));
 
         if (!userDevice.getUser().getEmail().equals(email)) {
-            throw new IllegalArgumentException("해당 기기에 접근할 권한이 없습니다.");
+            throw new IllegalArgumentException(ErrorMessages.DEVICE_ACCESS_DENIED);
         }
 
         ChatRoom newChatRoom = ChatRoom.builder()
@@ -261,24 +263,16 @@ public class ChatService {
         return new ChatRoomCreateResponse(savedChatRoom.getId());
     }
 
-    // 채팅방 삭제 비즈니스 로직
     @Transactional
     public void deleteChatRoom(Long roomId, String email) {
-        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 채팅방을 찾을 수 없습니다."));
-
-        if (!chatRoom.getUserDevice().getUser().getEmail().equals(email)) {
-            throw new IllegalArgumentException("해당 채팅방을 삭제할 권한이 없습니다.");
-        }
+        ChatRoom chatRoom = requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_DELETE_FORBIDDEN);
 
         chatRoomRepository.delete(chatRoom);
     }
 
-    // [추가] 유저의 모든 채팅방 일괄 삭제 로직
     @Transactional
     public void deleteAllChatRooms(String email) {
         List<ChatRoom> chatRooms = chatRoomRepository.findAllByUserEmailOrderByCreatedAtDesc(email);
-        // CascadeType.ALL 설정이 엔티티에 되어 있으므로, 리스트를 지우면 관련 메시지도 모두 연쇄 삭제됩니다.
         chatRoomRepository.deleteAll(chatRooms);
     }
 }

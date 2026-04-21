@@ -9,6 +9,10 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 import java.util.List;
 
+/**
+ * 채팅방·메시지·AI 요약 관련 REST API. 일부 GET은 공유 링크용으로 비로그인 허용
+ * ({@code SecurityConfig}의 permitAll 경로와 일치).
+ */
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor

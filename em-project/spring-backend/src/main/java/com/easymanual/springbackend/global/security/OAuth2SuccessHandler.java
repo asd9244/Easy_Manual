@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
+import com.easymanual.springbackend.global.error.ErrorMessages;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -50,6 +51,6 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         if (emailObj != null) {
             return (String) emailObj;
         }
-        throw new IllegalArgumentException("이메일 정보를 찾을 수 없습니다.");
+        throw new IllegalArgumentException(ErrorMessages.OAUTH_EMAIL_NOT_FOUND);
     }
 }
