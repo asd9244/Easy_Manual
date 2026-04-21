@@ -17,7 +17,6 @@ LangGraph StateGraph 조립 + 체크포인트 연결.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -33,12 +32,13 @@ from app.agents.router import (
 )
 from app.agents.state import AgentState
 from app.agents.summarizer import summarizer_node
+from app.config.settings import get_settings
 
 
 logger = logging.getLogger(__name__)
 
-
 _compiled_graph: Any | None = None
+_postgres_saver_cm: Any | None = None
 
 
 def _build_checkpointer():
@@ -49,7 +49,9 @@ def _build_checkpointer():
     테이블)가 생성된다. 이미 존재하면 no-op이므로 매번 호출해도 안전하다.
     """
 
-    url = os.getenv("POSTGRES_CHECKPOINT_URL", "").strip()
+    global _postgres_saver_cm
+
+    url = get_settings().postgres_checkpoint_url.strip()
     if not url:
         logger.info(
             "POSTGRES_CHECKPOINT_URL 미설정 → MemorySaver로 체크포인트를 운영합니다."
@@ -64,6 +66,7 @@ def _build_checkpointer():
         ctx = PostgresSaver.from_conn_string(url)
         saver = ctx.__enter__()
         saver.setup()
+        _postgres_saver_cm = ctx
         logger.info("PostgresSaver 초기화 완료 (%s)", _mask_url(url))
         return saver
     except Exception as exc:  # pragma: no cover - 환경 의존
@@ -133,3 +136,23 @@ def get_graph():
     if _compiled_graph is None:
         _compiled_graph = build_graph()
     return _compiled_graph
+
+
+def shutdown_checkpoint_resources() -> None:
+    """
+    앱 종료 시 PostgresSaver 컨텍스트를 정리하고 그래프 캐시를 비운다.
+
+    다음 기동 시 ``get_graph()``가 체크포인터를 다시 구성할 수 있도록 한다.
+    """
+
+    global _compiled_graph, _postgres_saver_cm
+
+    _compiled_graph = None
+
+    cm = _postgres_saver_cm
+    _postgres_saver_cm = None
+    if cm is not None:
+        try:
+            cm.__exit__(None, None, None)
+        except Exception:
+            logger.exception("PostgresSaver context shutdown failed")

@@ -8,20 +8,20 @@ gemma4:e4b 같은 무거운 모델을 노드마다 새로 로드하면 Ollama가
 
 from __future__ import annotations
 
-import os
+import app.config.bootstrap  # noqa: F401 — .env 로드 후 설정 읽기
 
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
+from app.config.settings import get_settings
 
-_OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+_s = get_settings()
+_OLLAMA_BASE = _s.ollama_base_url
+_ANSWER_MODEL = _s.answer_model
+_ROUTER_MODEL = _s.router_model_resolved()
+_EMBED_MODEL = _s.embed_model
 
 # 답변/요약/Router 모두 동일 모델을 공유한다. Router에서 가벼운 분류만 돌릴
 # 때는 max_tokens를 작게 제한해 지연을 줄인다 (router.py 참고).
-_ANSWER_MODEL = os.getenv("ANSWER_MODEL", "gemma4:e4b")
-_ROUTER_MODEL = os.getenv("ROUTER_MODEL", _ANSWER_MODEL)
-_EMBED_MODEL = os.getenv("EMBED_MODEL", "bge-m3")
-
-
 embeddings_model = OllamaEmbeddings(model=_EMBED_MODEL, base_url=_OLLAMA_BASE)
 
 answer_llm = ChatOllama(

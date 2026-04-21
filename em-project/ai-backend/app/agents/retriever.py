@@ -11,21 +11,14 @@ Retriever Node.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
-
-from neo4j import GraphDatabase
 
 from app.agents.llms import embeddings_model
 from app.agents.state import AgentState
 from app.agents.utils import merge_images_ordered_by_page, preview_for_log
+from app.neo4j_driver import get_neo4j_driver
 
 logger = logging.getLogger(__name__)
-
-
-_URI = os.getenv("NEO4J_URI")
-_USER = os.getenv("NEO4J_USER")
-_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 
 _VECTOR_QUERY = """
@@ -56,14 +49,14 @@ def _run_vector_search(question: str, manual_id: str) -> list[dict[str, Any]]:
 
     question_vector = embeddings_model.embed_query(question)
 
-    with GraphDatabase.driver(_URI, auth=(_USER, _PASSWORD)) as driver:
-        with driver.session() as session:
-            result = session.run(
-                _VECTOR_QUERY,
-                question_vector=question_vector,
-                manual_id=manual_id,
-            )
-            return [dict(record) for record in result]
+    driver = get_neo4j_driver()
+    with driver.session() as session:
+        result = session.run(
+            _VECTOR_QUERY,
+            question_vector=question_vector,
+            manual_id=manual_id,
+        )
+        return [dict(record) for record in result]
 
 
 def retriever_node(state: AgentState) -> dict[str, Any]:

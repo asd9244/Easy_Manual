@@ -1,6 +1,10 @@
-import os
 import json
+import logging
+import os
+
 import fitz  # PyMuPDF 라이브러리
+
+logger = logging.getLogger(__name__)
 
 
 def extract_text_from_pdf(pdf_path: str, output_base_dir: str, model_name: str):
@@ -23,7 +27,7 @@ def extract_text_from_pdf(pdf_path: str, output_base_dir: str, model_name: str):
     # 추출한 데이터를 차곡차곡 담을 빈 리스트
     extracted_data = []
 
-    print(f" [{model_name}] 텍스트 추출 시작... (경로: {pdf_path})")
+    logger.info("[%s] 텍스트 추출 시작 (경로: %s)", model_name, pdf_path)
 
     try:
         # 2. PDF 문서 열기
@@ -49,7 +53,7 @@ def extract_text_from_pdf(pdf_path: str, output_base_dir: str, model_name: str):
             }
 
             extracted_data.append(page_info)
-            print(f"   ✅ {page_num + 1}페이지 텍스트 추출 완료 ({len(clean_text)} 글자)")
+            logger.info("%s페이지 텍스트 추출 완료 (%s 글자)", page_num + 1, len(clean_text))
 
         # 5. 다 뽑은 데이터를 JSON 파일로 예쁘게 저장하기
         with open(json_filepath, "w", encoding="utf-8") as f:
@@ -57,11 +61,11 @@ def extract_text_from_pdf(pdf_path: str, output_base_dir: str, model_name: str):
             # indent=4 를 하면 사람이 읽기 좋게 줄바꿈이 됩니다.
             json.dump(extracted_data, f, ensure_ascii=False, indent=4)
 
-        print(f"🎉 추출 완료! 데이터가 '{json_filepath}'에 안전하게 저장되었습니다.\n")
+        logger.info("텍스트 추출 완료 → %s", json_filepath)
         return json_filepath
 
     except Exception as e:
-        print(f"❌ 오류 발생: {e}")
+        logger.exception("텍스트 추출 오류: %s", e)
         return None
 
 

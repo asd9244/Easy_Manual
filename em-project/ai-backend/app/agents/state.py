@@ -45,7 +45,7 @@ class AgentState(TypedDict, total=False):
 
     # ── 멀티턴 체크포인트 ─────────────────────────────────────────────
     # LangGraph의 add_messages reducer가 HumanMessage/AIMessage를 자동 누적해 준다.
-    messages: Annotated[list, add_messages]
+    messages: Annotated[list[Any], add_messages]
 
 
 def empty_state() -> AgentState:

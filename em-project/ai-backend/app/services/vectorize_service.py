@@ -1,23 +1,23 @@
-import os
-from neo4j import GraphDatabase
+import logging
+
+import app.config.bootstrap  # noqa: F401
+
 from langchain_ollama import OllamaEmbeddings
-from dotenv import load_dotenv
-import time
 
-load_dotenv()
-URI = os.getenv("NEO4J_URI")
-USER = os.getenv("NEO4J_USER")
-PASSWORD = os.getenv("NEO4J_PASSWORD")
+from app.config.settings import get_settings
+from app.neo4j_driver import get_neo4j_driver
 
-# Ollama 모델 설정
+logger = logging.getLogger(__name__)
+
+_s = get_settings()
 embeddings_model = OllamaEmbeddings(
-    model="bge-m3",
-    base_url="http://127.0.0.1:11434"
+    model=_s.embed_model,
+    base_url=_s.ollama_base_url,
 )
 
 
 def create_vector_index(session):
-    print("🛠️ Vector Index 세팅 중...")
+    logger.info("Vector Index 세팅 중...")
     session.run("DROP INDEX page_text_embeddings IF EXISTS")
     session.run("""
         CREATE VECTOR INDEX page_text_embeddings IF NOT EXISTS
@@ -27,7 +27,7 @@ def create_vector_index(session):
             `vector.similarity_function`: 'cosine'
         }}
     """)
-    print("   ✅ Index 생성 완료.")
+    logger.info("Index 생성 완료.")
 
 
 def update_embeddings(tx, model_name):
@@ -40,10 +40,10 @@ def update_embeddings(tx, model_name):
 
     records = list(result)
     if not records:
-        print(f"✨ [{model_name}] 모든 페이지가 이미 벡터화되어 있습니다!")
+        logger.info("[%s] 모든 페이지가 이미 벡터화되어 있습니다.", model_name)
         return
 
-    print(f"🚀 [{model_name}] 총 {len(records)}개 페이지 벡터화 시작...")
+    logger.info("[%s] 총 %s개 페이지 벡터화 시작...", model_name, len(records))
 
     for record in records:
         try:
@@ -51,30 +51,26 @@ def update_embeddings(tx, model_name):
             text = record["text"]
             page_num = record["page_num"]
 
-            # Ollama 호출 (여기서 시간이 걸릴 수 있음)
             embedding_vector = embeddings_model.embed_query(text)
 
-            # 한 페이지씩 즉시 업데이트
             tx.run("""
                 MATCH (p:Page) WHERE elementId(p) = $node_id
                 SET p.embedding = $embedding
             """, node_id=node_id, embedding=embedding_vector)
 
-            print(f"   ✅ {page_num}페이지 완료")
+            logger.info("%s페이지 완료", page_num)
         except Exception as e:
-            print(f"   ❌ {record['page_num']}페이지 실패: {e}")
-            continue  # 실패해도 다음 페이지로 진행
+            logger.warning("%s페이지 실패: %s", record["page_num"], e)
+            continue
 
 
 def run_vectorization(model_name: str):
-    with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as driver:
-        with driver.session() as session:
-            # 1. 인덱스 생성
-            create_vector_index(session)
-            # 2. 임베딩 작업 (transaction 없이 직접 실행하여 타임아웃 방지)
-            session.execute_write(update_embeddings, model_name)
-            print(f"🎉 [{model_name}] 벡터화 공정 종료")
+    driver = get_neo4j_driver()
+    with driver.session() as session:
+        create_vector_index(session)
+        session.execute_write(update_embeddings, model_name)
+        logger.info("[%s] 벡터화 공정 종료", model_name)
 
 
 if __name__ == "__main__":
-    run_vectorization("GMDS_MFL71890611_05_250625_00_WEB")  # 통합 파이프라인에서 쓴 이름과 맞춰주세요!
+    run_vectorization("GMDS_MFL71890611_05_250625_00_WEB")

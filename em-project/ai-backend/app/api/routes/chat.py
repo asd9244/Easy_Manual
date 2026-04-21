@@ -21,17 +21,18 @@ import logging
 import uuid
 from typing import Any, Optional
 
-from dotenv import load_dotenv
-
-# 반드시 ``app.agents``(→ retriever) import 보다 먼저 실행해야 한다.
-# retriever는 모듈 로드 시점에 ``NEO4J_URI`` 를 읽어 캐시하므로,
-# load_dotenv()가 늦으면 `.env`에 값이 있어도 빈 문자열로 고정된다.
-load_dotenv()
+import app.config.bootstrap  # noqa: F401 — retriever/Neo4j import 전에 .env 로드
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.agents import get_graph
+from app.api.http_constants import (
+    HTTP_400_INVOKE_REQUIRES_QUESTION_OR_TEXT,
+    HTTP_400_SUMMARY_TEXT_EMPTY,
+    HTTP_500_GRAPH_INVOKE,
+)
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -76,7 +77,12 @@ class InvokeRequest(BaseModel):
 
 
 def _invoke_graph(state_input: dict[str, Any], thread_id: str) -> dict[str, Any]:
-    """컴파일된 그래프를 실행하고 결과 state 딕셔너리를 반환한다."""
+    """
+    컴파일된 그래프를 실행하고 결과 state 딕셔너리를 반환한다.
+
+    예외 시: 전체 스택은 ``logger.exception``으로만 남기고, 클라이언트에는
+    고정 ``detail``만 전달한다 (내부 메시지 노출 방지).
+    """
 
     graph = get_graph()
     config = {"configurable": {"thread_id": thread_id}}
@@ -84,7 +90,7 @@ def _invoke_graph(state_input: dict[str, Any], thread_id: str) -> dict[str, Any]
         result = graph.invoke(state_input, config=config)
     except Exception as exc:
         logger.exception("LangGraph invoke 실패: %s", exc)
-        raise HTTPException(status_code=500, detail=f"graph invoke failed: {exc}")
+        raise HTTPException(status_code=500, detail=HTTP_500_GRAPH_INVOKE) from exc
     return dict(result)
 
 
@@ -117,7 +123,7 @@ def invoke(request: InvokeRequest):
     if not request.question and not request.conversation_text:
         raise HTTPException(
             status_code=400,
-            detail="question 또는 conversation_text 중 하나는 필수입니다.",
+            detail=HTTP_400_INVOKE_REQUIRES_QUESTION_OR_TEXT,
         )
 
     state_input: dict[str, Any] = {
@@ -178,7 +184,7 @@ def summarize_conversation(request: SummarizeRequest):
 
     text = request.conversation_text.strip()
     if not text:
-        raise HTTPException(status_code=400, detail="conversation_text is empty")
+        raise HTTPException(status_code=400, detail=HTTP_400_SUMMARY_TEXT_EMPTY)
 
     state_input = {
         "question": "",
