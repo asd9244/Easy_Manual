@@ -24,8 +24,7 @@ def print(*args, **kwargs):
     _original_print(*args, **kwargs)
 
 from neo4j import GraphDatabase
-from langchain_ollama import OllamaEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 
@@ -35,9 +34,9 @@ USER = os.getenv("NEO4J_USER")
 PASSWORD = os.getenv("NEO4J_PASSWORD")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# 모델 초기화
-embeddings_model = OllamaEmbeddings(model="bge-m3", base_url="http://127.0.0.1:11434")
-vlm = ChatGoogleGenerativeAI(model="gemini-3.1-pro-preview", google_api_key=GOOGLE_API_KEY, temperature=0.1)
+# 모델 초기화 (임베딩: 제미나이 활용)
+embeddings_model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GOOGLE_API_KEY)
+vlm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=GOOGLE_API_KEY, temperature=0.1)
 
 
 # ==========================================
@@ -260,7 +259,7 @@ def build_sections_for_manual(model_name):
                 CREATE VECTOR INDEX section_text_embeddings IF NOT EXISTS
                 FOR (s:Section) ON (s.embedding)
                 OPTIONS {indexConfig: {
-                    `vector.dimensions`: 1024,
+                    `vector.dimensions`: 768,
                     `vector.similarity_function`: 'cosine'
                 }}
             """)
