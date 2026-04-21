@@ -118,8 +118,8 @@ OCR이 놓칠 수 있는 시각적 정보에 집중해주세요. 특히:
     if image_count == 0:
         return ""
 
-    # 재시도 로직 추가 (429 에러 대응)
-    max_retries = 3
+    # 재시도 로직 강화 (429 에러 완벽 대응)
+    max_retries = 10
     for attempt in range(max_retries):
         try:
             messages = [HumanMessage(content=content_blocks)]
@@ -130,7 +130,8 @@ OCR이 놓칠 수 있는 시각적 정보에 집중해주세요. 특히:
             return str(response.content)
         except Exception as e:
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                wait_time = (attempt + 1) * 10  # 10초, 20초, 30초 점진적 대기
+                # 40초, 80초, 120초... 더 화끈하게 기다림
+                wait_time = (attempt + 1) * 40 
                 print(f"      [!] 제미나이 할당량 초과. {wait_time}초 후 다시 시도합니다... ({attempt+1}/{max_retries})")
                 time.sleep(wait_time)
                 continue
@@ -138,7 +139,7 @@ OCR이 놓칠 수 있는 시각적 정보에 집중해주세요. 특히:
                 print(f"      [!] 제미나이 호출 실패: {e}")
                 return ""
     
-    print("      [!] 최대 재시도 횟수를 초과하여 시각 정보 추출을 건너뜁니다.")
+    print("      [!] 10번의 재시도에도 불구하고 실패했습니다. 시각 정보를 건너뜁니다.")
     return ""
 
 
@@ -263,9 +264,9 @@ def build_sections_for_manual(model_name):
 
                 print(f"      -> 완료!")
 
-                # API 과부하 방지
+                # API 과부하 방지 (무료 티어 배려)
                 if idx < len(sections) - 1:
-                    time.sleep(2)
+                    time.sleep(5)
 
             # Step 6: 벡터 인덱스 생성
             print(f"\n[Step 6] section_text_embeddings 벡터 인덱스 생성 중...")
