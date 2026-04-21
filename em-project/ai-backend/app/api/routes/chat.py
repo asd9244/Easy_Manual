@@ -32,6 +32,7 @@ embeddings_model = SentenceTransformer('BAAI/bge-m3')
 
 # Gemini 모델들 (현재 사용 가능한 모델 위주로 재배치)
 GEMINI_LLM_CASCADE = [
+    "gemini-2.0-flash",                # 최신/고성능
     "gemini-1.5-flash",                # 프리티어 권장
     "gemini-1.5-pro",                  # 고성능
     "gemini-pro",                      # 레거시 이름
@@ -46,8 +47,13 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     for model_name in GEMINI_LLM_CASCADE:
         try:
             print(f"📡 [Gemini] Attempting: {model_name}")
-            # api_version="v1"을 명시하여 v1beta 404 에러 방지
-            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, api_version="v1", temperature=0.1)
+            # client_options를 통해 v1 API를 강제하여 v1beta 404 에러 방지
+            llm = ChatGoogleGenerativeAI(
+                model=model_name, 
+                google_api_key=api_key, 
+                client_options={"api_version": "v1"}, 
+                temperature=0.1
+            )
             response = llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content
