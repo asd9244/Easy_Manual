@@ -10,7 +10,8 @@ import {
   X,
   Sparkles,
   Image as ImageIcon,
-  Mic
+  Mic,
+  type LucideIcon,
 } from 'lucide-react';
 
 // 1. 우리가 쪼갠 파일들 임포트
@@ -42,6 +43,17 @@ import { authService } from '@/src/services/authService';
 import type { GuideTop5ClickPayload } from '@/src/services/guideService';
 import { filterDevicesByGuideProductType } from '@/src/utils/guideTop5Device';
 import { useToastStore } from '@/src/store/useToastStore';
+
+interface LocalDeviceCacheEntry {
+  id: string | number;
+  name: string;
+}
+
+interface AppNavItemProps {
+  id: Screen;
+  icon: LucideIcon;
+  label: string;
+}
 
 const DEFAULT_CHAT_WELCOME_MESSAGES: Message[] = [
   { id: '1', senderType: 'AI', text: '안녕하세요! 저는 픽시입니다. 무엇을 도와드릴까요?' },
@@ -162,7 +174,7 @@ export default function App() {
   };
 
   //  모바일 하단 메뉴용 (App 내부에 정의하여 상태 공유)
-  const NavItem = ({ id, icon: Icon, label }: any) => {
+  const NavItem = ({ id, icon: Icon, label }: AppNavItemProps) => {
     const isActive = screen === id;
     return (
       <button 
@@ -225,9 +237,10 @@ export default function App() {
         // 1. 별명 등 변경 사항 병합 (로컬 캐시가 있는 경우)
         const localData = localStorage.getItem('local_devices');
         if (localData) {
-          const localDevices = JSON.parse(localData);
-          const merged = fetchedDevices.map((d: any) => {
-            const local = localDevices.find((ld: any) => String(ld.id) === String(d.id));
+          const parsed: unknown = JSON.parse(localData);
+          const localDevices = Array.isArray(parsed) ? (parsed as LocalDeviceCacheEntry[]) : [];
+          const merged = fetchedDevices.map((d) => {
+            const local = localDevices.find((ld) => String(ld.id) === String(d.id));
             return local ? { ...d, name: local.name } : d;
           });
           setDevices(merged);
@@ -261,8 +274,8 @@ export default function App() {
   }, [screen]);
   
 
-// 데스크탑 사이드바 메뉴용 
-const SidebarItem = ({ id, icon: Icon, label }: any) => {
+  // 데스크탑 사이드바 메뉴용
+  const SidebarItem = ({ id, icon: Icon, label }: AppNavItemProps) => {
   const isActive = screen === id;
   return (
     <button 
@@ -285,10 +298,10 @@ const SidebarItem = ({ id, icon: Icon, label }: any) => {
       )}
     </button>
   );
-};
+  };
 
-// --- 채팅 오버레이 표시 여부 ---
-const showNav = !['splash', 'tutorial', 'auth', 'share'].includes(screen);
+  // --- 채팅 오버레이 표시 여부 ---
+  const showNav = !['splash', 'tutorial', 'auth', 'share'].includes(screen);
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden text-sm bg-fixie-mist text-fixie-steel font-sans selection:bg-theme-primary/30">

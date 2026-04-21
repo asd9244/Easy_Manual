@@ -3,8 +3,15 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 
+const DEFAULT_SPRING_ORIGIN = 'http://localhost:8080';
+const DEFAULT_AI_ORIGIN = 'http://localhost:8000';
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+  const springOrigin =
+    (env.VITE_PROXY_SPRING_ORIGIN || '').trim() || DEFAULT_SPRING_ORIGIN;
+  const aiOrigin = (env.VITE_PROXY_AI_ORIGIN || '').trim() || DEFAULT_AI_ORIGIN;
+
   return {
     plugins: [react(), tailwindcss()],
     define: {
@@ -16,34 +23,34 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: 3000, 
-      strictPort: true, 
+      port: 3000,
+      strictPort: true,
       proxy: {
         '/api': {
-          target: 'http://localhost:8080',
+          target: springOrigin,
           changeOrigin: true,
           secure: false,
         },
         '/oauth2/authorization': {
-          target: 'http://localhost:8080',
+          target: springOrigin,
           changeOrigin: true,
           secure: false,
         },
         '/login/oauth2': {
-          target: 'http://localhost:8080',
+          target: springOrigin,
           changeOrigin: true,
           secure: false,
         },
         '/uploads': {
-          target: 'http://localhost:8080',
+          target: springOrigin,
           changeOrigin: true,
           secure: false,
         },
         '/manual_images': {
-          target: 'http://localhost:8000',
+          target: aiOrigin,
           changeOrigin: true,
           secure: false,
-        }
+        },
       },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.

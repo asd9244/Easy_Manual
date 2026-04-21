@@ -1,6 +1,7 @@
 import React from 'react';
+import axios from 'axios';
 import { Message, Device } from '@/src/types/index';
-import { chatService } from '@/src/services/chatService';
+import { chatService, type AskQuestionResponse } from '@/src/services/chatService';
 import { MIN_LOADING_TIME } from '../constants';
 
 interface UseChatSendParams {
@@ -43,12 +44,24 @@ export function useChatSend({
   questionCategory,
 }: UseChatSendParams) {
 
-  const handleChatError = (error: any) => {
+  const handleChatError = (error: unknown) => {
     console.error('채팅 오류:', error);
-    let errorDetail = error.response?.data?.message || error.message;
-
-    if (error.response?.status === 500) {
-      errorDetail = '서버 엔진에서 기기 정보를 처리하지 못했습니다. 기기 상태를 다시 확인해주세요.';
+    let errorDetail = '알 수 없는 오류';
+    if (axios.isAxiosError(error)) {
+      const data = error.response?.data;
+      const fromBody =
+        typeof data === 'object' &&
+        data !== null &&
+        'message' in data &&
+        typeof (data as { message: unknown }).message === 'string'
+          ? (data as { message: string }).message
+          : undefined;
+      errorDetail = fromBody ?? error.message ?? errorDetail;
+      if (error.response?.status === 500) {
+        errorDetail = '서버 엔진에서 기기 정보를 처리하지 못했습니다. 기기 상태를 다시 확인해주세요.';
+      }
+    } else if (error instanceof Error) {
+      errorDetail = error.message;
     }
 
     const errorMsg: Message = {
@@ -64,7 +77,7 @@ export function useChatSend({
     const minDelay = new Promise(resolve => setTimeout(resolve, MIN_LOADING_TIME));
 
     try {
-      const responsePromise =
+      const responsePromise: Promise<AskQuestionResponse> =
         roomId === -1
           ? new Promise(resolve =>
               setTimeout(
@@ -81,7 +94,7 @@ export function useChatSend({
       const response = await responsePromise;
       await minDelay;
 
-      const data = response as any;
+      const data: AskQuestionResponse = response;
       const referencedPage = data.referencedPage || data.referenced_page;
       const manualImageUrls = data.manualImageUrls || data.manual_image_urls || [];
       const aiMessage = data.message || data.ai_answer || data.text || '대답을 생성할 수 없습니다.';

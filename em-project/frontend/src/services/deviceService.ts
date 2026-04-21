@@ -1,6 +1,15 @@
+import axios from 'axios';
 import { api } from '@/src/api/apiService';
-import { Device } from '@/src/types/index';
+import { Device, ManualSearchResponse } from '@/src/types/index';
 import { WashingMachine, Wind, Tv, ShieldCheck } from 'lucide-react';
+
+interface DeviceApiRow {
+  id?: string | number | null;
+  alias?: string;
+  representativeModelName?: string;
+  productType?: string;
+  image?: string;
+}
 
 /**
  * 기기 관리 API 서비스
@@ -14,7 +23,7 @@ export const deviceService = {
     try {
       const response = await api.get('/devices');
       if (response.data && Array.isArray(response.data)) {
-        return response.data.map((d: any, idx: number) => ({
+        return response.data.map((d: DeviceApiRow, idx: number) => ({
           // [수정] id가 없거나 빈 값("")일 경우에도 절대 중복되지 않는 고유값 생성
           id: (d.id !== undefined && d.id !== null && String(d.id).trim() !== "") 
             ? String(d.id) 
@@ -43,10 +52,11 @@ export const deviceService = {
       // 프론트엔드에서는 model 변수를 쓰지만, 백엔드 DTO(DeviceRegisterRequest)는 modelName을 기대하므로 키값을 맞춰줍니다.
       const response = await api.post('/devices', { modelName: model, alias: alias || model });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("기기 등록 실패:", error);
-      // 백엔드에서 내려준 실제 에러 메시지를 꺼내서 던집니다.
-      const errorMessage = error.response?.data?.message || error.response?.data || "기기 등록에 실패했습니다.";
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message ?? error.response?.data
+        : "기기 등록에 실패했습니다.";
       throw new Error(typeof errorMessage === 'string' ? errorMessage : "알 수 없는 오류가 발생했습니다.");
     }
   },
@@ -82,10 +92,11 @@ export const deviceService = {
    * 모델명 검색
    * GET /api/devices/search?query=...
    */
-  searchModels: async (query: string) => {
+  searchModels: async (query: string): Promise<ManualSearchResponse[]> => {
     try {
       const response = await api.get('/devices/search', { params: { query } });
-      return response.data;
+      const data = response.data;
+      return Array.isArray(data) ? (data as ManualSearchResponse[]) : [];
     } catch (error) {
       console.error("모델 검색 실패:", error);
       throw error;

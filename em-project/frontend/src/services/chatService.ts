@@ -1,6 +1,39 @@
 import { api } from '@/src/api/apiService';
 import { Message } from '@/src/types/index';
 
+/** 채팅방 목록 API 한 행 (camel/snake 혼용 가능) */
+export interface ChatRoomListRow {
+  id: number;
+  title?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  userDeviceId?: number;
+  deviceId?: number;
+  deviceName?: string;
+  device_name?: string;
+}
+
+interface ChatMessageRaw {
+  id: number | string;
+  senderType: 'USER' | 'AI';
+  message: string;
+  createdAt?: string;
+  referencedPage?: number | string;
+  manualImageUrls?: string[];
+}
+
+/** AI 질문 응답(JSON 필드명 변형 허용) */
+export interface AskQuestionResponse {
+  id?: number | string;
+  message?: string;
+  ai_answer?: string;
+  text?: string;
+  referencedPage?: number | string;
+  referenced_page?: number | string;
+  manualImageUrls?: string[];
+  manual_image_urls?: string[];
+}
+
 /**
  * 채팅 및 AI 상담 API 서비스
  * [수정] 모든 요청은 apiService의 api 인스턴스를 통해 수행 (Bearer 토큰 자동 주입)
@@ -9,10 +42,11 @@ export const chatService = {
   /**
    * 내 채팅방 목록 조회
    */
-  getChatRooms: async () => {
+  getChatRooms: async (): Promise<ChatRoomListRow[]> => {
     try {
       const response = await api.get('/chat/rooms');
-      return response.data;
+      const rows = response.data;
+      return Array.isArray(rows) ? (rows as ChatRoomListRow[]) : [];
     } catch (error) {
       console.error("채팅방 목록 조회 실패:", error);
       throw error;
@@ -74,7 +108,7 @@ export const chatService = {
     try {
       const response = await api.get(`/chat/rooms/${roomId}/messages`);
       if (response.data && Array.isArray(response.data)) {
-        return response.data.map((m: any) => ({
+        return response.data.map((m: ChatMessageRaw) => ({
           id: String(m.id),
           senderType: m.senderType, 
           text: m.message,
@@ -94,10 +128,10 @@ export const chatService = {
   /**
    * AI에게 질문하기
    */
-  askQuestion: async (roomId: number, message: string) => {
+  askQuestion: async (roomId: number, message: string): Promise<AskQuestionResponse> => {
     try {
       const response = await api.post(`/chat/rooms/${roomId}/ask`, { message });
-      return response.data; // ChatMessageResponse
+      return response.data as AskQuestionResponse;
     } catch (error) {
       console.error("AI 질문 실패:", error);
       throw error;

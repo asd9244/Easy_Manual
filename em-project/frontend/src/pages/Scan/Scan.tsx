@@ -3,10 +3,19 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 
-export const ScanScreen = ({ onClose, onScan }: any) => {
+interface ScanScreenProps {
+  onClose: () => void;
+  onScan: (model?: string) => void;
+}
 
-  const handleQRScan = (result: any) => {
-    if (result && result.length > 0) {
+interface QrScanSegment {
+  rawValue: string;
+}
+
+export const ScanScreen = ({ onClose, onScan }: ScanScreenProps) => {
+
+  const handleQRScan = (result: QrScanSegment[] | unknown) => {
+    if (Array.isArray(result) && result.length > 0 && result[0]?.rawValue) {
       const scannedText = result[0].rawValue;
       // 스캔된 원본 결과값 (모델명이나 URL)을 그대로 기기 등록(onScan)으로 넘김
       onScan(scannedText);
@@ -42,7 +51,11 @@ export const ScanScreen = ({ onClose, onScan }: any) => {
           >
             <Scanner
               onScan={handleQRScan}
-              onError={(e) => console.log(e)}
+              onError={(e) => {
+                if (import.meta.env.DEV) {
+                  console.warn('QR Scanner error:', e);
+                }
+              }}
             />
             <div className="absolute inset-0 pointer-events-none border-[40px] border-black/40" />
           </motion.div>

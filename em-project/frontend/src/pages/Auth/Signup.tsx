@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { ChevronLeft, Mail, Lock, User, CheckCircle } from 'lucide-react';
 import { api } from '@/src/api/apiService';
 
@@ -18,9 +19,14 @@ export const Signup: React.FC<SignupProps> = ({ onBack }) => {
       // POST /api/auth/signup 호출
       await api.post('/auth/signup', { email, password, nickname });
       setIsDone(true);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      alert(e.response?.data?.message || '회원가입에 실패했습니다. 서버 상태를 확인해주세요.');
+      const msg = axios.isAxiosError(e) ? e.response?.data?.message : undefined;
+      alert(
+        typeof msg === 'string' && msg
+          ? msg
+          : '회원가입에 실패했습니다. 서버 상태를 확인해주세요.',
+      );
     }
   };
 

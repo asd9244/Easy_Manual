@@ -15,15 +15,45 @@ import { QuestionListModal } from './QuestionListModal';
 
 // 로컬 스토리지에 기기 별명을 저장하던 로직을 백엔드로 이관하여 삭제하였습니다.
 
+export type HistoryFilter = 'all' | 'completed' | 'visit';
+
+interface ChatRoomApiRow {
+  id: number;
+  title?: string;
+  createdAt: string;
+  deviceName?: string;
+  deviceAlias?: string;
+  modelName?: string;
+  userDeviceId?: number;
+  questionCategoryLabel?: string;
+}
+
+interface HistoryListItem {
+  id: number;
+  title: string;
+  date: string;
+  status: HistoryFilter;
+  device: string;
+  model: string;
+  userDeviceId?: number;
+  categoryLabel: string;
+}
+
 // 1. 필요한 프롭스 타입 정의
 interface HistoryProps {
-  historyFilter: 'all' | 'completed' | 'visit';
-  setHistoryFilter: (filter: 'all' | 'completed' | 'visit') => void;
+  historyFilter: HistoryFilter;
+  setHistoryFilter: (filter: HistoryFilter) => void;
   onRoomSelect?: (id: number, deviceName?: string, focusUserMessageId?: string) => void;
 }
 
+const FILTER_TABS: { id: HistoryFilter; label: string }[] = [
+  { id: 'all', label: '전체' },
+  { id: 'completed', label: '가이드 완료' },
+  { id: 'visit', label: '방문 권장' },
+];
+
 export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilter, onRoomSelect }: HistoryProps) => {
-  const [historyItems, setHistoryItems] = useState<any[]>([]);
+  const [historyItems, setHistoryItems] = useState<HistoryListItem[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedShareUrl, setSelectedShareUrl] = useState('');
   
@@ -43,7 +73,13 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
     const fetchRooms = async () => {
       try {
         const res = await api.get('/chat/rooms');
-        const items = res.data.map((room: any) => {
+        const raw = res.data;
+        if (!Array.isArray(raw)) {
+          setHistoryItems([]);
+          return;
+        }
+        const rows = raw as ChatRoomApiRow[];
+        const items: HistoryListItem[] = rows.map((room) => {
           const serverName = room.deviceName || '알 수 없는 기기';
           return {
             id: room.id,
@@ -174,14 +210,10 @@ export const History: React.FC<HistoryProps> = ({ historyFilter, setHistoryFilte
 
       {/* 필터 카테고리 탭 */}
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-        {[
-          { id: 'all', label: '전체' },
-          { id: 'completed', label: '가이드 완료' },
-          { id: 'visit', label: '방문 권장' }
-        ].map(cat => (
+        {FILTER_TABS.map(cat => (
           <button
             key={cat.id}
-            onClick={() => setHistoryFilter(cat.id as any)}
+            onClick={() => setHistoryFilter(cat.id)}
             className={`px-4 py-2 rounded-3xl text-xs font-bold transition-all whitespace-nowrap ${
               historyFilter === cat.id 
                 ? 'bg-theme-primary text-white shadow-lg shadow-theme-primary/30' 

@@ -3,7 +3,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { FixieLogo } from '@/src/components/common/FixieLogo';
 import { TUTORIAL_STEPS } from '@/src/constants/data';
 
-export const TutorialScreen = ({ step, setStep, onComplete }: any) => {
+interface TutorialScreenProps {
+  step: number;
+  setStep: React.Dispatch<React.SetStateAction<number>>;
+  onComplete: () => void;
+}
+
+export const TutorialScreen = ({ step, setStep, onComplete }: TutorialScreenProps) => {
   const current = TUTORIAL_STEPS[step]; 
   const Icon = current.icon;
 

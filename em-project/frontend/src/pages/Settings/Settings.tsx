@@ -7,7 +7,8 @@ import {
   Shield, 
   HelpCircle, 
   LogOut, 
-  ChevronRight 
+  ChevronRight,
+  type LucideIcon,
 } from 'lucide-react';
 import { Screen, ThemeType } from '@/src/types/index';
 import { Profile } from '../Profile/Profile';
@@ -20,8 +21,15 @@ interface SettingsProps {
   setCurrentTheme: (theme: ThemeType) => void;
 }
 
+interface SettingsItemProps {
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+}
+
 // 💡 반복되는 리스트 아이템을 깔끔하게 찍어내는 도구(컴포넌트)
-const SettingsItem = ({ icon: Icon, title, subtitle, onClick }: any) => (
+const SettingsItem = ({ icon: Icon, title, subtitle, onClick }: SettingsItemProps) => (
   <button 
     onClick={onClick}
     className="w-full p-4 bg-white flex items-center justify-between border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors"

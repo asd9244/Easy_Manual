@@ -19,7 +19,7 @@ export interface Device {
   alias?: string;
   productType?: string;
   image?: string;
-  icon?: any;
+  icon?: LucideIcon;
 }
 
 export interface DeviceModel {

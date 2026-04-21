@@ -15,18 +15,24 @@ export const OAuthRedirectHandler: React.FC<OAuthRedirectHandlerProps> = ({ onLo
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
 
-    console.log("OAuth 리다이렉트 감지. 토큰 추출 시도...");
+    if (import.meta.env.DEV) {
+      console.log('OAuth 리다이렉트 감지. 토큰 추출 시도...');
+    }
 
     if (token) {
       // 2. 토큰을 localStorage에 저장합니다.
       localStorage.setItem('accessToken', token);
-      console.log("토큰 저장 완료. 홈으로 이동합니다.");
+      if (import.meta.env.DEV) {
+        console.log('토큰 저장 완료. 홈으로 이동합니다.');
+      }
 
       // 3. 부모 컴포넌트(App.tsx)의 로그인 성공 상태를 업데이트합니다.
       // (즉시 이동을 위해 인위적인 지연 없이 바로 호출합니다.)
       onLogin();
     } else {
-      console.info("OAuth 리다이렉트 URL 없음 (일반 접속). 로그인 화면 대기 중.");
+      if (import.meta.env.DEV) {
+        console.info('OAuth 리다이렉트 URL 없음 (일반 접속). 로그인 화면 대기 중.');
+      }
       // 토큰이 없으면 다시 인증 화면으로 보냅니다.
       // window.location.href = '/'; 
     }
