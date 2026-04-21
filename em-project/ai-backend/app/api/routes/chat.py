@@ -32,10 +32,9 @@ embeddings_model = SentenceTransformer('BAAI/bge-m3')
 
 # Gemini 모델들 (현재 사용 가능한 모델 위주로 재배치)
 GEMINI_LLM_CASCADE = [
-    "gemini-1.5-flash",                # 가장 빠르고 안정적 (보통 프리티어 쿼터 충분)
-    "gemini-1.5-flash-8b",             # 가볍고 빠름
+    "gemini-1.5-flash",                # 프리티어 권장
     "gemini-1.5-pro",                  # 고성능
-    "gemini-2.0-flash-exp",            # 2.0 실험 버전
+    "gemini-pro",                      # 레거시 이름 (간혹 이게 먹힐 때가 있음)
 ]
 
 def invoke_llm_with_fallback(prompt: str) -> str:
@@ -43,10 +42,12 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     제미나이 -> 그록(xAI) -> 허깅페이스(HF) -> 로컬 Ollama 순으로 시도
     """
     # 1. Gemini Cascade (가장 먼저 시도)
+    api_key = os.getenv("GOOGLE_API_KEY")
     for model_name in GEMINI_LLM_CASCADE:
         try:
             print(f"📡 [Gemini] Attempting: {model_name}")
-            llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.1)
+            # api_key를 명시적으로 전달하고, v1 또는 v1beta 자동 선택을 위해 version 미지정
+            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, temperature=0.1)
             response = llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content
@@ -424,9 +425,10 @@ def ask_manual(request: ChatRequest):
 
     print(f"\n💡 [AI 생성 답변]\n{ai_answer}\n")
 
-    # 프론트 반환용 이미지 경로 (상대 경로 사용 → Vite 프록시 또는 리버스 프록시를 통해 서빙)
+    # 프론트 반환용 이미지 경로 (절대 경로 사용)
+    base_url = "https://api.fixieeasymanualonline.tech"
     manual_image_urls = [
-        f"/manual_images/{target_manual}/{img_filename}"
+        f"{base_url}/manual_images/{target_manual}/{img_filename}"
         for img_filename in all_image_filenames
     ]
 
