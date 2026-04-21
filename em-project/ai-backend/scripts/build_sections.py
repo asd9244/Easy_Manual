@@ -187,6 +187,17 @@ def build_sections_for_manual(model_name):
     # Step 2~5: 각 섹션별 처리
     print(f"\n[Step 2~5] 섹션별 사전 처리 + 임베딩 + DB 저장 시작")
 
+    # [캐시 관리] 로컬에서 가져온 데이터가 있는지 확인
+    cache_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "section_cache.json")
+    section_cache = {}
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                section_cache = json.load(f)
+            print(f"      [✓] 'section_cache.json'을 불러왔습니다. ({len(section_cache.get(model_name, {}))}개 캐시 발견)")
+        except Exception as e:
+            print(f"      [!] 캐시 파일을 읽는 중 오류 발생: {e}")
+
     with GraphDatabase.driver(URI, auth=(USER, PASSWORD)) as driver:
         with driver.session() as session:
 
@@ -206,14 +217,21 @@ def build_sections_for_manual(model_name):
                         ocr_texts.append(f"--- {page_num}페이지 ---\n{ocr_by_page[page_num]}")
                 ocr_combined = "\n\n".join(ocr_texts)
 
-                # 2-2: 제미나이 시각 정보 추출
-                print(f"      -> 제미나이 시각 정보 추출 중...")
-                visual_desc = extract_visual_description(section, images_dir, model_name)
+                # 2-2: 시각 정보 추출 (캐시 우선 확인)
+                visual_desc = ""
+                hierarchy = section['hierarchy']
+                
+                if model_name in section_cache and hierarchy in section_cache[model_name]:
+                    print(f"      -> [캐시] 로컬에서 준비된 시각 정보를 발견했습니다! (제미나이 호출 생략)")
+                    visual_desc = section_cache[model_name][hierarchy]
+                else:
+                    print(f"      -> 제미나이 시각 정보 추출 중...")
+                    visual_desc = extract_visual_description(section, images_dir, model_name)
 
                 if visual_desc:
-                    print(f"      -> 시각 정보 추출 완료 ({len(visual_desc)}자)")
+                    print(f"      -> 시각 정보 반영 완료 ({len(visual_desc)}자)")
                 else:
-                    print(f"      -> 시각 정보 없음 (이미지 미존재 또는 호출 실패)")
+                    print(f"      -> 시각 정보 없음 (이미지 미존재 또는 캐시/호출 실패)")
 
                 # 3: combined_text 조립
                 combined_text = f"[목차 위치: {section['hierarchy']}]\n\n"
