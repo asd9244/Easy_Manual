@@ -2,6 +2,7 @@ import os
 import time
 from neo4j import GraphDatabase
 from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
 
 # .env 로드
 current_dir = os.path.dirname(os.path.abspath(__file__))
