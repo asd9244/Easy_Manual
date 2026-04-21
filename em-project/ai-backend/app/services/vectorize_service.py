@@ -1,7 +1,7 @@
 import os
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from sentence_transformers import SentenceTransformer
 from langchain_ollama import OllamaEmbeddings
 import time
 
@@ -14,11 +14,9 @@ AI_MODE = os.getenv("AI_MODE", "ollama")
 
 if AI_MODE == "gemini":
     print("🚀 Vector Mode: Cloud Gemini (v1)")
-    embeddings_model = GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001",
-        task_type="retrieval_document"
-    )
-    VECTOR_DIM = 3072
+    # 로컬 엔진(BGE-M3) 사용 (1024차원)
+    embeddings_model = SentenceTransformer('BAAI/bge-m3')
+    VECTOR_DIM = 1024
 else:
     print("🏠 Vector Mode: Local Ollama")
     embeddings_model = OllamaEmbeddings(
@@ -72,7 +70,9 @@ def update_embeddings(tx, model_name):
         # 429 대비 재시도 로직 (최대 4회, 60초 대기)
         for attempt in range(4):
             try:
-                embedding_vector = embeddings_model.embed_query(text)
+                embedding_vector = embeddings_model.encode(text).tolist()
+                
+                # DB 업데이트
                 tx.run("""
                     MATCH (s:Section) WHERE elementId(s) = $node_id
                     SET s.embedding = $embedding

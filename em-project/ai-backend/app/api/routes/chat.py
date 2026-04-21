@@ -25,10 +25,10 @@ HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
 # ─── 임베딩: Gemini (외부 API 사용으로 서버 자원 절약) ──────────────────────────
 print("🚀 AI Mode: Cloud API Only (Gemini Embeddings)")
-embeddings_model = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-001",
-    task_type="retrieval_query"
-)
+from sentence_transformers import SentenceTransformer
+
+# 로컬 엔진(BGE-M3) 사용 (1024차원)
+embeddings_model = SentenceTransformer('BAAI/bge-m3')
 
 # Gemini 모델들 (최신 순으로 정렬 - 빠른 모델 우선)
 GEMINI_LLM_CASCADE = [
@@ -289,7 +289,8 @@ def ask_manual(request: ChatRequest):
 
     # 2. 질문 벡터화
     try:
-        question_vector = embeddings_model.embed_query(user_question)
+        # 질문을 1024차원 벡터로 변환
+        question_vector = embeddings_model.encode(user_question).tolist()
     except Exception as e:
         err_msg = str(e)
         print(f"❌ Embedding Error: {err_msg}")
