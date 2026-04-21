@@ -15,7 +15,11 @@ public interface ManualRepository extends JpaRepository<Manual, Long> {
     /** 동일 제품군이 여러 건일 때를 대비해 id가 가장 작은 매뉴얼 한 건 */
     Optional<Manual> findFirstByProductTypeOrderByIdAsc(String productType);
 
-    // JPQL을 사용하여 검색 범위를 확장합니다: 모델명, 제품 종류, 대표 제품명 모두 검색 대상입니다.
+    // 기존 기기 등록 시 사용하는 쿼리 (하위 호환성 유지)
+    @Query("SELECT DISTINCT m FROM Manual m JOIN m.models mod WHERE mod.name LIKE %:modelName%")
+    Optional<Manual> findByModelNameContaining(@Param("modelName") String modelName);
+
+    // 새롭게 추가된 검색 범위 확장 쿼리
     @Query("SELECT DISTINCT m FROM Manual m LEFT JOIN m.models mod " +
            "WHERE mod.name LIKE %:query% " +
            "OR m.productType LIKE %:query% " +
