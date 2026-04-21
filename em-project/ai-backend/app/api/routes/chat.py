@@ -46,8 +46,8 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     for model_name in GEMINI_LLM_CASCADE:
         try:
             print(f"📡 [Gemini] Attempting: {model_name}")
-            # version="v1"을 명시하여 v1beta 404 에러 방지
-            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, version="v1", temperature=0.1)
+            # api_version="v1"을 명시하여 v1beta 404 에러 방지
+            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, api_version="v1", temperature=0.1)
             response = llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content
@@ -60,8 +60,8 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     if GROQ_API_KEY:
         try:
             print("🚀 [Groq] Attempting fallback...")
-            # Groq Llama3 70B 모델 사용 (매우 빠름)
-            groq_llm = ChatGroq(model="llama3-70b-8192", groq_api_key=GROQ_API_KEY)
+            # Groq 최신 모델 사용 (llama3-70b-8192는 서비스 종료됨)
+            groq_llm = ChatGroq(model="llama-3.3-70b-versatile", groq_api_key=GROQ_API_KEY)
             response = groq_llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content

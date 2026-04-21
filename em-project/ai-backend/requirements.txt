@@ -16,7 +16,7 @@ psycopg2-binary==2.9.10
 # 3. AI & LLM Pipeline
 # ==========================================
 langchain
-langchain-google-genai==4.2.2
+langchain-google-genai>=2.0.0
 sentence-transformers
 google-genai
 openai
