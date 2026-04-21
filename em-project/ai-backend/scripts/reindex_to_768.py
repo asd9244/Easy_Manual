@@ -14,8 +14,8 @@ NEO4J_URI = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "12341234")
 
-# 모델 초기화 (임베딩 768차원 고정)
-embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+# 모델 초기화 (임베딩 768차원 고정, 최신 모델인 text-embedding-004 사용)
+embeddings_model = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=GOOGLE_API_KEY)
 
 def reindex():
     print("🚀 [Step 1] 1024차원 -> 768차원 재임베딩 작업 시작...")
