@@ -34,7 +34,7 @@ embeddings_model = SentenceTransformer('BAAI/bge-m3')
 GEMINI_LLM_CASCADE = [
     "gemini-1.5-flash",                # 프리티어 권장
     "gemini-1.5-pro",                  # 고성능
-    "gemini-pro",                      # 레거시 이름 (간혹 이게 먹힐 때가 있음)
+    "gemini-pro",                      # 레거시 이름
 ]
 
 def invoke_llm_with_fallback(prompt: str) -> str:
@@ -46,8 +46,8 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     for model_name in GEMINI_LLM_CASCADE:
         try:
             print(f"📡 [Gemini] Attempting: {model_name}")
-            # api_key를 명시적으로 전달하고, v1 또는 v1beta 자동 선택을 위해 version 미지정
-            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, temperature=0.1)
+            # version="v1"을 명시하여 v1beta 404 에러 방지
+            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, version="v1", temperature=0.1)
             response = llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content
@@ -60,8 +60,8 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     if XAI_API_KEY:
         try:
             print("🌌 [Grok] Attempting fallback...")
-            # langchain-xai 또는 langchain-openai(base_url 설정) 사용
-            grok_llm = ChatXAI(model="grok-beta", xai_api_key=XAI_API_KEY)
+            # xAI 최신 모델명 적용
+            grok_llm = ChatXAI(model="grok-2-1212", xai_api_key=XAI_API_KEY)
             response = grok_llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content
