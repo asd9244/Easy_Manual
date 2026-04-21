@@ -25,7 +25,13 @@ public class ManualSearchResponse {
             this.id = model.getId();
             this.name = model.getName();
             this.productType = model.getProductType();
-            this.qrCodeUrl = model.getQrCodeUrl();
+            // 프론트엔드가 다른 도메인(Vercel)일 때도 이미지를 찾을 수 있게 절대 주소로 변경합니다.
+            String rawUrl = model.getQrCodeUrl();
+            if (rawUrl != null && rawUrl.startsWith("/")) {
+                this.qrCodeUrl = "https://api.fixieeasymanualonline.tech" + rawUrl;
+            } else {
+                this.qrCodeUrl = rawUrl;
+            }
         }
     }
 

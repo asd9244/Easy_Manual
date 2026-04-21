@@ -30,13 +30,12 @@ from sentence_transformers import SentenceTransformer
 # 로컬 엔진(BGE-M3) 사용 (1024차원)
 embeddings_model = SentenceTransformer('BAAI/bge-m3')
 
-# Gemini 모델들 (최신 순으로 정렬 - 빠른 모델 우선)
+# Gemini 모델들 (현재 사용 가능한 모델 위주로 재배치)
 GEMINI_LLM_CASCADE = [
-    "gemini-2.5-flash-preview-04-17",  # 최신 2.5 (학교에서 됐던 버전)
-    "gemini-2.0-flash",                # 2.0 최신
-    "gemini-2.0-flash-lite",           # 2.0 경량
-    "gemini-1.5-flash",                # 1.5 안정
-    "gemini-1.5-pro",                  # 1.5 고성능
+    "gemini-1.5-flash",                # 가장 빠르고 안정적 (보통 프리티어 쿼터 충분)
+    "gemini-1.5-flash-8b",             # 가볍고 빠름
+    "gemini-1.5-pro",                  # 고성능
+    "gemini-2.0-flash-exp",            # 2.0 실험 버전
 ]
 
 def invoke_llm_with_fallback(prompt: str) -> str:

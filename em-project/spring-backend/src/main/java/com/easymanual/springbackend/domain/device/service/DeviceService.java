@@ -84,13 +84,11 @@ public class DeviceService {
         }
 
         // 2. ManualRepository를 이용해 DB에서 검색어가 포함된 매뉴얼을 찾습니다.
-        // (주의: 우리가 예전에 만든 findByModelNameContaining은 Optional<Manual>을 반환하도록 짜여 있습니다.
-        // 실무에서는 검색 결과가 여러 개일 수 있으므로 List<Manual>을 반환하는 게 맞지만,
-        // 현재 구조를 최대한 유지하면서 Optional 안에 값이 있으면 리스트로 만들고, 없으면 빈 리스트를 반환하도록 처리합니다.)
-        Optional<Manual> manualOpt = manualRepository.findByModelNameContaining(query);
+        // 이제 모델명, 제품종류, 대표제품명 전체를 검색하여 리스트로 반환받습니다.
+        List<Manual> manuals = manualRepository.searchManuals(query);
 
         // 3. 검색 결과가 있으면 DTO로 변환해서 리스트에 담아주고, 없으면 빈 리스트를 반환합니다.
-        return manualOpt.stream()
+        return manuals.stream()
                 .map(manual -> new ManualSearchResponse(manual))
                 .toList();
     }
