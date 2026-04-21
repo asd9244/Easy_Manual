@@ -46,8 +46,8 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     for model_name in GEMINI_LLM_CASCADE:
         try:
             print(f"📡 [Gemini] Attempting: {model_name}")
-            # version="v1"을 명시하여 v1beta 404 에러 방지
-            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, version="v1", temperature=0.1)
+            # google_api_version="v1"을 명시하여 v1beta 404 에러 방지
+            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, google_api_version="v1", temperature=0.1)
             response = llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content
@@ -60,8 +60,8 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     if XAI_API_KEY:
         try:
             print("🌌 [Grok] Attempting fallback...")
-            # xAI 최신 모델명 적용
-            grok_llm = ChatXAI(model="grok-2-1212", xai_api_key=XAI_API_KEY)
+            # xAI 정식 모델명 적용
+            grok_llm = ChatXAI(model="grok-2", xai_api_key=XAI_API_KEY)
             response = grok_llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content
