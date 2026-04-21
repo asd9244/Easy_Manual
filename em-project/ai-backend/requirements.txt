@@ -17,6 +17,7 @@ psycopg2-binary==2.9.10
 # ==========================================
 langchain
 langchain-google-genai==4.2.2
+sentence-transformers
 google-genai
 openai
 langchain-openai
