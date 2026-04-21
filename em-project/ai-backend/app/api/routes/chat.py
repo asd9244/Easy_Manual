@@ -120,14 +120,16 @@ def get_manual_code(manual_id_or_name: str) -> str:
                     conn.close()
                     return row['manual_code']
 
-            # 2. model_name(SQ06... 등)으로 검색 (LIKE 사용)
+            # 2. model_name(SQ06... 등) 또는 제품명(양문형 냉장고 등)으로 검색
             cur.execute("""
                 SELECT m.manual_code 
                 FROM manuals m
-                JOIN models mod ON m.id = mod.manual_id
-                WHERE mod.name LIKE %s
+                LEFT JOIN models mod ON m.id = mod.manual_id
+                WHERE mod.name LIKE %s 
+                   OR m.representative_model_name LIKE %s
+                   OR m.product_type LIKE %s
                 LIMIT 1
-            """, (f"%{manual_id_or_name}%",))
+            """, (f"%{manual_id_or_name}%", f"%{manual_id_or_name}%", f"%{manual_id_or_name}%"))
             row = cur.fetchone()
             if row:
                 conn.close()
