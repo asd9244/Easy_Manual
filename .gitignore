@@ -26,4 +26,4 @@ node_modules/
 .env
 
 # 로컬 문서·노션 정리 등 (저장소에 포함하지 않음)
-docs/main-server_key.pem
+main-server_key.pem
