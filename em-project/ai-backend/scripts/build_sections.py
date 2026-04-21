@@ -36,7 +36,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # 모델 초기화 (임베딩: 제미나이 활용)
 embeddings_model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GOOGLE_API_KEY)
-vlm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GOOGLE_API_KEY, temperature=0.1)
+vlm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY, temperature=0.1)
 
 
 # ==========================================
