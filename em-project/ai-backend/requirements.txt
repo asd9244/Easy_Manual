@@ -21,7 +21,7 @@ sentence-transformers
 google-genai
 openai
 langchain-openai
-langchain-xai
+langchain-groq
 langchain-huggingface
 
 # ==========================================

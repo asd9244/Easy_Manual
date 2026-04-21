@@ -7,7 +7,7 @@ from typing import Optional, List, Dict
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_xai import ChatXAI
+from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEndpoint
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -20,7 +20,7 @@ PASSWORD = os.getenv("NEO4J_PASSWORD")
 router = APIRouter()
 
 AI_MODE = os.getenv("AI_MODE", "gemini")
-XAI_API_KEY = os.getenv("XAI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
 # ─── 임베딩: Gemini (외부 API 사용으로 서버 자원 절약) ──────────────────────────
@@ -46,8 +46,8 @@ def invoke_llm_with_fallback(prompt: str) -> str:
     for model_name in GEMINI_LLM_CASCADE:
         try:
             print(f"📡 [Gemini] Attempting: {model_name}")
-            # google_api_version="v1"을 명시하여 v1beta 404 에러 방지
-            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, google_api_version="v1", temperature=0.1)
+            # version="v1"을 명시하여 v1beta 404 에러 방지
+            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, version="v1", temperature=0.1)
             response = llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content
@@ -56,18 +56,18 @@ def invoke_llm_with_fallback(prompt: str) -> str:
             print(f"⚠️ [Gemini] {model_name} Fail: {e}")
             continue
 
-    # 2. Grok (xAI) Fallback
-    if XAI_API_KEY:
+    # 2. Groq Fallback
+    if GROQ_API_KEY:
         try:
-            print("🌌 [Grok] Attempting fallback...")
-            # xAI 정식 모델명 적용
-            grok_llm = ChatXAI(model="grok-2", xai_api_key=XAI_API_KEY)
-            response = grok_llm.invoke(prompt)
+            print("🚀 [Groq] Attempting fallback...")
+            # Groq Llama3 70B 모델 사용 (매우 빠름)
+            groq_llm = ChatGroq(model="llama3-70b-8192", groq_api_key=GROQ_API_KEY)
+            response = groq_llm.invoke(prompt)
             if hasattr(response, 'content'):
                 return response.content
             return str(response)
         except Exception as e:
-            print(f"⚠️ [Grok] Fallback Fail: {e}")
+            print(f"⚠️ [Groq] Fallback Fail: {e}")
 
     # 3. Hugging Face Inference API Fallback
     if HF_TOKEN:
