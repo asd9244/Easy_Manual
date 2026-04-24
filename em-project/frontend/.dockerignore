@@ -1,0 +1,9 @@
+# Docker 빌드 시 제외 — node_modules 는 컨테이너 안에서 npm ci 로 다시 설치
+
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+*.md

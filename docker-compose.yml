@@ -1,34 +1,194 @@
-version: '3.8'
+# =============================================================================
+# Docker Compose — 이 저장소(fixie) 루트에서 실행합니다.
+#
+# [개념] "서비스" = 컨테이너 하나의 설계도. 아래 services 블록마다 이미지·포트·환경변수가 묶입니다.
+# [명령] docker compose up -d --build   → 빌드 후 백그라운드 기동
+#        docker compose down            → 컨테이너 중지(볼륨 데이터는 기본 유지)
+#        docker compose down -v         → 볼륨까지 삭제( DB 날아감 — 주의 )
+#
+# [네트워크] 같은 Compose 안에서는 서비스 이름이 "호스트 이름"이 됩니다.
+#   예: Spring이 DB에 붙을 때 postgres:5432, AI가 Ollama에 붙을 때 ollama:11434
+#   PC 브라우저에서는 localhost:3000 / :8080 / :8000 으로 접속합니다.
+# =============================================================================
 
 services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Spring·AI(LangGraph 체크포인트)가 함께 쓰는 관계형 DB
+  # ---------------------------------------------------------------------------
   postgres:
     image: postgres:18
     container_name: pixie-postgres
+    # "호스트포트:컨테이너포트" — PC에서 DBeaver 등으로 붙을 때 localhost:5432
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 1234
       POSTGRES_DB: pixie
-      # PostgreSQL 18+ 권장 데이터 경로 설정
+      # Postgres 18 권장: 데이터 실제 경로를 하위 폴더(pgdata)로 둠
       PGDATA: /var/lib/postgresql/data/pgdata
+    # [볼륨] 컨테이너를 지워도 데이터가 남는 디스크 영역.
+    # external: true 인 pixie_postgres_data 는 예전에 쓰던 DB 데이터가 들어 있는 볼륨입니다.
+    # Compose "프로젝트 이름"이 바뀌면 새 볼륨이 생겨 빈 DB가 될 수 있으니 이름을 맞춰 둠.
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pixie_postgres_data:/var/lib/postgresql/data
     restart: always
 
+  # ---------------------------------------------------------------------------
+  # Neo4j — AI 백엔드가 벡터·그래프 검색에 사용
+  # ---------------------------------------------------------------------------
   neo4j:
     image: neo4j:5
     container_name: pixie-neo4j
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "7474:7474" # 브라우저 UI(버전에 따라 다를 수 있음)
+      - "7687:7687" # Bolt 프로토콜(앱이 주로 사용)
     environment:
-      # Neo4j 5.x 보안 정책에 맞춰 8자리로 변경
       NEO4J_AUTH: neo4j/12341234
     volumes:
       - neo4j_data:/data
     restart: always
 
+  # ---------------------------------------------------------------------------
+  # Ollama — 로컬 LLM/임베딩 서버(bge-m3, gemma 등). AI 서비스가 HTTP로 호출
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: pixie-ollama
+    # [포트 생략] PC에 이미 Ollama가 11434를 쓰면 충돌하므로 호스트에 안 열었습니다.
+    # 컨테이너끼리는 http://ollama:11434 로 접속하면 됩니다.
+    # PC에서 curl로 보고 싶다면 여기에 "11435:11434" 처럼 다른 호스트 포트를 추가하세요.
+    volumes:
+      # 모델 파일이 쌓이는 곳 — 한 번 pull 한 모델은 재다운로드 없이 유지
+      - ollama_data:/root/.ollama
+    restart: always
+    healthcheck:
+      # 기동 직후 잠깐 실패할 수 있어 start_period 로 유예
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # Spring Boot — REST API, OAuth, JWT, 업로드 파일 등
+  # ---------------------------------------------------------------------------
+  spring:
+    build:
+      # 이 폴더 안의 Dockerfile 로 이미지를 빌드
+      context: ./em-project/spring-backend
+    container_name: pixie-spring
+    ports:
+      - "8080:8080"
+    # [env_file] OAuth(구글/카카오) 키는 보통 여기에 둡니다(em-project/spring-backend/.env).
+    # 아래 environment 와 같은 변수명이 있으면 environment 가 우선(덮어씀)합니다.
+    env_file:
+      - ./em-project/spring-backend/.env
+    environment:
+      # Docker 네트워크 안에서는 서비스 이름 postgres 가 호스트명
+      DB_URL: jdbc:postgresql://postgres:5432/pixie
+      DB_USERNAME: postgres
+      DB_PASSWORD: "1234"
+      # Spring → FastAPI AI 호출 시 사용하는 내부 URL
+      AI_BACKEND_URL: http://ai:8000
+      # 소셜 로그인 성공 후 브라우저로 돌려보낼 프론트 주소(주소창과 맞출 것)
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
+      # 구글/카카오 콘솔에 등록한 redirect_uri 와 문자열이 정확히 같아야 함
+      OAUTH2_GOOGLE_REDIRECT_URI: ${OAUTH2_GOOGLE_REDIRECT_URI:-http://localhost:3000/login/oauth2/code/google}
+      OAUTH2_KAKAO_REDIRECT_URI: ${OAUTH2_KAKAO_REDIRECT_URI:-http://localhost:3000/login/oauth2/code/kakao}
+      JWT_SECRET: ${JWT_SECRET:-change-me-docker-compose-min-32-chars-long!!}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      # 의존성만 있고 RabbitMQ 서버는 없을 때 기동 오류 방지
+      SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+    depends_on:
+      postgres:
+        condition: service_started
+      ai:
+        condition: service_started
+    volumes:
+      # 업로드 이미지 유지(컨테이너 재생성해도 볼륨은 남음)
+      - spring_uploads:/app/uploads
+    restart: always
+
+  # ---------------------------------------------------------------------------
+  # FastAPI AI — 채팅, Neo4j, Ollama, Postgres 체크포인트
+  # ---------------------------------------------------------------------------
+  ai:
+    build:
+      context: ./em-project/ai-backend
+    container_name: pixie-ai
+    ports:
+      - "8000:8000"
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: "12341234"
+      POSTGRES_CHECKPOINT_URL: postgresql://postgres:1234@postgres:5432/pixie
+      OLLAMA_BASE_URL: http://ollama:11434
+      # 루트 .env 에 넣으면 Compose가 주입(선택). 비어 있으면 Gemini 등만 실패할 수 있음
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_started
+      neo4j:
+        condition: service_started
+      ollama:
+        condition: service_started
+    restart: always
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Vite 개발 서버. 브라우저는 localhost:3000
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./em-project/frontend
+    container_name: pixie-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # 컨테이너 안 Vite가 API 프록시할 때 쓰는 "백엔드 주소"(서비스 이름 사용)
+      VITE_PROXY_SPRING_ORIGIN: http://spring:8080
+      VITE_PROXY_AI_ORIGIN: http://ai:8000
+    depends_on:
+      spring:
+        condition: service_started
+      ai:
+        condition: service_started
+    restart: always
+
+  # ---------------------------------------------------------------------------
+  # [선택] Ollama 모델 최초 다운로드 — 평소에는 기동 안 함(profiles: setup)
+  # 실행 예: docker compose --profile setup run --rm ollama-pull
+  # ---------------------------------------------------------------------------
+  ollama-pull:
+    image: ollama/ollama:latest
+    profiles: ["setup"]
+    container_name: pixie-ollama-pull
+    environment:
+      # 원격 ollama 서비스에 pull 요청을 보냄
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      set -e;
+      echo "Waiting for Ollama...";
+      for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+        ollama list >/dev/null 2>&1 && break;
+        sleep 2;
+      done;
+      ollama pull bge-m3;
+      ollama pull gemma4:e4b;
+      echo "Models ready."
+    depends_on:
+      ollama:
+        condition: service_started
+
+# =============================================================================
+# volumes — 이름 붙은 디스크(컨테이너와 독립). docker volume ls 로 확인 가능
+# =============================================================================
 volumes:
-  postgres_data:
+  # 이미 Docker에 만들어 둔 볼륨을 그대로 쓸 때(데이터 이어 받기)
+  pixie_postgres_data:
+    external: true
   neo4j_data:
+  ollama_data:
+  spring_uploads:

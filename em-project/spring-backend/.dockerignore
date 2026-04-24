@@ -1,0 +1,11 @@
+# Docker 빌드 컨텍스트에서 빼는 파일 — 이미지에 안 넣어 용량·보안을 줄임
+# (.env 는 이미지에 박지 않음. 실행 시 compose env_file 로 주입)
+
+.gradle
+build
+.idea
+*.iml
+.git
+.gitignore
+.env
+*.md

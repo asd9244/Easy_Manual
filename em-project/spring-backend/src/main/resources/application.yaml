@@ -1,10 +1,15 @@
 server:
   port: 8080
+  # Vite 등 리버스 프록시 뒤에서 OAuth redirect_uri가 http://spring:8080 이 되지 않도록
+  forward-headers-strategy: framework
 
 # --- 더미 데이터 생성용 (로컬/개발) — global.seed.DummyDataSeedRunner 참고 ---
 # 각각 true일 때만 해당 시드 실행(순서: users → user-devices → chat-rooms). 전부 true면 전체 파이프라인.
 # 환경변수: APP_SEED_USERS_ENABLED, APP_SEED_USER_DEVICES_ENABLED, APP_SEED_CHAT_ROOMS_ENABLED (운영에서는 false 권장)
 app:
+  # 소셜 로그인 성공 후 브라우저를 보낼 프론트 주소 (Docker+Vite: 브라우저가 쓰는 호스트:포트)
+  oauth2:
+    frontend-base-url: ${FRONTEND_PUBLIC_URL:http://localhost:3000}
   seed:
     users:
       enabled: ${APP_SEED_USERS_ENABLED:false}
@@ -57,6 +62,8 @@ spring:
             # 🌟 수정됨: .env 파일에서 값을 가져옵니다.
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
+            # Vite(3000) 프록시 뒤에서는 {baseUrl}이 spring:8080 으로 잡힐 수 있어 URI 고정 권장
+            redirect-uri: ${OAUTH2_GOOGLE_REDIRECT_URI:http://localhost:3000/login/oauth2/code/google}
             scope:
               - email
               - profile
@@ -64,7 +71,7 @@ spring:
             # 🌟 수정됨: .env 파일에서 값을 가져옵니다.
             client-id: ${KAKAO_CLIENT_ID}
             client-secret: ${KAKAO_CLIENT_SECRET}
-            redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
+            redirect-uri: ${OAUTH2_KAKAO_REDIRECT_URI:http://localhost:3000/login/oauth2/code/kakao}
             authorization-grant-type: authorization_code
             client-authentication-method: client_secret_post
             client-name: Kakao

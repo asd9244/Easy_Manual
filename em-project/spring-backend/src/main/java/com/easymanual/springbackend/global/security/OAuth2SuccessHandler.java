@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import com.easymanual.springbackend.global.error.ErrorMessages;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -20,6 +21,9 @@ import java.io.IOException;
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final JwtProvider jwtProvider;
+
+    @Value("${app.oauth2.frontend-base-url:http://localhost:3000}")
+    private String frontendBaseUrl;
 
     // 소셜 로그인이 성공적으로 완료되면 Spring Security가 이 메서드를 자동으로 호출합니다.
     @Override
@@ -34,11 +38,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // 3. 추출한 이메일을 기반으로 우리 서버 전용 JWT 토큰을 생성합니다.
         String token = jwtProvider.createToken(email);
 
-        // 4. 클라이언트가 처음 요청한 도메인(localhost 또는 127.0.0.1)을 그대로 유지하며 리다이렉트합니다.
-        String serverName = request.getServerName();
-        String targetUrl = UriComponentsBuilder.fromUriString("http://" + serverName + ":3000/oauth2/redirect")
+        // 4. 프론트 주소는 프록시 뒤에서는 request 만으로는 알기 어려우므로 설정값 우선 (FRONTEND_PUBLIC_URL)
+        String base = frontendBaseUrl.endsWith("/")
+                ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1)
+                : frontendBaseUrl;
+        String targetUrl = UriComponentsBuilder.fromUriString(base + "/oauth2/redirect")
                 .queryParam("token", token)
-                .build().toUriString();
+                .build()
+                .encode()
+                .toUriString();
 
         // 5. 조립된 URL로 클라이언트의 브라우저를 강제 이동(Redirect)시킵니다.
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
