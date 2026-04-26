@@ -1,66 +1,153 @@
-# Fixie (Easy_Manual)
+# Fixie (Easy_Manual) Azure 배포 가이드
 
-전자제품에 대한 질문을 매뉴얼 데이터를 기반으로 답변하는 서비스입니다.
+이 문서는 Fixie(Easy_Manual) 서비스를 **Azure 환경**에 프로덕션 수준으로 배포하기 위한 가이드입니다. `deploy/azure-setup` 브랜치의 구성을 기준으로 작성되었습니다.
 
-## 구성 요약
+## 🏗️ 아키텍처 개요
+- **Frontend**: Vercel 호스팅 (Vercel `vercel.json`을 통한 프록시 라우팅 지원)
+- **Backend (Spring Boot)**: Azure VM 내 Docker Container
+- **AI Backend (FastAPI)**: Azure VM 내 Docker Container
+- **Database**: PostgreSQL 17 (사용자, 매뉴얼 메타데이터)
+- **Vector DB**: Neo4j 5 (RAG 파이프라인 그래프 및 벡터 데이터베이스)
+- **Network / Security**: Cloudflare Tunnel (`cloudflared`)을 활용하여 공인 IP 포트 개방 없이 안전한 HTTPS 연결 및 도메인 매핑 제공
 
-| 구분              | 경로                            | 포트     | 역할                                                                |
-| ----------------- | ------------------------------- | -------- | ------------------------------------------------------------------- |
-| 프론트엔드        | `em-project/frontend`           | **3000** | React, Vite — `/api` 등을 Spring으로 프록시                         |
-| API (Spring Boot) | `em-project/spring-backend`     | **8080** | 인증(JWT·OAuth2), PostgreSQL 영속성, 채팅 API — AI는 FastAPI에 위임 |
-| AI (FastAPI)      | `em-project/ai-backend`         | **8000** | Neo4j 벡터 검색, 임베딩(Ollama), LLM(Gemini 등)                     |
-| 데이터 파이프라인 | `em-project/ai-backend/scripts` | —        | PDF·OCR·Neo4j 적재 (`run_pipeline.py` 등)                           |
+### 아키텍처 다이어그램 (Mermaid)
+```mermaid
+graph TD
+    %% 외부 엔드포인트
+    User[사용자 Browser]
+    
+    %% Vercel Frontend
+    subgraph Vercel[Vercel 클라우드]
+        Frontend[React / Vite 프론트엔드]
+    end
+    
+    %% Cloudflare
+    CF[Cloudflare Network]
+    
+    %% Azure VM
+    subgraph AzureVM[Azure 프로덕션 VM]
+        Tunnel[Cloudflare Tunnel<br>pixie-tunnel]
+        
+        subgraph Docker[Docker Compose Network]
+            Spring[Spring Boot Backend<br>pixie-spring-prod: 8080]
+            FastAPI[AI FastAPI Backend<br>pixie-ai-prod: 8000]
+            PG[(PostgreSQL 17<br>pixie-postgres-prod: 5432)]
+            Neo4j[(Neo4j 5<br>pixie-neo4j-prod: 7474/7687)]
+        end
+    end
+    
+    %% 외부 API
+    subgraph ExternalAPI[외부 API 서비스]
+        Gemini[Google Gemini API]
+        OAuth[Google / Kakao OAuth]
+    end
 
-외부 저장소는 저장소 루트의 [docker-compose.yml](docker-compose.yml)로 기동합니다.
+    %% 연결 관계
+    User -->|정적 리소스 / UI 로드| Frontend
+    User -->|API 요청| CF
+    Frontend -->|/api 프록시 라우팅| CF
+    CF <-->|보안 터널| Tunnel
+    Tunnel -->|트래픽 전달| Spring
+    
+    Spring <-->|회원 및 매뉴얼 데이터 쿼리| PG
+    Spring <-->|소셜 로그인 검증| OAuth
+    Spring -->|챗봇/AI 질의| FastAPI
+    
+    FastAPI <-->|RAG 그래프/벡터 검색| Neo4j
+    FastAPI <-->|LLM 응답 생성| Gemini
+    FastAPI <-->|매뉴얼 메타데이터 참조| PG
+```
 
-| 서비스        | 포트                               | 기본 계정·DB (compose 기준)                     |
-| ------------- | ---------------------------------- | ----------------------------------------------- |
-| PostgreSQL 18 | **5432**                           | DB `pixie`, 사용자 `postgres` / 비밀번호 `1234` |
-| Neo4j 5       | **7474**(브라우저), **7687**(Bolt) | 사용자 `neo4j` / 비밀번호 `12341234`            |
+## 📋 사전 준비 (Prerequisites)
+1. **Azure VM**: Docker 및 Docker Compose가 설치된 Linux VM (Ubuntu 등 권장)
+2. **Cloudflare**: Cloudflare Zero Trust 대시보드에서 생성한 Tunnel Token
+3. **Vercel**: 프론트엔드 호스팅 및 배포를 위한 Vercel 프로젝트 세팅
+4. **API Keys**: Google OAuth, Kakao OAuth, Gemini API KEY 등 필요
 
-## 권장 실행 순서 (로컬)
+## 🚀 배포 단계 (Deployment Steps)
 
-1. **Docker**  
-   저장소 루트에서 PostgreSQL·Neo4j를 띄웁니다.  
-   `docker compose up -d` (또는 `docker-compose up -d`)
+### 1. 레포지토리 클론 및 브랜치 전환
+Azure VM의 터미널에서 다음 명령어를 실행하여 소스코드를 가져옵니다.
+```bash
+git clone https://github.com/asd9244/Easy_Manual.git
+cd Easy_Manual
+git checkout deploy/azure-setup
+```
 
-2. **환경 변수**
-   - Spring: `em-project/spring-backend/.env.example` → `.env`로 복사 후 수정
-   - AI: `em-project/ai-backend/.env.example` → `.env`로 복사 후 `GOOGLE_API_KEY` 등 설정
-   - 프론트(선택): `em-project/frontend/.env.example` 참고
+### 2. 환경 변수 설정 (`.env`)
+프로젝트 루트 디렉토리에 `.env` 파일을 생성하고 다음 변수들을 기입합니다.
+*(주의: 보안상 `.env` 파일은 절대 깃허브에 커밋되지 않도록 해야 합니다.)*
 
-   Spring은 `application.yaml`에서 `optional:file:.env`를 읽습니다. **실행 작업 디렉터리**가 `spring-backend`일 때 같은 폴더의 `.env`가 사용됩니다.
+```env
+# Database Settings
+DB_USERNAME=postgres
+DB_PASSWORD=your_db_password
+DB_NAME=pixie
+DB_URL=jdbc:postgresql://postgres:5432/pixie
 
-3. **Ollama (임베딩)**  
-   AI 채팅 라우트는 `http://127.0.0.1:11434`에서 **모델 `bge-m3`** 를 사용합니다. Ollama를 별도 설치·실행한 뒤 해당 모델을 받아 두어야 합니다.
+# Neo4j Settings
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_neo4j_password
 
-4. **Spring Boot**  
-   `em-project/spring-backend`에서 애플리케이션 실행 (Gradle: `./gradlew bootRun`, Windows는 `gradlew.bat bootRun`). 포트 **8080**.
+# Security & JWT
+JWT_SECRET=your_super_secret_jwt_key
+JWT_EXPIRATION=86400000
 
-5. **FastAPI**  
-   `em-project/ai-backend`에서 가상환경·의존성 설치 후, 예: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`. 포트 **8000**.  
-   Spring의 [WebClientConfig](em-project/spring-backend/src/main/java/com/easymanual/springbackend/global/config/WebClientConfig.java) 기본값이 `http://localhost:8000`입니다.
+# OAuth2 Settings (Social Login)
+GOOGLE_CLIENT_ID=your_google_id
+GOOGLE_CLIENT_SECRET=your_google_secret
+KAKAO_CLIENT_ID=your_kakao_id
+KAKAO_CLIENT_SECRET=your_kakao_secret
 
-6. **프론트엔드**  
-   `em-project/frontend`에서 `npm install` 후 `npm run dev` — 포트 **3000**.
+# AI Settings (Gemini 2.0 Flash 등 모델 사용)
+GOOGLE_API_KEY=your_gemini_api_key
 
-## 의존 관계 (요청 흐름)
+# Network Settings
+FRONTEND_URL=https://your-vercel-domain.vercel.app
+CLOUDFLARE_TUNNEL_TOKEN=your_cloudflare_tunnel_token
+```
 
-- 브라우저 → **Vite(3000)** → 프록시 → **Spring(8080)** → **PostgreSQL**
-- 채팅 질의 시: **Spring** → **FastAPI(8000)** → **Neo4j** + **Ollama** + **Google API**(Gemini)
+### 3. Docker Compose 빌드 및 컨테이너 실행
+프로덕션용 `docker-compose.prod.yml` 파일을 사용하여 모든 서비스를 컨테이너로 백그라운드 실행합니다.
 
-매뉴얼 그래프·벡터 데이터는 Python 스크립트로 Neo4j에 적재해야 하며, Spring `Manual` 메타데이터와 `manual_id`(매뉴얼 코드)가 AI 쪽 `product_name` 필터와 일치해야 질의응답이 동작합니다.
+```bash
+docker-compose -f docker-compose.prod.yml up -d --build
+```
 
-## 인증·CORS 참고
+#### 배포되는 컨테이너 목록:
+- `pixie-postgres-prod`: RDBMS 영속성 제공 (5432)
+- `pixie-neo4j-prod`: 벡터 및 그래프 DB (7474, 7687)
+- `pixie-spring-prod`: 메인 비즈니스 로직, 회원가입/인증 (8080)
+- `pixie-ai-prod`: AI 챗봇 API 서버, RAG 검색 및 LLM 연동 (8000)
+- `pixie-tunnel`: Cloudflare Tunnel 클라이언트 (인바운드 포트 포워딩 없이 안전하게 노출)
 
-- 프론트는 `localhost:3000` / `127.0.0.1:3000` 만 [SecurityConfig](em-project/spring-backend/src/main/java/com/easymanual/springbackend/global/config/SecurityConfig.java) CORS에 허용되어 있습니다.
-- 소셜 로그인(Google/Kakao)을 쓰려면 `.env`의 OAuth 클라이언트 값을 실제 키로 채워야 합니다. 이메일 가입·로그인만 사용하는 경우에도 `application.yaml` 플레이스홀더 때문에 빈 값이면 기동이 실패할 수 있으므로, 로컬용 더미 값이 필요하면 팀 규칙에 맞게 설정하세요.
+### 4. 프론트엔드 배포 (Vercel)
+프론트엔드는 `em-project/frontend` 디렉토리를 Vercel에 연동하여 배포합니다.
+- **Framework Preset**: Vite
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- **환경 변수**: Vercel 대시보드에 프로덕션용 환경 변수들(백엔드 도메인 등) 등록 필요
 
-## 환경 정합성 체크리스트
+### 5. 매뉴얼 (AI 데이터) 동기화 안내
+로컬이나 초기 세팅 시 작업해둔 RAG 메타데이터 및 이미지 파일이 Azure VM 서버에도 필요할 수 있습니다.
+- `em-project/ai-backend/data/processed_images` 경로에 추출된 매뉴얼 이미지들이 위치해야 AI 서버가 이미지 프록시로 응답할 수 있습니다.
+- 초기 구축 시 Neo4j에 문서를 벡터라이즈하여 적재하는 과정이 필요할 수 있습니다.
 
-- [ ] Docker에서 Postgres·Neo4j가 떠 있고, `.env`의 DB·Neo4j URL·비밀번호가 compose와 동일한지
-- [ ] `JWT_SECRET`·`JWT_EXPIRATION`(밀리초) 설정
-- [ ] AI: `NEO4J_*`, `GOOGLE_API_KEY`, Ollama `bge-m3`
-- [ ] 포트 **3000 / 8080 / 8000** 이 충돌하지 않는지
+## 🛠️ 유지 보수 명령어
 
-자세한 변수 목록은 각 디렉터리의 `.env.example`을 참고하세요.
+- **실시간 로그 확인**: 
+  ```bash
+  # 스프링 부트 로그 보기
+  docker logs -f pixie-spring-prod
+  
+  # AI 서버 로그 보기
+  docker logs -f pixie-ai-prod
+  ```
+- **서비스 재시작**: 
+  ```bash
+  docker-compose -f docker-compose.prod.yml restart
+  ```
+- **컨테이너 업데이트**: 코드 변경 후 변경 사항을 반영하려면 다시 빌드합니다.
+  ```bash
+  docker-compose -f docker-compose.prod.yml up -d --build
+  ```
