@@ -1,250 +1,231 @@
-# Fixie
+# Fixie (Easy Manual): AI 기반 가전 매뉴얼 Q&A·기기 연동 웹 서비스
 
-**가전 제품 매뉴얼을 기반으로, 내가 등록한 기기에 대해 AI와 대화하며 쓰는 법·고장·설정을 물어볼 수 있는 웹 서비스입니다.**  
-(PDF로부터 추출·구축한 지식 DB 위에 RAG(검색 증강 생성)로 답을 만듭니다.)
+## **1. 프로젝트 개요 (Project Overview)**
 
-이 저장소는 **프론트엔드·API·AI·데이터 파이프라인**이 `em-project/` 아래에 모여 있고, 루트의 [docker-compose.yml](docker-compose.yml)로 인프라와 앱을 한꺼번에 올릴 수 있게 구성되어 있습니다.
+- **기획 배경**  
+  가전 제품은 매뉴얼이 두껍고 검색이 어렵고, “지금 이 기기”에 맞는 답을 찾기까지 시간이 걸립니다. PDF로만 흩어진 설명을 그대로 두면, 사용자는 고객센터·검색·배달 앱 쪽으로 먼저 기대기 쉽습니다.
 
----
+- **프로젝트 목표**  
+  **매뉴얼을 지식 DB(Neo4j + 벡터)로 올리고**, 사용자가 **기기(매뉴얼)를 등록한 뒤** 그 스코프 안에서만 **AI와 채팅**하며 쓰는 법·고장·설정을 물어볼 수 있게 합니다.  
+  **Spring Boot**는 인증·기기·채팅 기록·비즈니스 API를, **FastAPI + LangGraph**는 RAG·에이전트·임베딩을 맡깁니다.  
+  오프라인으로 **PDF → 이미지·OCR·목차(TOC) → Neo4j 적재·섹션·임베딩** 파이프라인([`em-project/ai-backend/scripts`](em-project/ai-backend/scripts))을 두어, 데이터를 **재현 가능한 절차**로 쌓을 수 있게 합니다.
 
-## 이런 점이 다릅니다
+<br>
 
-- **채팅으로 매뉴얼 Q&A** — 질문을 보내면 **Neo4j에 적재된 매뉴얼 섹션**을 벡터 검색으로 골라, **LangGraph**로 라우팅·답변·요약을 처리합니다.
-- **기기(매뉴얼) 단위 스코프** — DB의 매뉴얼 코드와 AI 쪽 `product_name`이 맞아야 해서, **다른 제품 매뉴얼이 섞이지 않도록** 설계했습니다.
-- **역할 분리** — **Spring**은 인증·기기·채팅 기록·비즈니스 API, **FastAPI**는 임베딩·그래프 검색·LLM 파이프라인에 집중합니다.
-- **문서化 파이프라인** — PDF → 이미지·OCR·목차(TOC) → **Neo4j** 적재·섹션·임베딩은 `em-project/ai-backend/scripts`에서 이어집니다.
+## **2. 기술 스택 (Tech Stack)**
 
----
+- Infra & Run (로컬·컨테이너)
 
-## 서비스가 하는 일(한눈에)
+| Category | Detail |
+| --- | --- |
+| Container | **Docker**, **Docker Compose** ([`docker-compose.yml`](docker-compose.yml)) |
+| DB | **PostgreSQL 18** (앱·LangGraph checkpoint 등), **Neo4j 5** (그래프·벡터) |
+| LLM/임베딩(로컬) | **Ollama** — 예: 임베딩 `bge-m3`, 답변/Router `gemma4:e4b` 등(Compose·[`ollama-pull`](docker-compose.yml) 주석 참고) |
+| 포트(개발 시 흔한 값) | Vite **3000**, Spring **8080**, FastAPI **8000**, Postgres **5432**, Neo4j Bolt **7687** |
+
+<br>
+
+- Backend (Java) — `em-project/spring-backend`
+
+| Category | Detail (Java) |
+| --- | --- |
+| **Runtime** | **Java 17**, **Spring Boot 4.0** |
+| **Web·Data** | Spring Web MVC, Spring Data JPA, Hibernate, **PostgreSQL** JDBC |
+| **Security** | Spring Security, **OAuth2** Client (Google, Kakao), **JWT** (jjwt 0.12.x) |
+| **AI 연동** | Spring WebFlux **`WebClient`** → FastAPI |
+| **API 문서** | **springdoc** OpenAPI (Swagger UI) |
+| **Build** | **Gradle** |
+| **기타** | Lombok, Bean Validation, **ZXing** (QR), JUnit 5 |
+
+<br>
+
+- AI server (Python) — `em-project/ai-backend`
+
+| Category | Detail (Python) |
+| --- | --- |
+| **Runtime** | **Python 3** + **FastAPI**, **Uvicorn** |
+| **Orchestration** | **LangGraph** (Router → Retriever → Answerer / Summarizer / Fallback) |
+| **LangChain 계열(실제 사용)** | `langchain_core` (메시지), **`langchain_ollama`** (ChatOllama, OllamaEmbeddings) |
+| **Storage** | **Neo4j** 드라이버, Cypher, 벡터 인덱스; **`langgraph-checkpoint-postgres`** + **psycopg** |
+| **문서/파이프라인(오프라인)** | **PyMuPDF** (`fitz`) — PDF·OCR·TOC; 스크립트에서 **Ollama 임베딩**·(선택) **Google Gemini**(`build_sections` 등) |
+| **Document** | FastAPI **OpenAPI** (Swagger) |
+| **Test** | **pytest** |
+
+<br>
+
+- Frontend (TypeScript) — `em-project/frontend`
+
+| Category | Detail (TypeScript) |
+| --- | --- |
+| **UI** | **React 19**, **Vite 6**, **Tailwind CSS 4** |
+| **HTTP** | **Axios** — JWT·401/403·공유 뷰 예외 ([`apiService.ts`](em-project/frontend/src/api/apiService.ts)) |
+| **State** | **Zustand** |
+| **콘텐츠** | `react-markdown`, `remark-gfm` |
+| **UX** | Motion, Lucide React |
+| **기능** | `@yudiel/react-qr-scanner` (QR) |
+| **CI/패키지** | **npm** |
+
+<br>
+
+- **의존성에만 있고 런타임에서 쓰지 않거나 미연동인 항목(참고)**  
+  삭제 권고가 아니라 **정리·탐구용**입니다.
+
+| 영역 | 항목 | 비고 |
+| --- | --- | --- |
+| 프론트 | `@tanstack/react-query`, `zod`, `@google/genai`, `html2canvas`, `jspdf`, `dotenv` 등 | `src` import 기준 |
+| Spring | `spring-boot-starter-amqp` | RabbitMQ. 코드·Bean 없음, Compose에서 AMQP 자동구성 제외 |
+| Python | `openai`, `langchain-openai`, `httpx`, `opencv-python`, `Pillow` 등 | 런타임 에이전트는 Ollama·PyMuPDF 위주. `vectorize_service.py`는 타 모듈에서 미참조 |
+
+- **파이프라인 메모**  
+  [`build_sections.py`](em-project/ai-backend/scripts/build_sections.py)는 **`langchain_google_genai`**(Gemini)를 쓰는데, [`requirements.txt`](em-project/ai-backend/requirements.txt)에 **패키지가 없을 수 있어** `langchain-google-genai` 등을 **별도 pip**이 필요한 환경이 있을 수 있습니다.
+
+<br>
+
+## **3. 시스템 아키텍처 & 데이터 흐름 (System Architecture & Data Flow)**
+
+이미지 대신 **다이어그램**으로 요약합니다.
+
+### 3-1. 서비스 데이터 플로우
+
+- 브라우저 **→ Vite(3000)** — `/api` **프록시** **→ Spring(8080)** **→ PostgreSQL** (사용자·기기·채팅·매뉴얼 메타)
+- **채팅 질의** 시: **Spring** **→ WebClient** **→ FastAPI(8000)** **→ LangGraph** **→ Neo4j(벡터·그래프) + Ollama(임베딩/소형 LLM)**  
+- 매뉴얼 **페이지 이미지**는 AI 서비스가 `data/processed_images`를 **`/manual_images`** 로 제공할 수 있음
 
 ```mermaid
 flowchart LR
-  subgraph client[브라우저]
-    UI[React + Vite]
+  subgraph client[Browser]
+    UI[React + Vite :3000]
   end
-  subgraph api[Spring Boot]
-    Auth[JWT / OAuth2]
-    Chat[채팅·기기 API]
+  subgraph api[Spring Boot :8080]
+    S[REST · JWT · OAuth2]
   end
-  subgraph ai[FastAPI + LangGraph]
-    R[Router]
-    V[Neo4j 벡터 검색]
-    A[답변 / 요약]
+  subgraph ai[FastAPI :8000]
+    G[LangGraph]
   end
-  DB[(PostgreSQL)]
-  G[(Neo4j)]
-  O[Ollama 임베딩]
-  UI -->|/api| Auth
-  UI -->|/api| Chat
-  Chat --> DB
-  Chat -->|질답·요약| R
-  R --> V
-  R --> A
-  V --> G
-  V --> O
+  PG[(PostgreSQL)]
+  N4j[(Neo4j)]
+  Ol[Ollama]
+  UI -->|/api proxy| S
+  S --> PG
+  S -->|질답·요약| G
+  G --> N4j
+  G --> Ol
 ```
 
-- **읽는 사람용 요약**  
-  화면에서 보낸 질문은 **Spring**이 기록한 뒤 **AI 서비스**로 전달되고, **Neo4j**에서 관련 매뉴얼 구절을 찾아 답이 생성됩니다. 사용자·기기·채팅은 **PostgreSQL**에 둡니다.
+### 3-2. 저장소·역할
 
----
+| 구분 | 경로/구성 | 역할 |
+| --- | --- | --- |
+| 프론트 | `em-project/frontend` | UI, API 프록시, OAuth용 `X-Forwarded-*` ([`vite.config.ts`](em-project/frontend/vite.config.ts)) |
+| API | `em-project/spring-backend` | 인증, 기기, 채팅, 파일, AI 호출 |
+| AI | `em-project/ai-backend` | RAG, LangGraph, Neo4j, 체크포인트, 매뉴얼 정적 경로 |
+| 파이프라인 | `em-project/ai-backend/scripts` | PDF·적재·섹션·임베딩 |
+| 인프라 정의 | [`docker-compose.yml`](docker-compose.yml) | Postgres, Neo4j, Ollama, (선택) 풀스택 |
+| DB 이전 가이드 | [`dump/`](dump/) | Postgres / Neo4j 덤프 문서 |
 
-## 기술 스택
+### 3-3. ID 정합 (매뉴얼 스코프)
 
-아래는 이 저장소에서 실제로 쓰는 **언어·런타임·라이브러리·인프라**를 레이어별로 정리한 것입니다. (버전은 `package.json` / `build.gradle` / `requirements.txt` / Compose 이미지 태그를 기준으로 합니다.)
+- Spring `Manual`의 **매뉴얼 코드**와 Neo4j/AI 쪽 **`product_name`(=`manual_id`)**이 **같아야** 제품 간 검색이 섞이지 않습니다.  
+- Neo4j 적재·시드·파이프라인 출력 이름을 **한 규칙**으로 맞출 것.
 
-### 프론트엔드 — `em-project/frontend`
+<br>
 
-| 구분 | 기술 |
-|------|------|
-| **런타임·언어** | TypeScript 5.8, Node (npm 패키지) |
-| **UI 프레임워크** | React 19, React DOM 19 |
-| **빌드·개발** | Vite 6, `@vitejs/plugin-react` 5, ES Modules (`"type": "module"`) |
-| **스타일** | Tailwind CSS 4, `@tailwindcss/vite`, Autoprefixer |
-| **상태·데이터 패칭** | Zustand, TanStack React Query 5 |
-| **HTTP** | Axios (인터셉터: JWT, 401/403 처리) |
-| **마크다운** | `react-markdown`, `remark-gfm` (채팅 등 본문 렌더) |
-| **UX·애니메이션** | Motion (`motion` 패키지) |
-| **아이콘** | Lucide React |
-| **입력·스키마** | Zod |
-| **기타 클라이언트** | `@google/genai` (Google GenAI 연동), `@yudiel/react-qr-scanner` (QR 스캔), `html2canvas`, `jspdf` (캡처·PDF), `dotenv` |
+## **4. 주요 기능 (Key Features)**
 
-### 백엔드(API) — `em-project/spring-backend`
+### 1. 인증·계정
 
-| 구분 | 기술 |
-|------|------|
-| **언어·런타임** | Java 17 (Gradle 툴체인) |
-| **프레임워크** | Spring Boot 4.0, Spring Web MVC, Spring Data JPA, Spring Security, Spring Validation, Spring Boot AMQP(의존성 포함) |
-| **비동기 HTTP 클라이언트** | Spring WebFlux — `WebClient`로 AI(FastAPI) 연동 |
-| **영속성** | Hibernate / JPA, **PostgreSQL** JDBC 드라이버 |
-| **인증·보안** | JWT (jjwt 0.12.x: api·impl·jackson), **OAuth2 Client** (Google, Kakao) |
-| **API 문서** | springdoc OpenAPI 3 (Swagger UI) |
-| **기타** | Lombok, Spring Boot Devtools, **ZXing** (QR 코드 생성: core, javase) |
-| **빌드** | Gradle (Boot 플러그인, JUnit 5) |
+- 이메일 가입/로그인, **Google·Kakao** OAuth2, JWT
+- Vite 뒤에서 OAuth `redirect`가 꼬이지 않게 **Forward 헤더**·`.env`의 redirect URI 정합
 
-### AI·RAG·데이터 파이프라인 — `em-project/ai-backend`
+### 2. 기기(매뉴얼)와 차고(Garage)
 
-| 구분 | 기술 |
-|------|------|
-| **웹** | **FastAPI**, **Uvicorn** (ASGI) |
-| **설정·스키마** | Pydantic 2, pydantic-settings, python-dotenv |
-| **에이전트·오케스트레이션** | **LangGraph** (StateGraph, Router / Retriever / Answerer / Summarizer / Fallback), **LangChain** 1.2, langchain-ollama, OpenAI·langchain-openai(호환 API·클라이언트 경로) |
-| **멀티턴·체크포인트** | `langgraph-checkpoint-postgres`, **psycopg** 3 (binary) — LangGraph State를 **PostgreSQL**에 저장 |
-| **그래프·벡터 DB** | **Neo4j** Python Driver 6, Cypher, 벡터 인덱스(`db.index.vector.queryNodes` 등) |
-| **임베딩·LLM(로컬)** | **Ollama** HTTP — 임베딩 모델 예: **bge-m3**; Compose 예시에 `gemma4:e4b` 등 |
-| **클라우드 LLM** | **Google Generative AI (Gemini 등)** — `GOOGLE_API_KEY` |
-| **문서·이미지 파이프라인** | **PyMuPDF**, **OpenCV** (Python), **Pillow** (PDF·페이지 이미지·OCR/TOC 전처리용) |
-| **HTTP 유틸** | httpx |
-| **테스트** | pytest 8+ |
+- 모델명 검색으로 **지원 매뉴얼**을 고르고 **UserDevice**로 등록
+- **내 기기 목록**·별칭·(소프트) 삭제
 
-### 데이터·메시징·인프라
+### 3. QR·스캔
 
-| 구분 | 기술 |
-|------|------|
-| **관계형 DB** | **PostgreSQL 18** (앱·Spring·LangGraph checkpoint 등) |
-| **그래프 DB** | **Neo4j 5** (Bolt, 브라우저 UI) |
-| **로컬 모델 런타임** | **Ollama** (Docker 이미지 `ollama/ollama` 또는 호스트 데몬) |
-| **컨테이너** | **Docker**, **Docker Compose** — Postgres, Neo4j, Ollama, (선택) Spring·AI·Frontend 멀티 서비스 |
-| **빈 값 자동제외(Compose)** | RabbitMQ는 의존성만 있고 `SPRING_AUTOCONFIGURE_EXCLUDE`로 AMQP 자동구성 제외(Compose용) |
+- **QR 스캔** 화면([`Scan`](em-project/frontend/src/pages/Scan/Scan.tsx)) — 촬영 값을 기기 등록 흐름에 전달
 
-### 요약 한 줄
+### 4. 매뉴얼 RAG 채팅
 
-**React 19 + Vite 6 + TS + Tailwind 4** · **Spring Boot 4 + JPA + Security + OAuth2 + JWT + WebClient** · **FastAPI + LangGraph + LangChain + Neo4j + Ollama + (Gemini)** · **PostgreSQL + Neo4j** · **Docker Compose**
+- 기기(채팅방) 단위로 질문 **→** Spring이 메시지 저장 **→** FastAPI **LangGraph** (Router·Retriever·Answerer/요약/폴백)
+- **벡터 검색** 후 `product_name`으로 **재필터**해 타 매뉴얼 오염 완화
 
----
+### 5. 히스토리·요약·공유
 
-## 저장소 구조
+- 채팅방/메시지 **히스토리**, 대화 **요약** API
+- **공유** 링크(쿼리/경로) — 공유 화면에서는 401 시 강제 홈 이동을 막는 처리([`apiService`](em-project/frontend/src/api/apiService.ts))
 
-저장소 루트는 **애플리케이션 코드(`em-project/`)**·**컨테이너 정의**·**DB 이전 문서**로 나뉩니다. 아래는 **의미 있는 소스·설정 위주**입니다(`node_modules`, `.venv`, IDE 설정 등은 생략).
+### 6. 가이드·설정·테마
 
-### 루트(`fixie/`)
+- **자주 찾는 가이드 TOP5**([`/api/guides/top5`](em-project/spring-backend/src/main/java/com/easymanual/springbackend/domain/chat/controller/GuideStatController.java)) — 제품군별
+- 설정·**테마**·프로필·튜토리얼
+
+### 7. 오프라인 데이터 파이프라인
+
+- **PDF** → 이미지·OCR·TOC **→** Neo4j 그래프 **→** 섹션·임베딩·인덱스([`run_pipeline.py`](em-project/ai-backend/scripts/run_pipeline.py) 등)
+
+<br>
+
+## **5. 트러블 슈팅 (Troubleshooting)**
+
+- **LangGraph + Postgres 체크포인트**  
+  - 모든 요청이 **같은 `thread_id`** 를 쓰면 이전 `state`가 복원되어 **카운터·상태 누적**이 생길 수 있음.  
+  - **해결:** `room_id` 기반 스레드 vs **oneshot** 요청마다 유일 ID 등 [thread_id 규칙](em-project/ai-backend/app/api/routes/chat.py) 및 [회귀 테스트](em-project/ai-backend/tests/test_chat_thread_id.py).
+
+- **Neo4j 벡터만으로는 타 제품 섞임**  
+  - **해결:** 쿼리에 `section.product_name = $manual_id` **재필터**, Spring·Neo4j **ID 정합** 유지.
+
+- **OAuth / 리버스 프록시**  
+  - Vite(3000) **프록시** 뒤에서 redirect_uri·Host가 달라지는 문제.  
+  - **해결:** `application.yaml` **forward-headers**, `.env`의 **`FRONTEND_PUBLIC_URL`**, OAuth 콘솔에 등록한 URI와 **문자 일치**.
+
+- **공유 뷰에서 401**  
+  - 전역 인터셉터가 로그인 화면으로 보내면 공유 UX가 깨질 수 있음.  
+  - **해결:** `?share=` / `/share/…` **컨텍스트**에서 리다이렉트 생략.
+
+- **`build_sections` / requirements**  
+  - `langchain_google_genai` 를 쓰는데 lock에 없으면 **import 오류** — **해결:** `pip install` 로 패키지 보강 또는 requirements 반영.
+
+<br>
+
+## **6. 인프라·로컬 실행 (Docker & Environment)**
+
+- **권장:** 저장소 **루트**에서 `docker compose up -d` — 서비스·볼륨·`depends_on`은 [`docker-compose.yml`](docker-compose.yml) 주석 참고.
+- **환경 변수** (각 앱 **`.env.example` → `.env`**)  
+  - `em-project/spring-backend/.env` — DB, JWT, OAuth, `AI_BACKEND_URL`  
+  - `em-project/ai-backend/.env` — `NEO4J_*`, `POSTGRES_CHECKPOINT_URL`, `GOOGLE_API_KEY`(선택), Ollama URL  
+  - (선택) `em-project/frontend/.env` — Vite 프록시 오리진
+- **Ollama**  
+  - 임베딩 **`bge-m3`** 등. Compose `ollama` + `--profile setup` 의 `ollama-pull` 프로필로 모델 pull 예시.
+- **앱만 로컬로 띄울 때**  
+  - Postgres·Neo4j(·Ollama) 선기동 **→** Spring(8080) **→** FastAPI(8000) **→** `npm run dev`(3000).
+- **체크리스트(요지)**  
+  - DB/Neo4j URL·비밀번호가 Compose와 일치하는지, `JWT_SECRET` 길이, **3000/8080/8000** 포트 충돌, CORS(개발은 localhost:3000 중심).
+
+<br>
+
+## **7. 저장소 구조 (Repository layout)**
 
 | 경로 | 역할 |
-|------|------|
-| [README.md](README.md) | 프로젝트 소개·기술 스택·구조·실행 힌트 |
-| [docker-compose.yml](docker-compose.yml) | PostgreSQL, Neo4j, Ollama, Spring, AI, Frontend 등 서비스·볼륨·환경 변수 |
-| [dump/](dump/) | DB 덤프를 다른 환경에서 쓰는 방법([Postgres](dump/POSTGRES_덤프_다른환경에서_사용하기.md), [Neo4j](dump/NEO4J_덤프_다른환경에서_사용하기.md)) |
-| [em-project/](em-project/) | 프론트·Spring·AI **세 앱** |
+| --- | --- |
+| [`em-project/frontend`](em-project/frontend) | React + Vite — `src/pages`·`services`·`api` |
+| [`em-project/spring-backend`](em-project/spring-backend) | `global/`(config, security, seed), `domain/(user, device, manual, chat, file)` |
+| [`em-project/ai-backend`](em-project/ai-backend) | `app/`(agents, api, services), `scripts/`, `data/`, `tests/` |
+| [`dump/`](dump/) | Postgres / Neo4j 덤프 이전 문서 |
+| [`docker-compose.yml`](docker-compose.yml) | 전체 인프라·앱 |
 
----
-
-### `em-project/frontend` — React (Vite)
-
-| 경로 | 설명 |
-|------|------|
-| [index.html](em-project/frontend/index.html), [vite.config.ts](em-project/frontend/vite.config.ts) | 엔트리, `/api` → Spring·AI **프록시**(`VITE_PROXY_SPRING_ORIGIN`, `VITE_PROXY_AI_ORIGIN`), OAuth용 `X-Forwarded-*` 헤더 |
-| [src/main.tsx](em-project/frontend/src/main.tsx), [src/App.tsx](em-project/frontend/src/App.tsx) | 마운트, 전역 내비·채팅 오버레이·스플래시/인증/공유 흐름 |
-| [src/api/apiService.ts](em-project/frontend/src/api/apiService.ts) | Axios 인스턴스, JWT 인터셉터, 401/403·**공유 뷰** 예외 |
-| [src/services/](em-project/frontend/src/services/) | `authService`, `deviceService`, `chatService`, `guideService` 등 API 모듈 |
-| [src/store/](em-project/frontend/src/store/) | Zustand(예: 토스트) |
-| [src/types/](em-project/frontend/src/types/), [src/utils/](em-project/frontend/src/utils/) | 공용 타입·유틸(가이드 TOP5·기기 필터 등) |
-| [src/constants/data.ts](em-project/frontend/src/constants/data.ts) | 테마·튜토리얼 상수 |
-| [src/components/common/](em-project/frontend/src/components/common/) | 로고, 카드, 토스트, 가이드/공유 모달, 디바이스 카드 등 |
-| [src/pages/](em-project/frontend/src/pages/) | **화면별** — `Home`, `Garage`, `Chat`(컴포넌트·훅), `History`, `Settings`·`SettingsSubpage`, `Auth`·`OAuthRedirectHandler`·`Signup`·`FindPassword`, `Profile`, `Share`, `Scan`, `SplashScreen`, `TutorialScreen` |
-| [src/index.css](em-project/frontend/src/index.css) | 전역 스타일 |
-
----
-
-### `em-project/spring-backend` — Spring Boot API
-
-| 경로 | 설명 |
-|------|------|
-| [build.gradle](em-project/spring-backend/build.gradle), [settings.gradle](em-project/spring-backend/settings.gradle) | Gradle, 의존성 |
-| [Dockerfile](em-project/spring-backend/Dockerfile) | 컨테이너 이미지 |
-| [src/main/resources/application.yaml](em-project/spring-backend/src/main/resources/application.yaml) | 서버·DB·OAuth·JWT·로컬 시드 플래그 |
-| [SpringBackendApplication.java](em-project/spring-backend/src/main/java/com/easymanual/springbackend/SpringBackendApplication.java) | 진입점 |
-| **global/** | [config](em-project/spring-backend/src/main/java/com/easymanual/springbackend/global/config) — `SecurityConfig`, `WebClientConfig`, `WebMvcConfig`, `JpaConfig`, Swagger 등 · [security](em-project/spring-backend/src/main/java/com/easymanual/springbackend/global/security) — JWT, OAuth2 · [seed](em-project/spring-backend/src/main/java/com/easymanual/springbackend/global/seed) — 로컬 더미 데이터 · [error](em-project/spring-backend/src/main/java/com/easymanual/springbackend/global/error) |
-| **domain/user/** | 가입·로그인·프로필·OAuth — `UserController` |
-| **domain/device/** | 기기 등록·검색·`UserDevice` — `DeviceController` |
-| **domain/manual/** | `Manual`·`Model` |
-| **domain/chat/** | 채팅방·메시지·AI 연동 DTO, 가이드 TOP5 — `ChatController`, `GuideStatController` |
-| **domain/file/** | 업로드 — `FileController` |
-| [uploads/](em-project/spring-backend/uploads/) | 런타임 업로드·**QR 이미지** 등(Compose에서는 볼륨 `spring_uploads`와 연결) |
-| [src/test/](em-project/spring-backend/src/test/) | JUnit |
-
----
-
-### `em-project/ai-backend` — FastAPI·RAG·파이프라인
-
-| 경로 | 설명 |
-|------|------|
-| [app/main.py](em-project/ai-backend/app/main.py) | FastAPI 앱, `/manual_images` 정적 경로, chat 라우터 |
-| [app/api/routes/chat.py](em-project/ai-backend/app/api/routes/chat.py) | `/api/chat/ask`, `/summarize`, `/invoke` — LangGraph 호출 |
-| [app/api/http_constants.py](em-project/ai-backend/app/api/http_constants.py) | HTTP 에러 상수 |
-| [app/agents/](em-project/ai-backend/app/agents/) | `graph`, `router`, `retriever`, `answerer`, `summarizer`, `fallback`, `state`, `llms` |
-| [app/services/](em-project/ai-backend/app/services/) | `pdf_service`, `ocr_service`, `toc_service`, `vectorize_service` 등 |
-| [app/config/](em-project/ai-backend/app/config/) | 설정·`.env` 부트스트랩 |
-| [app/neo4j_driver.py](em-project/ai-backend/app/neo4j_driver.py) | Neo4j 드라이버 |
-| [scripts/](em-project/ai-backend/scripts/) | [run_pipeline.py](em-project/ai-backend/scripts/run_pipeline.py) — 통합 파이프라인 · [ingest_to_neo4j.py](em-project/ai-backend/scripts/ingest_to_neo4j.py), [build_sections.py](em-project/ai-backend/scripts/build_sections.py), [finalize_db.py](em-project/ai-backend/scripts/finalize_db.py), [cleanup_legacy.py](em-project/ai-backend/scripts/cleanup_legacy.py) |
-| [data/](em-project/ai-backend/data/) | `raw_pdf`, `processed_images`, `extracted_texts`, `extracted_toc` — **매뉴얼 입·출력**(제품 코드별 하위 폴더) |
-| [tests/](em-project/ai-backend/tests/) | pytest(예: `thread_id` 규칙, HTTP 상수) |
-| [requirements.txt](em-project/ai-backend/requirements.txt), [Dockerfile](em-project/ai-backend/Dockerfile), `.env.example` | 의존성·이미지·환경 변수 템플릿 |
-
----
-
-### 요약 트리
+**요약 트리**
 
 ```text
 fixie/
 ├── docker-compose.yml
-├── dump/                          # Postgres·Neo4j 덤프 이전 가이드
+├── dump/
 ├── README.md
 └── em-project/
-    ├── frontend/
-    │   ├── src/
-    │   │   ├── api/              # axios
-    │   │   ├── components/       # 공통 UI
-    │   │   ├── pages/            # 화면별(Chat 훅·컴포넌트 포함)
-    │   │   ├── services/         # API 래퍼
-    │   │   ├── store/, types/, utils/
-    │   │   ├── App.tsx, main.tsx, index.css
-    │   │   └── constants/
-    │   ├── vite.config.ts
-    │   └── package.json
-    ├── spring-backend/
-    │   ├── src/main/java/.../    # global + domain (user, device, manual, chat, file)
-    │   ├── src/main/resources/
-    │   ├── src/test/
-    │   ├── uploads/
-    │   ├── build.gradle
-    │   └── Dockerfile
-    └── ai-backend/
-        ├── app/                    # main, api, agents, services, config
-        ├── scripts/               # PDF → Neo4j 파이프라인
-        ├── data/                   # raw_pdf, 이미지·텍스트·목차
-        ├── tests/
-        ├── requirements.txt
-        └── Dockerfile
+    ├── frontend/          # Vite, src/ (api, pages, services, …)
+    ├── spring-backend/     # Gradle, global + domain, uploads/
+    └── ai-backend/         # app/, scripts/, data/, requirements.txt
 ```
 
----
-
-## 처음 오셨다면(짧은 실행 가이드)
-
-1. **Docker**  
-   루트에서 `docker compose up -d` — DB·그래프 DB·(선택) 풀스택은 [docker-compose.yml](docker-compose.yml) 주석을 참고하세요.
-
-2. **환경 변수**  
-   각 앱의 `.env.example`을 `.env`로 복사해 값을 맞춥니다.  
-   - `em-project/spring-backend/.env`  
-   - `em-project/ai-backend/.env`  
-   - (선택) `em-project/frontend/.env`
-
-3. **Ollama**  
-   AI가 임베딩에 **`bge-m3`** 를 씁니다. 로컬 Ollama를 쓰는 경우 모델을 받아 둡니다. Compose를 쓰면 `ollama` 서비스·`--profile setup`으로 `ollama-pull` 예시가 있습니다.
-
-4. **앱만 따로 띄울 때(개발 흐름)**  
-   Postgres·Neo4j(·Ollama)를 먼저 띄운 뒤, Spring(8080) → FastAPI(8000) → `frontend`에서 `npm run dev`(3000) 순서를 맞추는 방식이 일반적입니다.
-
-5. **매뉴얼 데이터**  
-   질의응답을 쓰려면 Neo4j에 매뉴얼이 적재돼 있어야 하고, Spring의 **매뉴얼 메타**와 **동일한 식별자**가 AI 쪽 필터(`product_name`)와 일치해야 합니다. 덤프·이전은 `dump/` 문서를 참고하세요.
-
----
-
-## 문서·라이선스
-
-- 데이터베이스 덤프/이전: `dump/`  
-- 상세한 포트·CORS·체크리스트는 `docker-compose.yml`과 각 `.env.example`에 정리돼 있습니다.
-
-이 프로젝트에 기여하거나 fork 하기 전에, 위 **저장소 구조**와 **`.env` 예시**를 한 번씩 열어 보시면 전체 맥락이 잡히기 쉽습니다.
+이 저장소는 **One_More_Project** 스타일의 README 구조(개요 → 스택 → 아키텍처 → 기능 → 트러블슈팅 → 인프라)를 따르되, **이미지 없이** Mermaid·표·문장으로만 기술했습니다.
