@@ -2,6 +2,27 @@
 
 이 문서는 Fixie(Easy_Manual) 서비스를 **Azure 환경**에 프로덕션 수준으로 배포하기 위한 가이드입니다. `deploy/azure-setup` 브랜치의 구성을 기준으로 작성되었습니다.
 
+<p align="left">
+  <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/status-developing-4BC51D?style=flat-square" />
+</p>
+
+> **"매뉴얼의 복잡함을 Fixie로 해결하세요!"**  
+> 사용자의 편의를 논리로 증명하고, 복잡한 가이드를 지식 그래프 기반 AI로 재구조화하여 최적의 정보를 제공하는 **지능형 매뉴얼 서포트 시스템**입니다.
+
+<p align="left">
+  <img src="https://img.shields.io/badge/Spring%20Boot-6DB33F?style=flat-square&logo=Spring%20Boot&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-005571?style=flat-square&logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/Neo4j-008CC1?style=flat-square&logo=neo4j&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=PostgreSQL&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB" />
+  <img src="https://img.shields.io/badge/Azure-0089D6?style=flat-square&logo=microsoft-azure&logoColor=white" />
+  <img src="https://img.shields.io/badge/Google%20Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white" />
+</p>
+
+
+
+
 ## 🏗️ 아키텍처 개요
 - **Frontend**: Vercel 호스팅 (Vercel `vercel.json`을 통한 프록시 라우팅 지원)
 - **Backend (Spring Boot)**: Azure VM 내 Docker Container
@@ -9,6 +30,9 @@
 - **Database**: PostgreSQL 17 (사용자, 매뉴얼 메타데이터)
 - **Vector DB**: Neo4j 5 (RAG 파이프라인 그래프 및 벡터 데이터베이스)
 - **Network / Security**: Cloudflare Tunnel (`cloudflared`)을 활용하여 공인 IP 포트 개방 없이 안전한 HTTPS 연결 및 도메인 매핑 제공
+
+---
+
 
 ### 아키텍처 다이어그램 (Mermaid)
 ```mermaid
