@@ -20,7 +20,30 @@
   <img src="https://img.shields.io/badge/Google%20Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white" />
 </p>
 
+---
+## 🤔 기술 선택 배경
 
+### Azure VM
+- 초기 목표: 로컬 LLM(Gemma + Ollama) 구동을 위한 환경 확보
+- 현실: 3GB RAM 환경에서 메모리 한계 → OOM 발생
+- 결정: Gemini API로 전환, 향후 GPU 인스턴스 업그레이드 시 로컬 LLM 재전환 고려
+- Oracle Cloud 대비 GPU 인스턴스 접근성 및 팀 내 학습 목적으로 선택
+
+### Cloudflare Tunnel
+- 공인 IP 포트 개방 없이 HTTPS 연결 가능
+- 보안 강화 + VM 비용 절감 (공인 IP 미사용) 동시 달성
+- Zero Trust 기반 안전한 외부 노출 구조
+
+### PostgreSQL + Neo4j 분리
+- PostgreSQL: 사용자/매뉴얼 메타데이터 등 정형 관계형 데이터
+- Neo4j: RAG 파이프라인의 그래프 탐색 및 벡터 검색
+- 역할 분리로 각 DB의 강점을 최대한 활용
+
+### Docker Compose (prod 분리)
+- `docker-compose.prod.yml` 별도 구성으로 개발/프로덕션 환경 분리
+- 5개 서비스의 의존성을 선언적으로 관리, 단일 명령으로 전체 스택 실행 가능
+
+---
 
 
 ## 🏗️ 아키텍처 개요
@@ -81,6 +104,7 @@ graph TD
     FastAPI <-->|LLM 응답 생성| Gemini
     FastAPI <-->|매뉴얼 메타데이터 참조| PG
 ```
+---
 
 ## 📋 사전 준비 (Prerequisites)
 1. **Azure VM**: Docker 및 Docker Compose가 설치된 Linux VM (Ubuntu 등 권장)
