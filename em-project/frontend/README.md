@@ -48,37 +48,80 @@
 
 ---
 
-## 🏗️ 서비스 아키텍처 (Architecture)
+## 🏗️ 프론트엔드 아키텍처 (Frontend Architecture)
+
+Fixie 프론트엔드는 화면 단위의 `Pages`, 재사용 가능한 `Components`, 전역 상태를 관리하는 `Zustand Store`, 서버 통신을 담당하는 `API Layer`로 역할을 나누어 구성했습니다.
+사용자 흐름은 QR/모델명 인식 → 기기 등록/선택 → AI 채팅 → 이력 및 공유로 이어지며, 각 화면은 필요한 상태와 API만 연결되도록 설계했습니다.
 
 ```mermaid
 graph TD
-    subgraph Client["Frontend (React + Vite)"]
-        UI["User Interface"]
-        State["Zustand / TanStack Query"]
-        Router["Custom Screen Router"]
+    App["App / Screen Router"]
+
+    subgraph Pages["Pages"]
+        Home["Home"]
+        Scan["QR / Model Scan"]
+        Garage["Garage"]
+        Chat["AI Chat"]
+        History["History & Share"]
     end
 
-    subgraph Pages["핵심 화면"]
-        Scan["📷 QR / 모델명 스캔"]
-        Garage["🚗 나의 기기 (기기 관리)"]
-        Chat["💬 AI 채팅 (픽시)"]
-        History["📋 이력 & 공유"]
+    subgraph Components["Shared Components"]
+        Layout["Layout / Navigation"]
+        UI["Reusable UI"]
+        ThemeUI["Theme UI"]
     end
 
-    subgraph External["외부 서비스"]
-        Gemini["Google Gemini API"]
-        FastAPI["FastAPI (AI 백엔드)"]
-        DB["PostgreSQL / Neo4j"]
+    subgraph State["State & Data"]
+        Store["Zustand Store"]
+        Query["TanStack Query"]
+        ApiLayer["API Layer"]
     end
 
-    UI --> Scan
-    Scan -->|기기 식별| Garage
-    Garage -->|선택| Chat
-    Chat <-->|AI 응답| Gemini
-    Chat --> History
-    State --> UI
-    FastAPI <--> DB
-    Chat <-->|API 호출| FastAPI
+    subgraph Browser["Browser Services"]
+        Camera["Camera / QR Scan"]
+        Storage["Local Storage"]
+        Share["Share Link"]
+    end
+
+    subgraph Server["External APIs"]
+        Spring["Spring Backend API"]
+        Gemini["Gemini API"]
+    end
+
+    App --> Pages
+    Pages --> Home
+    Pages --> Scan
+    Pages --> Garage
+    Pages --> Chat
+    Pages --> History
+
+    Pages --> Components
+    Components --> Layout
+    Components --> UI
+    Components --> ThemeUI
+
+    Pages --> Store
+    Pages --> Query
+    Query --> ApiLayer
+    ApiLayer --> Spring
+    ApiLayer --> Gemini
+
+    Scan --> Camera
+    Store --> Storage
+    History --> Share
+
+    classDef mint fill:#7DE3D1,stroke:#0F766E,color:#0F172A;
+    classDef lavender fill:#C9AFFF,stroke:#7C3AED,color:#1E1B4B;
+    classDef sky fill:#61DAFB,stroke:#0284C7,color:#0F172A;
+    classDef dark fill:#334155,stroke:#181717,color:#FFFFFF;
+    classDef soft fill:#F8FAFC,stroke:#CBD5E1,color:#0F172A;
+
+    class App mint;
+    class Pages,Home,Scan,Garage,Chat,History lavender;
+    class Components,Layout,UI,ThemeUI sky;
+    class State,Store,Query,ApiLayer mint;
+    class Browser,Camera,Storage,Share soft;
+    class Server,Spring,Gemini dark;
 ```
 
 ---
