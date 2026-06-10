@@ -40,7 +40,20 @@ Fixie는 팀 프로젝트로 진행되었으며, `main` 브랜치에는 팀원�
 
 > 영상 업로드 후 아래 링크를 실제 데모 영상 URL로 교체합니다.
 
-[Fixie 데모 영상 보기](https://example.com/fixie-demo)
+
+### 📺스플레시 화면
+https://github.com/user-attachments/assets/2f435d83-c098-4f98-ac36-5ba9fb190063
+
+---
+
+### ✏️모델 등록
+https://github.com/user-attachments/assets/0b5a3a37-aa10-4641-93a5-6d560b2e727f
+
+---
+
+### 🗨️AI 대화
+https://github.com/user-attachments/assets/133cd2e8-1641-4c94-b802-503893b86442
+
 
 ---
 ## 🤔 기술 선택 배경
