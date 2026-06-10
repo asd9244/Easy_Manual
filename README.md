@@ -53,7 +53,13 @@ Fixie는 팀 프로젝트로 진행된 AI 기반 매뉴얼 서포트 시스템�
 
 서비스 진입 시 표시되는 스플래시 애니메이션입니다. 브랜드 아이덴티티와 사용자 경험을 고려하여 직접 기획 및 구현했습니다.
 
-https://github.com/user-attachments/assets/2f435d83-c098-4f98-ac36-5ba9fb190063
+
+https://github.com/user-attachments/assets/faf51ca6-f873-4c3a-9ead-66e9302ca911
+
+
+
+
+
 
 ---
 
@@ -61,7 +67,7 @@ https://github.com/user-attachments/assets/2f435d83-c098-4f98-ac36-5ba9fb190063
 
 사용자가 제품 및 장비 정보를 등록하는 화면입니다. 이미지 업로드와 기본 정보 입력 과정을 확인할 수 있습니다.
 
-https://github.com/user-attachments/assets/0b5a3a37-aa10-4641-93a5-6d560b2e727f
+https://github.com/user-attachments/assets/fd86cf8b-1894-42cd-b400-1c0675e6c595
 
 ---
 
@@ -69,7 +75,12 @@ https://github.com/user-attachments/assets/0b5a3a37-aa10-4641-93a5-6d560b2e727f
 
 등록된 매뉴얼 데이터를 기반으로 질문을 입력하면 RAG 검색과 Gemini 응답 생성을 통해 필요한 정보를 제공합니다.
 
-https://github.com/user-attachments/assets/133cd2e8-1641-4c94-b802-503893b86442
+
+
+
+https://github.com/user-attachments/assets/2ea16f98-0be9-4a60-b247-156ab9b59f5a
+
+
 
 
 ---
