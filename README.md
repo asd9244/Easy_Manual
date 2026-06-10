@@ -1,6 +1,6 @@
 # Fixie (Easy_Manual) Azure 배포 가이드
 
-이 문서는 Fixie(Easy_Manual) 서비스를 **Azure 환경**에 프로덕션 수준으로 배포하기 위한 가이드입니다. `deploy/azure-setup` 브랜치의 구성을 기준으로 작성되었습니다.
+이 문서는 Fixie(Easy_Manual) 서비스의 Azure 기반 프로덕션 배포 환경과 운영 구성을 정리한 문서입니다. deploy/azure-setup 브랜치를 기준으로 작성되었으며, 프로젝트 개요와 담당 역할, 배포 아키텍처 및 운영 방법을 함께 다룹니다.
 
 <p align="left">
   <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" />
@@ -23,35 +23,52 @@
 ---
 ## 🙋 담당 역할 및 기여 범위
 
-Fixie는 팀 프로젝트로 진행되었으며, `main` 브랜치에는 팀원들과 함께 개발한 서비스 본체가 반영되어 있습니다. 이 브랜치(`deploy/azure-setup`)에서는 프로덕션 배포 환경 구축과 배포 안정화, 일부 프론트엔드 사용자 경험 개선을 중심으로 기여했습니다.
+Fixie는 팀 프로젝트로 진행된 AI 기반 매뉴얼 서포트 시스템입니다. 프로젝트 전반의 프론트엔드 개발과 UI/UX 구현을 담당했으며, 서비스 배포 및 운영 환경 구축에도 참여했습니다.
+
+  - 프론트엔드 개발: React 기반 주요 화면 구현, 사용자 흐름 설계, UI 컴포넌트 개발 및 서비스 전반의 화면 구성을 담당했습니다.
+  - UI/UX 디자인: 서비스 색상 시스템, 톤앤매너 정립, 사용성 개선 작업을 진행했습니다.
+  - 스플래시 애니메이션 제작: 서비스 첫인상을 담당하는 스플래시 화면을 기획 및 구현했습니다.
+  - 프로덕션 배포 구성: Azure VM 기반으로 Spring Boot, FastAPI, PostgreSQL, Neo4j, Cloudflare Tunnel을 Docker Compose 환경으로 구성했습니다.
+  - HTTPS 배포 연동: Cloudflare Tunnel과 Vercel을 연동하여 외부 HTTPS 환경을 구축했습니다.
+  - AI 운영 구조 개선: 로컬 LLM 운영 중 발생한 메모리 한계를 확인하고 Gemini API 기반 구조로 전환하는 과정에 참여했습니다.
+  - 배포 문서화: Azure VM 배포 절차, 환경 변수, 컨테이너 운영 및 유지보수 문서를 작성했습니다.
+
+
+
 
 > 현재 Azure for Students 크레딧 소진으로 상시 운영 서버는 중단된 상태입니다. 배포 브랜치에는 Azure VM, Docker Compose, Cloudflare Tunnel, Vercel 연동을 위한 프로덕션 구성이 포함되어 있으며, 동일 애플리케이션 흐름은 로컬 환경에서 재현할 수 있습니다.
 
-- **프로덕션 배포 구성**: Azure VM 기반으로 Spring Boot, FastAPI, PostgreSQL, Neo4j, Cloudflare Tunnel을 Docker Compose 프로덕션 스택으로 구성했습니다.
-- **HTTPS 배포 연동**: Cloudflare Tunnel을 활용하여 공인 IP 없이 백엔드 API를 외부 HTTPS 도메인으로 연결하고, Vercel 프론트엔드와 연동했습니다.
-- **AI 운영 구조 개선**: 로컬 LLM 운영 중 발생한 VM 메모리 한계를 확인하고, Gemini API 기반 응답 구조로 전환하여 운영 안정성을 높였습니다.
-- **프론트엔드 UX 기여**: 서비스 첫인상을 담당하는 스플래시 화면과 전반적인 프론트엔드 색감 및 톤앤매너 개선에 기여했습니다.
-- **배포 문서화**: Azure VM 배포 절차, 환경 변수, 컨테이너 실행 및 유지보수 명령어를 README에 정리했습니다.
-
 ---
+
 ## 🎬 데모 영상
+아래 영상은 팀 프로젝트의 최종 구현 상태를 보여주기 위해 main 브랜치 기준으로 촬영되었습니다.
+
+현재 브랜치(deploy/azure-setup)는 Azure 기반 프로덕션 배포 환경 구성과 운영 구조를 정리한 브랜치이며, 서비스 기능 및 사용자 인터페이스는 main 브랜치와 동일한 애플리케이션을 기준으로 합니다.
+
 
 스플래시 화면, 주요 화면 색감, AI 매뉴얼 질의 흐름을 확인할 수 있는 데모 영상입니다. 클라우드 크레딧 소진으로 상시 운영 서버가 중단된 경우, 동일한 애플리케이션 코드를 로컬 환경에서 실행해 촬영한 데모로 대체합니다.
 
-> 영상 업로드 후 아래 링크를 실제 데모 영상 URL로 교체합니다.
-
 
 ### 📺스플레시 화면
+
+서비스 진입 시 표시되는 스플래시 애니메이션입니다. 브랜드 아이덴티티와 사용자 경험을 고려하여 직접 기획 및 구현했습니다.
+
 https://github.com/user-attachments/assets/2f435d83-c098-4f98-ac36-5ba9fb190063
 
 ---
 
 ### ✏️모델 등록
+
+사용자가 제품 및 장비 정보를 등록하는 화면입니다. 이미지 업로드와 기본 정보 입력 과정을 확인할 수 있습니다.
+
 https://github.com/user-attachments/assets/0b5a3a37-aa10-4641-93a5-6d560b2e727f
 
 ---
 
 ### 🗨️AI 대화
+
+등록된 매뉴얼 데이터를 기반으로 질문을 입력하면 RAG 검색과 Gemini 응답 생성을 통해 필요한 정보를 제공합니다.
+
 https://github.com/user-attachments/assets/133cd2e8-1641-4c94-b802-503893b86442
 
 
