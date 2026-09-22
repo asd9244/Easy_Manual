@@ -37,7 +37,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # 모델 초기화
 embeddings_model = OllamaEmbeddings(model="bge-m3", base_url="http://127.0.0.1:11434")
-vlm = ChatGoogleGenerativeAI(model="gemini-3.1-pro-preview", google_api_key=GOOGLE_API_KEY, temperature=0.1)
+vlm = ChatGoogleGenerativeAI(model="gemini-3.6-flash", google_api_key=GOOGLE_API_KEY, temperature=0.1)
 
 
 # ==========================================
