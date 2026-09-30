@@ -33,6 +33,14 @@ services:
     volumes:
       - pixie_postgres_data:/var/lib/postgresql/data
     restart: always
+    # 접속을 받을 수 있을 때 healthy — spring·ai는 이 상태를 기다린 뒤 기동한다
+    # (ai가 너무 일찍 붙으면 체크포인트가 조용히 MemorySaver로 폴백됨)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pixie"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   # ---------------------------------------------------------------------------
   # Neo4j — AI 백엔드가 벡터·그래프 검색에 사용
@@ -102,7 +110,7 @@ services:
       SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       ai:
         condition: service_started
     volumes:
@@ -129,7 +137,7 @@ services:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       neo4j:
         condition: service_started
       ollama:
