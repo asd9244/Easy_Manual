@@ -21,8 +21,10 @@ from app.neo4j_driver import get_neo4j_driver
 logger = logging.getLogger(__name__)
 
 
+# 인덱스에는 모든 매뉴얼이 섞여 있어, 후보를 5개만 뽑으면 다른 매뉴얼 섹션이 상위를
+# 차지해 대상 매뉴얼 결과가 줄거나 0개가 된다. 넉넉히 50개를 뽑은 뒤 필터 → TOP 3.
 _VECTOR_QUERY = """
-CALL db.index.vector.queryNodes('section_text_embeddings', 5, $question_vector)
+CALL db.index.vector.queryNodes('section_text_embeddings', 50, $question_vector)
 YIELD node AS section, score
 WHERE section.product_name = $manual_id
 

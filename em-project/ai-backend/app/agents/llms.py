@@ -24,10 +24,15 @@ _EMBED_MODEL = _s.embed_model
 # 때는 max_tokens를 작게 제한해 지연을 줄인다 (router.py 참고).
 embeddings_model = OllamaEmbeddings(model=_EMBED_MODEL, base_url=_OLLAMA_BASE)
 
+# Ollama 기본 컨텍스트(4096)는 매뉴얼 섹션 3개 + 질문(1.9k~4.8k 토큰)과 추론 토큰을
+# 담지 못해 빈 답변이 나왔다. Router도 같은 값을 써야 Ollama가 모델을 다시 올리지 않는다.
+_NUM_CTX = 16384
+
 answer_llm = ChatOllama(
     model=_ANSWER_MODEL,
     base_url=_OLLAMA_BASE,
     temperature=0.1,
+    num_ctx=_NUM_CTX,
 )
 
 # Router는 분류 목적이라 짧은 출력만 요구한다. temperature=0으로 고정해 같은
@@ -37,6 +42,7 @@ router_llm = ChatOllama(
     base_url=_OLLAMA_BASE,
     temperature=0.0,
     num_predict=32,
+    num_ctx=_NUM_CTX,
 )
 
 
