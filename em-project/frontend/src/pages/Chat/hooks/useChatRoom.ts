@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, Device } from '@/src/types/index';
-import { chatService } from '@/src/services/chatService';
+import { chatService, type ChatRoomListRow } from '@/src/services/chatService';
 import { MIN_LOADING_TIME } from '../constants';
 
 interface UseChatRoomParams {
@@ -24,7 +24,7 @@ export function useChatRoom({
   const [activeDeviceId, setActiveDeviceId] = useState<number | null>(deviceId ?? null);
   const [selectedMentionDevice, setSelectedMentionDevice] = useState<string | null>(initialDeviceName ?? null);
   const [isGuestMode, setIsGuestMode] = useState(false);
-  const [pendingResumeRooms, setPendingResumeRooms] = useState<any[] | null>(null);
+  const [pendingResumeRooms, setPendingResumeRooms] = useState<ChatRoomListRow[] | null>(null);
 
   const hasProcessedInitialQuery = useRef(false);
   const loadingOpsCount = useRef(0);
@@ -75,7 +75,7 @@ export function useChatRoom({
         try {
           const rooms = await chatService.getChatRooms();
           if (cancelled) return;
-          const currentRoom = rooms.find((r: any) => Number(r.id) === Number(roomId));
+          const currentRoom = rooms.find((r: ChatRoomListRow) => Number(r.id) === Number(roomId));
           if (currentRoom) {
             const devId = currentRoom.userDeviceId || currentRoom.deviceId;
             setActiveDeviceId(devId !== undefined ? Number(devId) : null);
@@ -99,7 +99,7 @@ export function useChatRoom({
           const rooms = await chatService.getChatRooms();
           if (cancelled) return;
           const deviceRooms = rooms.filter(
-            (r: any) => r.userDeviceId === deviceId || r.deviceId === deviceId,
+            (r: ChatRoomListRow) => r.userDeviceId === deviceId || r.deviceId === deviceId,
           );
 
           if (deviceRooms.length > 0) {

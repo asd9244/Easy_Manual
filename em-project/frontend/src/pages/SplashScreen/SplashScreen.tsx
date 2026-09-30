@@ -1,7 +1,11 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
 
-export const SplashScreen = ({ onComplete }: any) => {
+interface SplashScreenProps {
+  onComplete: () => void;
+}
+
+export const SplashScreen = ({ onComplete }: SplashScreenProps) => {
   useEffect(() => { 
     const timer = setTimeout(onComplete, 2800); 
     return () => clearTimeout(timer); 

@@ -1,5 +1,9 @@
+import logging
 import os
+
 import fitz  # PyMuPDF 라이브러리
+
+logger = logging.getLogger(__name__)
 
 
 def convert_pdf_to_images(pdf_path: str, output_base_dir: str, model_name: str, dpi: int = 200):
@@ -20,7 +24,7 @@ def convert_pdf_to_images(pdf_path: str, output_base_dir: str, model_name: str, 
     # 생성된 이미지 경로를 담을 리스트
     saved_image_paths = []
 
-    print(f"🚀 [{model_name}] PDF 변환 시작... (경로: {pdf_path})")
+    logger.info("[%s] PDF 변환 시작 (경로: %s)", model_name, pdf_path)
 
     try:
         # 2. PDF 문서 열기
@@ -46,13 +50,13 @@ def convert_pdf_to_images(pdf_path: str, output_base_dir: str, model_name: str, 
             pix.save(image_filepath)
             saved_image_paths.append(image_filepath)
 
-            print(f"   ✅ 저장 완료: {image_filename} ({page_num + 1}/{total_pages})")
+            logger.info("저장 완료: %s (%s/%s)", image_filename, page_num + 1, total_pages)
 
-        print(f"🎉 변환 완료! 총 {total_pages}장의 이미지가 '{output_dir}'에 저장되었습니다.\n")
+        logger.info("변환 완료: 총 %s장 → %s", total_pages, output_dir)
         return saved_image_paths
 
     except Exception as e:
-        print(f"❌ 오류 발생: {e}")
+        logger.exception("PDF 변환 오류: %s", e)
         return
 
 # 실제로 함수를 실행하는 부분

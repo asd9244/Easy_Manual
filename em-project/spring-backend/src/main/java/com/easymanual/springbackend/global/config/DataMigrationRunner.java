@@ -73,10 +73,10 @@ public class DataMigrationRunner implements CommandLineRunner {
                             .build();
 
                     modelRepository.save(model);
-                    log.info("✨ 마이그레이션 완료: 매뉴얼 ID [{}], 등록 모델 [{}] (QR URL: {})", manualId, cleanName, qrUrl);
+                    log.info("마이그레이션 완료: 매뉴얼 ID [{}], 등록 모델 [{}] (QR URL: {})", manualId, cleanName, qrUrl);
                 }
             }
-            log.info("🚀 데이터 마이그레이션 및 개별 QR 코드 생성이 완벽하게 끝났습니다!");
+            log.info("데이터 마이그레이션 및 개별 QR 코드 생성이 완료되었습니다.");
         } catch (Exception e) {
             log.error("마이그레이션 중 오류가 발생했습니다. (자료가 없거나 컬럼이 존재하지 않음)", e);
         }

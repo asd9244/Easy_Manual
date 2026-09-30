@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { FixieLogo } from '@/src/components/common/FixieLogo';  
 import { api } from '@/src/api/apiService';
 import { FindPassword } from './FindPassword';
 import { Signup } from './Signup';
 
-export const AuthScreen = ({ onLogin }: any) => {
+interface AuthScreenProps {
+  onLogin: () => void;
+}
+
+export const AuthScreen = ({ onLogin }: AuthScreenProps) => {
   const [authMode, setAuthMode] = useState<'login' | 'find-password' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,9 +22,16 @@ export const AuthScreen = ({ onLogin }: any) => {
       const token = response.data.accessToken || response.data.token;
       if (token) localStorage.setItem('accessToken', token);
       onLogin(); // 성공 시 페이지 전환
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("로그인 에러:", e);
-      alert(e.response?.data?.message || '로그인에 실패했습니다. 이메일이나 비밀번호를 확인해주세요.');
+      const msg = axios.isAxiosError(e)
+        ? e.response?.data?.message
+        : undefined;
+      alert(
+        typeof msg === 'string' && msg
+          ? msg
+          : '로그인에 실패했습니다. 이메일이나 비밀번호를 확인해주세요.',
+      );
     }
   };
 

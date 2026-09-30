@@ -1,8 +1,13 @@
 package com.easymanual.springbackend.domain.user.service;
 
-import com.easymanual.springbackend.domain.user.dto.*;
+import com.easymanual.springbackend.domain.user.dto.LoginRequest;
+import com.easymanual.springbackend.domain.user.dto.LoginResponse;
+import com.easymanual.springbackend.domain.user.dto.SignUpRequest;
+import com.easymanual.springbackend.domain.user.dto.UserResponse;
+import com.easymanual.springbackend.domain.user.dto.UserUpdateRequest;
 import com.easymanual.springbackend.domain.user.entity.User;
 import com.easymanual.springbackend.domain.user.repository.UserRepository;
+import com.easymanual.springbackend.global.error.ErrorMessages;
 import com.easymanual.springbackend.global.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,7 +29,7 @@ public class UserService {
     public UserResponse signUp(SignUpRequest request) {
         // 1. 이메일 중복 검사
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("이미 가입된 이메일입니다.");
+            throw new IllegalArgumentException(ErrorMessages.USER_EMAIL_DUPLICATE);
         }
 
         // 2. 비밀번호 암호화 (예: "1234" -> "$2a$10$x8...")
@@ -51,17 +56,17 @@ public class UserService {
     public LoginResponse login(LoginRequest request) {
         // 1. DB에서 이메일로 유저 찾기 (없으면 에러 발생)
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("가입되지 않은 이메일입니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_EMAIL_NOT_REGISTERED));
 
         // 유저의 상태(status)가 DELETED(탈퇴)인 경우, 비밀번호 검사 전에 즉시 예외를 발생시켜 로그인을 차단합니다.
         if (user.getStatus() == User.UserStatus.DELETED) {
-            throw new IllegalArgumentException("탈퇴한 회원입니다. 로그인이 불가능합니다.");
+            throw new IllegalArgumentException(ErrorMessages.USER_DELETED);
         }
 
         // 2. 비밀번호 확인 (매우 중요!)
         // DB에는 암호화된 복잡한 비밀번호가 들어있으므로, passwordEncoder.matches() 라는 전용 도구로 비교해야 합니다.
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("비밀번호가 틀렸습니다.");
+            throw new IllegalArgumentException(ErrorMessages.USER_WRONG_PASSWORD);
         }
 
         // 3. 이메일과 비밀번호가 모두 맞다면, 기계를 돌려 JWT 토큰(팔찌)을 생성합니다.
@@ -78,7 +83,7 @@ public class UserService {
 
         // 1. 매니저(Controller)가 넘겨준 이메일로 창고(DB)에서 유저를 찾습니다.
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_NOT_FOUND));
 
         // 2. 찾은 유저 정보를 프론트엔드에게 주기 좋게 영수증(UserResponse)에 담아서 돌려줍니다.
         // (비밀번호 같은 민감한 정보는 UserResponse 안에 없으므로 안전합니다!)
@@ -90,7 +95,7 @@ public class UserService {
 
         // 1. 매니저가 준 이메일로 창고(DB)에서 유저를 찾아옵니다.
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_NOT_FOUND));
 
         // 2. 유저 객체의 스위치를 눌러서 닉네임을 새 것으로 바꿉니다.
         // (JPA의 '더티 체킹(Dirty Checking)' 마법 덕분에, 여기서 값만 바꿔도
@@ -106,7 +111,7 @@ public class UserService {
     public void withdrawUser(String email) {
         // 1. SecurityContext 에서 전달받은 이메일로 DB에서 쥬어 엔티티를 조회합니다.
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_NOT_FOUND));
 
         // 2. 조회된 유저 엔티티의 상태 변경 메서드를 호출합니다.
         // @Transactional 어노테이션에 의해 영속성 컨텍스트(Persistence Context)가 이 객체를 관리하고 있으므로,
@@ -118,7 +123,7 @@ public class UserService {
     @Transactional
     public void updateTheme(String email, String theme) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("해당 유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.USER_NOT_FOUND));
 
         user.updateTheme(theme);
     }

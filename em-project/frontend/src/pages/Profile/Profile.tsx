@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import { api } from '@/src/api/apiService';
 import { authService } from '@/src/services/authService';
 import { useToastStore } from '@/src/store/useToastStore';
@@ -62,7 +63,9 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
         showToast('프로필 사진이 변경되었습니다! 🎉', 'success');
       }
     } catch (error) {
-      console.warn('서버 업로드 실패, 로컈 프리븷 모드로 폴백:', error);
+      if (import.meta.env.DEV) {
+        console.warn('서버 업로드 실패, 로컬 프리뷰 모드로 폴백:', error);
+      }
       // 서버 업로드 실패 시 base64로 임시 저장 (테스트 환경 호환)
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -88,10 +91,12 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
         setNickname(data.nickname);
       }
       showToast('프로필이 성공적으로 업데이트 되었습니다! 🎉', 'success');
-    } catch (error: any) {
-      console.error("프로필 업데이트 실패:", error);
-      const msg = error.response?.data?.message || '업데이트에 실패했습니다.';
-      showToast(msg, 'error');
+    } catch (error: unknown) {
+      console.error('프로필 업데이트 실패:', error);
+      const msg = axios.isAxiosError(error)
+        ? (error.response?.data as { message?: string } | undefined)?.message
+        : undefined;
+      showToast(msg || '업데이트에 실패했습니다.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -107,7 +112,9 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
 
       // 2. 결과 확인 및 후속 조치 (성공 시에만 클린업 진행)
       if (result.success) {
-        console.log("회원 탈퇴 성공 (서버)");
+        if (import.meta.env.DEV) {
+          console.log('회원 탈퇴 성공 (서버)');
+        }
         
         // 3. 성공 후 로컬 데이터 정리
         authService.logout();
@@ -121,8 +128,8 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
         // 실패 시 Toast 알림 (사용자 요청 사항)
         showToast(result.message || '탈퇴 도중 오류가 발생했습니다.', 'error');
       }
-    } catch (error: any) {
-      console.error("회원 탈퇴 처리 중 예외 발생:", error);
+    } catch (error: unknown) {
+      console.error('회원 탈퇴 처리 중 예외 발생:', error);
       showToast('처리 도중 예상치 못한 오류가 발생했습니다.', 'error');
     } finally {
       setIsWithdrawing(false);
@@ -203,4 +210,4 @@ export const Profile: React.FC<ProfileProps> = ({ setScreen }) => {
       </div>
     </div>
   );
-};
+};

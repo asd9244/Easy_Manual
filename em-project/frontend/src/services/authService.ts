@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { api } from '@/src/api/apiService';
 
 /**
@@ -23,15 +24,15 @@ export const authService = {
         success: false, 
         message: `탈퇴 처리 중 오류가 발생했습니다. (상태 코드: ${response.status})` 
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("회원 탈퇴 API 호출 실패:", error);
-      
-      // 에러 응답에서 메시지 추출
-      const errorMessage = error.response?.data?.message 
-        || error.message 
-        || '서버와의 통신이 원활하지 않습니다.';
-        
-      return { success: false, message: errorMessage };
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message ?? error.message
+        : error instanceof Error
+          ? error.message
+          : '서버와의 통신이 원활하지 않습니다.';
+
+      return { success: false, message: typeof errorMessage === 'string' ? errorMessage : '서버와의 통신이 원활하지 않습니다.' };
     }
   },
 

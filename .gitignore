@@ -25,5 +25,11 @@ node_modules/
 # 비밀키, ai키 등등
 .env
 
+# Postgres 덤프 (민감 데이터 포함 가능)
+dump/pixie.dump
+
+# Neo4j 덤프 (neo4j-admin archive, 민감 데이터 포함 가능)
+dump/neo4j.dump
+
 # 로컬 문서·노션 정리 등 (저장소에 포함하지 않음)
 docs/

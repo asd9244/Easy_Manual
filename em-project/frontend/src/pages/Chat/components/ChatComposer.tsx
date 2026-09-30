@@ -1,8 +1,6 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  X,
-  Paperclip,
   Mic,
   Send,
   AtSign,
@@ -14,7 +12,8 @@ import { Device } from '@/src/types/index';
 interface ChatComposerProps {
   inputText: string;
   canSend: boolean;
-  attachedFiles: string[];
+  /** 이력 등 읽기 전용일 때 입력 비활성 */
+  isReadOnly?: boolean;
   selectedMentionDevice: string | null;
   showMentionPopover: boolean;
   mentionQuery: string;
@@ -24,8 +23,6 @@ interface ChatComposerProps {
   onSend: () => void;
   onSendAndClearMention: () => void;
   onVoiceOpen: () => void;
-  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemoveAttachment: (index: number) => void;
   onToggleMentionPopover: () => void;
   onSelectMention: (deviceName: string) => void;
 }
@@ -33,7 +30,7 @@ interface ChatComposerProps {
 export const ChatComposer: React.FC<ChatComposerProps> = ({
   inputText,
   canSend,
-  attachedFiles,
+  isReadOnly = false,
   selectedMentionDevice,
   showMentionPopover,
   mentionQuery,
@@ -43,56 +40,31 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   onSend,
   onSendAndClearMention,
   onVoiceOpen,
-  onFileChange,
-  onRemoveAttachment,
   onToggleMentionPopover,
   onSelectMention,
-}) => (
-  <div className={`
-    absolute left-0 right-0 transition-all duration-300
-    bottom-0 p-3 bg-white border-t border-slate-50
-    md:bottom-8 md:left-10 md:right-10 md:p-0 md:bg-transparent md:border-none
-  `}>
-    {/* 첨부파일 미리보기 */}
-    <AnimatePresence>
-      {attachedFiles.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 10 }}
-          className="flex items-center gap-3 mb-3 p-3 bg-white/90 backdrop-blur-md rounded-2xl border border-slate-100 shadow-lg max-w-[calc(100%-16px)] md:max-w-full overflow-x-auto no-scrollbar"
-        >
-          {attachedFiles.map((file, i) => (
-            <div key={i} className="relative group">
-              <img src={file} alt="Preview" className="w-14 h-14 object-cover rounded-xl shadow-sm" />
-              <button onClick={() => onRemoveAttachment(i)} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors">
-                <X size={12} />
-              </button>
-            </div>
-          ))}
-        </motion.div>
-      )}
-    </AnimatePresence>
-
-    {/* 메인 입력 Pill */}
-    <div className={`
+}) => {
+  return (
+  <div
+    className="shrink-0 w-full border-t border-slate-100 bg-white/95 backdrop-blur-md p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
+  >
+    {/* 메인 입력 Pill — 상위가 문서 흐름에 있어 메시지 영역과 겹치지 않음 */}
+    <div
+      className={`
       flex items-center gap-2 transition-all duration-300 relative
-      bg-white/40 backdrop-blur-xl rounded-full p-1 pl-4 shadow-none border border-white/20
-      md:bg-white/60 md:backdrop-blur-xl md:p-2 md:pl-4 md:shadow-lg md:border-white/30
-    `}>
+      bg-white/90 backdrop-blur-xl rounded-full p-1 pl-4 shadow-sm border border-slate-100/80
+      md:p-2 md:pl-4 md:shadow-md
+    `}
+    >
       <button
+        type="button"
         onClick={onVoiceOpen}
         className="p-2 text-theme-primary bg-theme-primary/10 rounded-full hover:bg-theme-primary/20 transition-colors"
       >
         <Mic size={18} className="md:w-5 md:h-5" />
       </button>
 
-      <input type="file" id="file-upload" multiple accept="image/*" className="hidden" onChange={onFileChange} />
-      <label htmlFor="file-upload" className="p-2 text-slate-400 rounded-full hover:bg-slate-100 cursor-pointer transition-colors">
-        <Paperclip size={18} className="md:w-5 md:h-5" />
-      </label>
-
       <button
+        type="button"
         id="mention-btn"
         onClick={onToggleMentionPopover}
         className={`p-2 rounded-full transition-all font-bold text-sm ${
@@ -110,7 +82,8 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         value={inputText}
         onChange={onInputChange}
         placeholder="질문을 입력하세요.."
-        className="flex-1 bg-transparent h-10 px-1 focus:outline-none text-[13px] md:text-sm text-slate-700 font-medium"
+        disabled={isReadOnly}
+        className="flex-1 bg-transparent h-10 px-1 focus:outline-none text-[13px] md:text-sm text-slate-700 font-medium disabled:opacity-50"
         onKeyDown={(e) => {
           if (e.nativeEvent.isComposing) return;
           if (e.key === 'Enter' && canSend) onSend();
@@ -118,6 +91,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
       />
 
       <button
+        type="button"
         id="send-btn"
         disabled={!canSend}
         className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-md transition-all shrink-0 ${
@@ -145,6 +119,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             <div className="max-h-56 overflow-y-auto no-scrollbar">
               <div className="p-2 border-b border-slate-50">
                 <button
+                  type="button"
                   onClick={() => onSelectMention('매뉴얼 즉시 보기')}
                   className="w-full text-left px-3 py-2.5 hover:bg-theme-primary/5 rounded-xl transition-colors flex items-center gap-3"
                 >
@@ -162,6 +137,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     .filter(d => d.name.toLowerCase().includes(mentionQuery.toLowerCase()) || d.model.toLowerCase().includes(mentionQuery.toLowerCase()))
                     .map((device, idx) => (
                       <button
+                        type="button"
                         key={device.id || `mention-device-${idx}`}
                         onClick={() => onSelectMention(device.name)}
                         className="w-full text-left px-3 py-2.5 hover:bg-white rounded-xl hover:shadow-sm transition-all flex items-center gap-3"
@@ -187,4 +163,5 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
       </AnimatePresence>
     </div>
   </div>
-);
+  );
+};

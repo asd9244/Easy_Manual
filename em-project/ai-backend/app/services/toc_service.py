@@ -1,6 +1,10 @@
-import os
 import json
+import logging
+import os
+
 import fitz  # PyMuPDF 라이브러리
+
+logger = logging.getLogger(__name__)
 
 
 def extract_toc_from_pdf(pdf_path: str, output_base_dir: str, model_name: str):
@@ -19,7 +23,7 @@ def extract_toc_from_pdf(pdf_path: str, output_base_dir: str, model_name: str):
     # 최종 저장될 JSON 파일 경로
     json_filepath = os.path.join(output_dir, f"{model_name}_toc.json")
 
-    print(f"🚀 [{model_name}] PDF 북마크(목차) 추출 시작... (경로: {pdf_path})")
+    logger.info("[%s] PDF 북마크(목차) 추출 시작 (경로: %s)", model_name, pdf_path)
 
     try:
         # 2. PDF 문서 열기
@@ -30,7 +34,7 @@ def extract_toc_from_pdf(pdf_path: str, output_base_dir: str, model_name: str):
         raw_toc = doc.get_toc()
 
         if not raw_toc:
-            print("❌ 이 PDF에는 내장 북마크가 없습니다. 수동 추출이 필요합니다.")
+            logger.warning("이 PDF에는 내장 북마크가 없습니다. 수동 추출이 필요합니다.")
             return None
 
         structured_toc = []
@@ -57,17 +61,21 @@ def extract_toc_from_pdf(pdf_path: str, output_base_dir: str, model_name: str):
             }
             structured_toc.append(toc_node)
 
-            print(f"   ✅ [Lv.{level}] {title} (p.{page_num})")
+            logger.info("[Lv.%s] %s (p.%s)", level, title, page_num)
 
         # 5. JSON 파일로 저장하기
         with open(json_filepath, "w", encoding="utf-8") as f:
             json.dump(structured_toc, f, ensure_ascii=False, indent=4)
 
-        print(f"\n🎉 추출 완료! 총 {len(structured_toc)}개의 목차 데이터가 '{json_filepath}'에 저장되었습니다.\n")
+        logger.info(
+            "추출 완료: 목차 %s건 → %s",
+            len(structured_toc),
+            json_filepath,
+        )
         return json_filepath
 
     except Exception as e:
-        print(f"❌ 오류 발생: {e}")
+        logger.exception("목차 추출 오류: %s", e)
         return None
 
 

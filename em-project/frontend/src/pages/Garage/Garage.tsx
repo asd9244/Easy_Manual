@@ -11,7 +11,7 @@ import {
   Camera,
   WashingMachine
 } from 'lucide-react';
-import { Device, Screen } from '@/src/types/index';
+import { Device, DeviceModel, ManualSearchResponse, Screen } from '@/src/types/index';
 import { deviceService } from '@/src/services/deviceService';
 import { DeviceStatusCard } from '@/src/components/common/DeviceStatusCard';
 
@@ -39,7 +39,7 @@ export const Garage: React.FC<GarageProps> = ({
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<ManualSearchResponse[]>([]);
   const [isRegistering, setIsRegistering] = useState(false);
   const [newNickname, setNewNickname] = useState(''); // 별명 수정을 위한 임시 상태
 
@@ -98,9 +98,10 @@ export const Garage: React.FC<GarageProps> = ({
       setIsSearching(false);
       setSearchQuery('');
       alert("성공적으로 기기가 등록되었습니다! 🎉");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("기기 등록 에러 내역:", error);
-      alert(error.message || "기기 등록에 실패했습니다.");
+      const msg = error instanceof Error ? error.message : "기기 등록에 실패했습니다.";
+      alert(msg);
     } finally {
       setIsRegistering(false);
     }
@@ -347,7 +348,7 @@ export const Garage: React.FC<GarageProps> = ({
                 {/* 검색 결과 목록 (높이 제한 및 스크롤) */}
                 <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4 no-scrollbar">
                   {searchResults.length > 0 ? (
-                    searchResults.map((item: any, idx: number) => (
+                    searchResults.map((item: ManualSearchResponse, idx: number) => (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -363,7 +364,7 @@ export const Garage: React.FC<GarageProps> = ({
                         
                         {/* 세부 지원 모델 및 개별 QR 리스트 영역 */}
                         <div className="space-y-2">
-                          {(item.models || []).map((mod: any, mIdx: number) => (
+                          {(item.models || []).map((mod: DeviceModel, mIdx: number) => (
                             <div key={mod.id || `mod-${idx}-${mIdx}`} className="flex items-center justify-between bg-white p-2.5 rounded-2xl shadow-sm border border-white hover:border-theme-primary/20 transition-all group">
                               <div className="flex items-center gap-3">
                                 {mod.qrCodeUrl ? (

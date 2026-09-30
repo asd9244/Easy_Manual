@@ -54,52 +54,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const bubbleBody = (
     <>
-      {msg.attachments && msg.attachments.length > 0 && (
-        <div
-          className={`
-            grid gap-2 mb-3 max-w-[320px]
-            ${
-              msg.attachments.length === 1
-                ? "grid-cols-1"
-                : msg.attachments.length === 2
-                  ? "grid-cols-2"
-                  : msg.attachments.length >= 3
-                    ? "grid-cols-3"
-                    : ""
-            }
-          `}
-        >
-          {msg.attachments.map((url, i) => (
-            <div
-              key={i}
-              onClick={() => onImageClick(msg.attachments || [], i)}
-              className={`
-                relative overflow-hidden rounded-xl border border-white/20 cursor-pointer hover:opacity-90 transition-opacity
-                ${
-                  msg.attachments &&
-                  msg.attachments.length >= 3 &&
-                  i === 2 &&
-                  msg.attachments.length > 3
-                    ? 'after:content-["+' +
-                      (msg.attachments.length - 3) +
-                      '"] after:absolute after:inset-0 after:bg-black/50 after:flex after:items-center after:justify-center after:text-white after:font-bold'
-                    : ""
-                }
-                ${msg.attachments && msg.attachments.length >= 3 && i >= 3 ? "hidden" : ""}
-                aspect-square
-              `}
-            >
-              <img
-                src={url}
-                alt="Attachment"
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
       <div className="text-sm leading-relaxed mb-1 px-1 whitespace-pre-wrap markdown-content">
         <div
           className={`prose prose-sm max-w-none ${
