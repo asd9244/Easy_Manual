@@ -168,16 +168,19 @@ services:
       # 원격 ollama 서비스에 pull 요청을 보냄
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["/bin/sh", "-c"]
-    command: >
-      set -e;
-      echo "Waiting for Ollama...";
-      for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
-        ollama list >/dev/null 2>&1 && break;
-        sleep 2;
-      done;
-      ollama pull bge-m3;
-      ollama pull gemma4:e4b;
-      echo "Models ready."
+    # 목록 한 항목으로 적어야 스크립트 전체가 sh -c 의 인자 하나로 전달된다
+    # (문자열로 적으면 compose가 공백 단위로 잘라 첫 단어 'set'만 실행됨)
+    command:
+      - |
+        set -e
+        echo "Waiting for Ollama..."
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+          ollama list >/dev/null 2>&1 && break
+          sleep 2
+        done
+        ollama pull bge-m3
+        ollama pull gemma4:e4b
+        echo "Models ready."
     depends_on:
       ollama:
         condition: service_started
