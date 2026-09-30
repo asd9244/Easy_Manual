@@ -1,0 +1,12 @@
+# NVIDIA GPU가 있는 PC에서만 덧붙여 쓰는 설정.
+# (기본 docker-compose.yml에 넣으면 GPU가 없는 PC에서 ollama 컨테이너가 기동하지 않는다)
+# 실행: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
