@@ -232,6 +232,7 @@ public class ChatService {
             return AiChatRequest.builder()
                     .manual_id(manualCode)
                     .question(request.getMessage())
+                    .room_id(String.valueOf(roomId))
                     .build();
         });
 
