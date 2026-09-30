@@ -20,6 +20,11 @@ from app.api.routes import chat
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 대화 저장소(PostgresSaver)를 첫 요청 전에 준비한다. 첫 요청 때 setup()이 돌면
+    # CREATE INDEX CONCURRENTLY가 Spring의 열린 트랜잭션을 기다려 서로 멈춘다.
+    from app.agents.graph import get_graph
+
+    get_graph()
     yield
     try:
         from app.agents.graph import shutdown_checkpoint_resources
