@@ -135,6 +135,9 @@ services:
       ollama:
         condition: service_started
     restart: always
+    volumes:
+      - ./em-project/ai-backend/data:/app/data
+
 
   # ---------------------------------------------------------------------------
   # Frontend — Vite 개발 서버. 브라우저는 localhost:3000
