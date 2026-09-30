@@ -17,22 +17,32 @@ import com.easymanual.springbackend.domain.device.entity.UserDevice;
 import com.easymanual.springbackend.domain.device.repository.UserDeviceRepository;
 import com.easymanual.springbackend.global.error.ErrorMessages;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 
+/**
+ * AI 서버 호출(최대 180초)은 DB 트랜잭션 밖에서 한다. 트랜잭션을 연 채 기다리면
+ * 그동안 커넥션·잠금을 붙잡고, DB 스키마 변경(CREATE INDEX CONCURRENTLY 등)을 막는다.
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatService {
 
     private static final int MAX_CONVERSATION_TEXT_CHARS = 100_000;
+    private static final String AI_ANSWER_FAILED_MESSAGE =
+            "죄송합니다. 답변을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final WebClient webClient;
     private final UserDeviceRepository userDeviceRepository;
+    private final TransactionTemplate transactionTemplate;
 
     private ChatRoom requireChatRoom(Long roomId) {
         return chatRoomRepository.findById(roomId)
@@ -87,19 +97,20 @@ public class ChatService {
     /**
      * 로그인한 사용자 본인 방만: DB 메시지 텍스트만 모아 AI 요약 (미디어 URL·이미지 제외).
      */
-    @Transactional(readOnly = true)
     public ConversationSummaryResponse summarizeConversation(Long roomId, String email) {
-        requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_ACCESS_DENIED);
+        String payload = transactionTemplate.execute(status -> {
+            requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_ACCESS_DENIED);
 
-        List<ChatMessage> messages = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
-        String conversationText = buildConversationTextForSummary(messages);
-        if (conversationText.isBlank()) {
-            throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_EMPTY);
-        }
+            List<ChatMessage> messages = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
+            String conversationText = buildConversationTextForSummary(messages);
+            if (conversationText.isBlank()) {
+                throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_EMPTY);
+            }
 
-        String payload = conversationText.length() > MAX_CONVERSATION_TEXT_CHARS
-                ? conversationText.substring(0, MAX_CONVERSATION_TEXT_CHARS)
-                : conversationText;
+            return conversationText.length() > MAX_CONVERSATION_TEXT_CHARS
+                    ? conversationText.substring(0, MAX_CONVERSATION_TEXT_CHARS)
+                    : conversationText;
+        });
 
         AiSummarizeRequest aiRequest = AiSummarizeRequest.builder()
                 .conversationText(payload)
@@ -121,47 +132,48 @@ public class ChatService {
     /**
      * 특정 AI 답변 한 턴만 요약: 직전 USER 질문 + 해당 AI 답 텍스트만 전달.
      */
-    @Transactional(readOnly = true)
     public ConversationSummaryResponse summarizeTurn(Long roomId, Long aiMessageId, String email) {
-        requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_ACCESS_DENIED);
+        String conversationText = transactionTemplate.execute(status -> {
+            requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_ACCESS_DENIED);
 
-        ChatMessage aiMsg = chatMessageRepository.findById(aiMessageId)
-                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.CHAT_MESSAGE_NOT_FOUND));
+            ChatMessage aiMsg = chatMessageRepository.findById(aiMessageId)
+                    .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.CHAT_MESSAGE_NOT_FOUND));
 
-        if (!aiMsg.getChatRoom().getId().equals(roomId)) {
-            throw new IllegalArgumentException(ErrorMessages.CHAT_MESSAGE_WRONG_ROOM);
-        }
-        if (aiMsg.getSenderType() != ChatMessage.SenderType.AI) {
-            throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_ONLY_AI);
-        }
-
-        List<ChatMessage> ordered = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
-        ChatMessage userMsg = null;
-        for (int i = 0; i < ordered.size(); i++) {
-            if (ordered.get(i).getId().equals(aiMessageId)) {
-                for (int j = i - 1; j >= 0; j--) {
-                    if (ordered.get(j).getSenderType() == ChatMessage.SenderType.USER) {
-                        userMsg = ordered.get(j);
-                        break;
-                    }
-                }
-                break;
+            if (!aiMsg.getChatRoom().getId().equals(roomId)) {
+                throw new IllegalArgumentException(ErrorMessages.CHAT_MESSAGE_WRONG_ROOM);
             }
-        }
-        if (userMsg == null) {
-            throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_NO_USER_FOR_AI);
-        }
+            if (aiMsg.getSenderType() != ChatMessage.SenderType.AI) {
+                throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_ONLY_AI);
+            }
 
-        String u = userMsg.getMessage() != null ? userMsg.getMessage().trim() : "";
-        String a = aiMsg.getMessage() != null ? aiMsg.getMessage().trim() : "";
-        if (u.isBlank() && a.isBlank()) {
-            throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_NO_TEXT);
-        }
+            List<ChatMessage> ordered = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId);
+            ChatMessage userMsg = null;
+            for (int i = 0; i < ordered.size(); i++) {
+                if (ordered.get(i).getId().equals(aiMessageId)) {
+                    for (int j = i - 1; j >= 0; j--) {
+                        if (ordered.get(j).getSenderType() == ChatMessage.SenderType.USER) {
+                            userMsg = ordered.get(j);
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            if (userMsg == null) {
+                throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_NO_USER_FOR_AI);
+            }
 
-        String conversationText = "[USER] " + u + "\n\n[AI] " + a;
-        if (conversationText.length() > MAX_CONVERSATION_TEXT_CHARS) {
-            conversationText = conversationText.substring(0, MAX_CONVERSATION_TEXT_CHARS);
-        }
+            String u = userMsg.getMessage() != null ? userMsg.getMessage().trim() : "";
+            String a = aiMsg.getMessage() != null ? aiMsg.getMessage().trim() : "";
+            if (u.isBlank() && a.isBlank()) {
+                throw new IllegalArgumentException(ErrorMessages.CHAT_SUMMARY_NO_TEXT);
+            }
+
+            String text = "[USER] " + u + "\n\n[AI] " + a;
+            return text.length() > MAX_CONVERSATION_TEXT_CHARS
+                    ? text.substring(0, MAX_CONVERSATION_TEXT_CHARS)
+                    : text;
+        });
 
         AiSummarizeRequest aiRequest = AiSummarizeRequest.builder()
                 .conversationText(conversationText)
@@ -193,55 +205,76 @@ public class ChatService {
         return sb.toString().trim();
     }
 
-    @Transactional
     public ChatMessageResponse askQuestion(Long roomId, String email, ChatAskRequest request) {
-        ChatRoom chatRoom = requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_ACCESS_DENIED);
+        // 1) 질문 저장 (트랜잭션)
+        AiChatRequest aiRequest = transactionTemplate.execute(status -> {
+            ChatRoom chatRoom = requireOwnedChatRoom(roomId, email, ErrorMessages.CHAT_ROOM_ACCESS_DENIED);
 
-        boolean isFirstMessage = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId).isEmpty();
+            boolean isFirstMessage = chatMessageRepository.findAllByChatRoomIdOrderByCreatedAtAsc(roomId).isEmpty();
 
-        if (isFirstMessage) {
-            String newTitle = request.getMessage();
-            if (newTitle.length() > 15) {
-                newTitle = newTitle.substring(0, 15) + "...";
+            if (isFirstMessage) {
+                String newTitle = request.getMessage();
+                if (newTitle.length() > 15) {
+                    newTitle = newTitle.substring(0, 15) + "...";
+                }
+                chatRoom.updateTitle(newTitle);
             }
-            chatRoom.updateTitle(newTitle);
+
+            ChatMessage userMessage = ChatMessage.builder()
+                    .chatRoom(chatRoom)
+                    .senderType(ChatMessage.SenderType.USER)
+                    .message(request.getMessage())
+                    .mediaUrl(null)
+                    .build();
+            chatMessageRepository.save(userMessage);
+
+            String manualCode = chatRoom.getUserDevice().getManual().getManualCode();
+            return AiChatRequest.builder()
+                    .manual_id(manualCode)
+                    .question(request.getMessage())
+                    .build();
+        });
+
+        // 2) AI 호출 (트랜잭션 밖). 실패해도 질문은 남기고, 답변 자리에 실패 안내를 저장한다.
+        AiChatResponse aiResponse = null;
+        try {
+            aiResponse = webClient.post()
+                    .uri("/api/chat/ask")
+                    .bodyValue(aiRequest)
+                    .retrieve()
+                    .bodyToMono(AiChatResponse.class)
+                    .block();
+        } catch (RuntimeException e) {
+            log.warn("AI 답변 호출 실패 roomId={}: {}", roomId, e.toString());
         }
 
-        ChatMessage userMessage = ChatMessage.builder()
-                .chatRoom(chatRoom)
-                .senderType(ChatMessage.SenderType.USER)
-                .message(request.getMessage())
-                .mediaUrl(null)
-                .build();
-        chatMessageRepository.save(userMessage);
+        String answer = AI_ANSWER_FAILED_MESSAGE;
+        Integer foundPage = null;
+        String urlsString = null;
+        if (aiResponse != null && aiResponse.getAiAnswer() != null) {
+            answer = aiResponse.getAiAnswer();
+            foundPage = aiResponse.getFoundPage();
+            urlsString = (aiResponse.getManualImageUrls() != null && !aiResponse.getManualImageUrls().isEmpty())
+                    ? String.join(",", aiResponse.getManualImageUrls())
+                    : null;
+        }
+        String finalAnswer = answer;
+        Integer finalFoundPage = foundPage;
+        String finalUrlsString = urlsString;
 
-        String manualCode = chatRoom.getUserDevice().getManual().getManualCode();
-        AiChatRequest aiRequest = AiChatRequest.builder()
-                .manual_id(manualCode)
-                .question(request.getMessage())
-                .build();
+        // 3) 답변 저장 (트랜잭션)
+        return transactionTemplate.execute(status -> {
+            ChatMessage aiMessage = ChatMessage.builder()
+                    .chatRoom(chatRoomRepository.getReferenceById(roomId))
+                    .senderType(ChatMessage.SenderType.AI)
+                    .message(finalAnswer)
+                    .referencedPage(finalFoundPage)
+                    .manualImageUrl(finalUrlsString)
+                    .build();
+            chatMessageRepository.save(aiMessage);
 
-        AiChatResponse aiResponse = webClient.post()
-                .uri("/api/chat/ask")
-                .bodyValue(aiRequest)
-                .retrieve()
-                .bodyToMono(AiChatResponse.class)
-                .block();
-
-        String urlsString = (aiResponse.getManualImageUrls() != null && !aiResponse.getManualImageUrls().isEmpty())
-                ? String.join(",", aiResponse.getManualImageUrls())
-                : null;
-
-        ChatMessage aiMessage = ChatMessage.builder()
-                .chatRoom(chatRoom)
-                .senderType(ChatMessage.SenderType.AI)
-                .message(aiResponse.getAiAnswer())
-                .referencedPage(aiResponse.getFoundPage())
-                .manualImageUrl(urlsString)
-                .build();
-        chatMessageRepository.save(aiMessage);
-
-        return new ChatMessageResponse(aiMessage);
+            return new ChatMessageResponse(aiMessage);
+        });
     }
 
     @Transactional
