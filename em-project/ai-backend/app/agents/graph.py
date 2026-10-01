@@ -3,7 +3,7 @@ LangGraph StateGraph 조립 + 체크포인트 연결.
 
 그래프 구조:
 
-    START -> router -> ...
+    START -> rewriter -> router -> ...
 
 체크포인트는 다음 우선순위로 선택한다.
 
@@ -25,6 +25,7 @@ from langgraph.graph import END, StateGraph
 from app.agents.answerer import answerer_node
 from app.agents.fallback import fallback_node
 from app.agents.retriever import retriever_node
+from app.agents.rewriter import rewriter_node
 from app.agents.router import (
     router_node,
     select_post_retriever,
@@ -94,13 +95,15 @@ def build_graph():
 
     workflow = StateGraph(AgentState)
 
+    workflow.add_node("rewriter", rewriter_node)
     workflow.add_node("router", router_node)
     workflow.add_node("retriever", retriever_node)
     workflow.add_node("answerer", answerer_node)
     workflow.add_node("summarizer", summarizer_node)
     workflow.add_node("fallback", fallback_node)
 
-    workflow.set_entry_point("router")
+    workflow.set_entry_point("rewriter")
+    workflow.add_edge("rewriter", "router")
 
     workflow.add_conditional_edges(
         "router",
