@@ -12,10 +12,15 @@ def test_thread_id_uses_room_prefix_when_room_id_set():
     assert chat._thread_id_for(req) == "room-42"
 
 
-def test_thread_id_oneshot_unique_per_call_for_chat_request():
+def test_thread_id_oneshot_unique_per_call_for_chat_request_without_room():
     req = chat.ChatRequest(manual_id="m1", question="q")
     a = chat._thread_id_for(req)
     b = chat._thread_id_for(req)
     assert a.startswith("oneshot-")
     assert b.startswith("oneshot-")
     assert a != b
+
+
+def test_thread_id_uses_room_prefix_for_chat_request_with_room():
+    req = chat.ChatRequest(manual_id="m1", question="q", room_id="5790")
+    assert chat._thread_id_for(req) == "room-5790"

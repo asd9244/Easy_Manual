@@ -43,10 +43,11 @@ router = APIRouter()
 
 
 class ChatRequest(BaseModel):
-    """기존 /ask 계약."""
+    """기존 /ask 계약. room_id가 오면 같은 채팅방의 대화를 한 체크포인트 스레드로 잇는다."""
 
     manual_id: str
     question: str
+    room_id: Optional[str] = None
 
 
 class SummarizeRequest(BaseModel):
@@ -166,6 +167,7 @@ def ask_manual(request: ChatRequest):
     state_input = {
         "manual_id": request.manual_id,
         "question": request.question,
+        "room_id": request.room_id,
     }
     final_state = _invoke_graph(state_input, _thread_id_for(request))
 
