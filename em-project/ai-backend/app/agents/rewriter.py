@@ -18,18 +18,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage
-
 from app.agents.llms import answer_llm, llm_text
 from app.agents.router import _rule_intent
 from app.agents.state import AgentState
-from app.agents.utils import preview_for_log
+from app.agents.utils import format_history, preview_for_log
 
 logger = logging.getLogger(__name__)
-
-# 최근 3번의 주고받기만 참고한다. AI 답변은 길어 앞부분만 넣는다.
-_MAX_HISTORY_MESSAGES = 6
-_MAX_ANSWER_CHARS = 300
 
 _REWRITE_TEMPLATE = """[이전 대화]를 참고해 [새 질문]을 앞의 대화 없이도 이해되는 질문 하나로 다시 써라.
 - "그거", "그건", "이거" 같은 말은 이전 대화에서 가리키는 대상으로 바꿔라.
@@ -41,16 +35,6 @@ _REWRITE_TEMPLATE = """[이전 대화]를 참고해 [새 질문]을 앞의 대�
 
 [새 질문]
 {question}"""
-
-
-def _format_history(messages: list[Any]) -> str:
-    lines: list[str] = []
-    for message in messages[-_MAX_HISTORY_MESSAGES:]:
-        if isinstance(message, HumanMessage):
-            lines.append(f"사용자: {str(message.content).strip()}")
-        elif isinstance(message, AIMessage):
-            lines.append(f"AI: {str(message.content).strip()[:_MAX_ANSWER_CHARS]}")
-    return "\n".join(lines)
 
 
 def rewriter_node(state: AgentState) -> dict[str, Any]:
@@ -73,7 +57,7 @@ def rewriter_node(state: AgentState) -> dict[str, Any]:
         return {"question": question}
 
     prompt = _REWRITE_TEMPLATE.format(
-        history=_format_history(messages),
+        history=format_history(messages),
         question=question,
     )
     rewritten = llm_text(answer_llm.invoke(prompt)).strip()

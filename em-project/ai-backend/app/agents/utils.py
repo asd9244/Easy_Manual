@@ -10,6 +10,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from langchain_core.messages import AIMessage, HumanMessage
+
+# 프롬프트에 넣는 대화 기록: 최근 3번의 주고받기만, AI 답변은 길어 앞부분만.
+_MAX_HISTORY_MESSAGES = 6
+_MAX_ANSWER_CHARS = 300
+
 
 def merge_images_ordered_by_page(records: list[dict[str, Any]]) -> list[str]:
     """
@@ -45,6 +51,18 @@ def truncate(text: str, max_chars: int) -> str:
     if not text:
         return text
     return text if len(text) <= max_chars else text[:max_chars]
+
+
+def format_history(messages: list[Any]) -> str:
+    """체크포인트의 ``messages``를 Rewriter·Answerer 프롬프트용 대화 기록 문자열로 바꾼다."""
+
+    lines: list[str] = []
+    for message in messages[-_MAX_HISTORY_MESSAGES:]:
+        if isinstance(message, HumanMessage):
+            lines.append(f"사용자: {str(message.content).strip()}")
+        elif isinstance(message, AIMessage):
+            lines.append(f"AI: {truncate(str(message.content).strip(), _MAX_ANSWER_CHARS)}")
+    return "\n".join(lines)
 
 
 def preview_for_log(text: str, max_len: int = 100) -> str:

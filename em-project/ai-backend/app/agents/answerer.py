@@ -21,7 +21,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from app.agents.llms import answer_llm, llm_text
 from app.agents.state import AgentState
-from app.agents.utils import preview_for_log
+from app.agents.utils import format_history, preview_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,11 @@ _MANUAL_QA_TEMPLATE = """너는 전자제품 고객센터의 최고 권위자이
 2. 확실하지 않은 내용이 있으면, "죄송합니다. 현재 매뉴얼에서 해당 내용을 확인하지 못했습니다. 정확하지 않은 정보를 안내해 드리는 것보다 확인된 내용만 전달해 드리는 것이 맞다고 판단했습니다. 다른 표현으로 다시 질문해 주시거나, 제조사 고객센터에 문의해 주시면 더 정확한 안내를 받으실 수 있습니다." 라는 취지로 부드럽게 답해.
 3. 답변할 때 참고한 섹션명이나 페이지 번호를 자연스럽게 언급해줘. (예: "[필터 청소하기] 섹션(p41~43)에 따르면...")
 4. 한국어로 정확하고 친절하게 답변해.
+5. [이전 대화]가 있으면 이어지는 대화이니, 인사를 반복하지 말고 바로 답해.
+6. [이전 대화]는 흐름을 이해하는 데만 쓰고, 답의 근거는 반드시 [매뉴얼 내용]에서만 찾아.
+
+[이전 대화]
+{history}
 
 [참고 섹션 목록]
 {toc_section}
@@ -50,6 +55,10 @@ _SMALLTALK_TEMPLATE = """너는 전자제품 매뉴얼 Q&A 서비스 '픽시'의
 - 한국어로 한두 문장 정도로 자연스럽게 답해라.
 - 제품 증상·설정·고장 안내는 하지 말고, 필요하면 가전 사용 질문은 제품명이나 증상을 말해 달라고 부드럽게 유도해라.
 - 매뉴얼 내용을 지어내지 말 것.
+- [이전 대화]가 있으면 흐름에 맞게 답하고, 인사를 반복하지 마라.
+
+[이전 대화]
+{history}
 
 [사용자 메시지]
 {question}"""
@@ -69,15 +78,19 @@ def answerer_node(state: AgentState) -> dict[str, Any]:
         preview_for_log(question),
     )
 
+    # 같은 채팅방의 이전 대화(체크포인트 messages). 이번 질문은 아직 들어 있지 않다.
+    history = format_history(state.get("messages") or []) or "(없음)"
+
     if intent == "manual_qa":
         prompt = _MANUAL_QA_TEMPLATE.format(
+            history=history,
             toc_section=state.get("toc_section", ""),
             combined_text=state.get("combined_text", ""),
             question=question,
         )
     else:
         # smalltalk / unknown 폴백: Neo4j 컨텍스트 없이 짧은 응답
-        prompt = _SMALLTALK_TEMPLATE.format(question=question)
+        prompt = _SMALLTALK_TEMPLATE.format(history=history, question=question)
 
     response = answer_llm.invoke(prompt)
     answer = llm_text(response).strip()
