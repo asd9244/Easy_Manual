@@ -58,7 +58,7 @@
 | Category | Detail (TypeScript) |
 | --- | --- |
 | **FrontEnd** | **React 19**, **TypeScript 5.8**, **Vite 6** |
-| **Library & API** | **TailwindCSS 4**, **TanStack Query**, **Zustand**, **Axios**, **react-markdown** + **remark-gfm**, **@yudiel/react-qr-scanner**, **html2canvas** + **jspdf**, lucide-react, motion |
+| **Library & API** | **TailwindCSS 4**, **Zustand**, **Axios**, **react-markdown** + **remark-gfm**, **@yudiel/react-qr-scanner**, lucide-react, motion |
 | **IDE** | **VSCode** |
 | **Server** | **Node.js** (Vite Dev Server) |
 | **Build** | **npm** |
