@@ -77,6 +77,23 @@ class InvokeRequest(BaseModel):
 # ──────────────────────────────────────────────────────────────────────
 
 
+# 같은 채팅방 스레드를 이어 쓰면 LangGraph는 저장된 이전 state 위에 입력을 덮어쓴다.
+# 이번 질문에만 쓰는 값(검색 결과·페이지·이미지·카운터 등)이 이전 질문 것으로 남지 않도록
+# 매 요청 입력에서 비운다. messages(대화 기록)는 넣지 않아 그대로 누적된다.
+_PER_TURN_RESET: dict[str, Any] = {
+    "conversation_text": None,
+    "intent_hint": None,
+    "retrieved_records": [],
+    "toc_section": "",
+    "combined_text": "",
+    "manual_image_urls": [],
+    "found_page": None,
+    "final_answer": "",
+    "llm_calls": 0,
+    "neo4j_queries": 0,
+}
+
+
 def _invoke_graph(state_input: dict[str, Any], thread_id: str) -> dict[str, Any]:
     """
     컴파일된 그래프를 실행하고 결과 state 딕셔너리를 반환한다.
@@ -128,6 +145,7 @@ def invoke(request: InvokeRequest):
         )
 
     state_input: dict[str, Any] = {
+        **_PER_TURN_RESET,
         "manual_id": request.manual_id,
         "question": request.question or "",
         "conversation_text": request.conversation_text,
@@ -165,6 +183,7 @@ def ask_manual(request: ChatRequest):
 
     # intent_hint 미설정 → 라우터가 smalltalk / manual_qa 등 분류
     state_input = {
+        **_PER_TURN_RESET,
         "manual_id": request.manual_id,
         "question": request.question,
         "room_id": request.room_id,
